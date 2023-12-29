@@ -29,6 +29,7 @@ DO_formatted <- function(fil) {
   DO<-DO[,c(1,2,3)]
   colnames(DO)[1] <- "Date"
   colnames(DO)[2] <- "DO"
+  DO<-filter(DO, DO>0)
   return(DO)}
 DO_unformatted <- function(fil) {
   DO <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
@@ -36,6 +37,7 @@ DO_unformatted <- function(fil) {
   colnames(DO)[2] <- "DO"
   colnames(DO)[3] <- "Temp"
   DO$Date <- mdy_hms(DO$Date)
+  DO<-filter(DO, DO>0)
   return(DO)}
 SpC_formatted <- function(fil) {
   SpC <- read_csv(fil)
@@ -50,31 +52,6 @@ SpC_unformatted <- function(fil) {
   colnames(SpC)[2] <- "SpC"
   SpC$Date <- mdy_hms(SpC$Date)
   return(SpC)}
-PT_formatted <- function(fil) {
-  PT <- read_csv(fil)
-  PT<-PT[,c(1,2)]
-  colnames(PT)[1] <- "Date"
-  colnames(PT)[2] <- "PT"
-  return(PT)}
-PT_unformatted <- function(fil) {
-  PT <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
-  PT<-PT[,c(1,2)]
-  colnames(PT)[1] <- "Date"
-  colnames(PT)[2] <- "PT"
-  PT$Date <- mdy_hms(PT$Date)
-  return(PT)}
-FAWN_formatted <- function(fil) {
-  FAWN <- read_csv(fil)
-  colnames(FAWN)[1] <- "Date"
-  FAWN$PSI<-conv_unit(FAWN$`BP avg (mb)`, "mbar", "psi")
-  return(FAWN)}
-FAWN_unformatted <- function(fil) {
-  FAWN <- read_csv(fil,col_types = cols(`FAWN Station` = col_skip(),
-                                        Period = col_datetime(format = "%m/%d/%Y %H:%M"),
-                                        `N (# obs)` = col_skip()))
-  colnames(FAWN)[1] <- "Date"
-  FAWN$PSI<-conv_unit(FAWN$`BP avg (mb)`, "mbar", "psi")
-  return(FAWN)}
 
 
 ####pH#####
@@ -156,7 +133,7 @@ for(fil in file.names){
   DO <- DO_unformatted(fil)
   DO_everything<-rbind(DO_everything,DO)}
 GB_DO <- DO_everything[!duplicated(DO_everything[c('Date')]),]
-GB_DO$ID<-'AM'
+GB_DO$ID<-'GB'
 
 DO_everything<-data.frame()
 file.names <- list.files(path="01_Raw_data/Hobo/Ichetucknee/DO/formatted", pattern=".csv", full.names=TRUE)
@@ -168,7 +145,7 @@ for(fil in file.names){
   DO <- DO_unformatted(fil)
   DO_everything<-rbind(DO_everything,DO)}
 ID_DO <- DO_everything[!duplicated(DO_everything[c('Date')]),]
-ID_DO$ID<-'AM'
+ID_DO$ID<-'ID'
 
 DO_everything<-data.frame()
 file.names <- list.files(path="01_Raw_data/Hobo/Little Fanning/DO/formatted", pattern=".csv", full.names=TRUE)
@@ -180,7 +157,7 @@ for(fil in file.names){
   DO <- DO_unformatted(fil)
   DO_everything<-rbind(DO_everything,DO)}
 LF_DO <- DO_everything[!duplicated(DO_everything[c('Date')]),]
-LF_DO$ID<-'AM'
+LF_DO$ID<-'LF'
 
 DO_everything<-data.frame()
 file.names <- list.files(path="01_Raw_data/Hobo/Otter/DO/formatted", pattern=".csv", full.names=TRUE)
@@ -192,7 +169,7 @@ for(fil in file.names){
   DO <- DO_unformatted(fil)
   DO_everything<-rbind(DO_everything,DO)}
 OS_DO <- DO_everything[!duplicated(DO_everything[c('Date')]),]
-OS_DO$ID<-'AM'
+OS_DO$ID<-'OS'
 
 DO<-rbind(AM_DO, GB_DO, LF_DO, ID_DO, OS_DO)
 write_csv(DO, "02_Clean_data/Chem/DO.csv")
@@ -260,3 +237,17 @@ OS_SpC$ID<-'OS'
 
 SpC<-rbind(OS_SpC, GB_SpC, ID_SpC, LF_SpC, AM_SpC)
 write_csv(SpC, "02_Clean_data/Chem/SpC.csv")
+
+###compile####
+file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
+file.names<-file.names[c(2,1,3,5,7)]
+
+data <- lapply(file.names,function(x) {read_csv(x)})
+library(plyr)
+
+master<-join_all(data, by=c('Date','ID'), type='left')
+master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0)
+
+write_csv(master, "02_Clean_data/master.csv")
+detach("package:plyr", unload = TRUE)
+ggplot(master, aes(Date, DO)) + geom_line() + facet_wrap(~ ID, ncol=5)

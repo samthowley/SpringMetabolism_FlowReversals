@@ -94,7 +94,6 @@ GB_PT <- PT_everything[!duplicated(PT_everything[c('Date')]),]
 GB_PT$ID<-'GB'
 
 PT<-rbind(OS_PT, GB_PT, ID_PT, LF_PT, AM_PT)
-write_csv(PT, "02_Clean_data/Chem/PT.csv")
 
 ###FAWN####
 FAWN_everything<-data.frame()
@@ -141,6 +140,7 @@ for(fil in file.names){
 ID_FAWN <- FAWN_everything[!duplicated(FAWN_everything[c('Date')]),]
 ID_FAWN$ID<-'ID'
 
+file.names <- list.files(path="01_Raw_data/Hobo/Otter/FAWN", pattern=".csv", full.names=TRUE)
 FAWN_everything<-data.frame()
 for(fil in file.names){
   FAWN <- FAWN_unformatted(fil)
@@ -149,4 +149,35 @@ OS_FAWN <- FAWN_everything[!duplicated(FAWN_everything[c('Date')]),]
 OS_FAWN$ID<-'OS'
 
 FAWN<-rbind(AM_FAWN, LF_FAWN, GB_FAWN, OS_FAWN, ID_FAWN)
-write_csv(FAWN, "02_Clean_data/Chem/FAWN.csv")
+
+##Calculation#####
+
+stage<-left_join(PT, FAWN, by=c('Date', 'ID'))
+stage <- stage[complete.cases(stage[ , c('PT')]), ]
+
+for(i in 1:nrow(stage)){if(stage$ID=='OS') {
+
+  stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(0.6894/0.372))+0.6995}
+
+  else if (stage$ID=='ID'){
+
+    stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.64))+0.11}
+
+  else if(stage$ID=='GB'){
+
+    stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.47/0.634))+0.176}
+
+  else if(stage$ID=='LF'){
+
+    stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(0.6894/0.372))+0.6995}
+
+  else if(stage$ID=='AM'){
+
+    stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.41/0.634))+0.515}
+
+  else {stage$depth[i]<- NULL }}
+
+stage<- filter(stage,depth<20)
+ggplot(stage, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=5)
+write_csv(stage, "02_Clean_data/Chem/depth.csv")
+
