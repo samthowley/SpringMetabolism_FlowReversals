@@ -23,6 +23,7 @@ pH_HOBO <- function(fil) {
   colnames(pH)[1] <- "Date"
   colnames(pH)[2] <- "pH"
   pH$pH<-as.numeric(pH$pH)
+  pH<-pH[order(as.Date(pH$Date, format="%Y-%m-%d %H:%M:%S")),]
   return(pH)}
 DO_formatted <- function(fil) {
   DO <- read_csv(fil)
@@ -38,6 +39,7 @@ DO_unformatted <- function(fil) {
   colnames(DO)[3] <- "Temp"
   DO$Date <- mdy_hms(DO$Date)
   DO<-filter(DO, DO>0)
+  DO<-DO[order(as.Date(DO$Date, format="%Y-%m-%d %H:%M:%S")),]
   return(DO)}
 SpC_formatted <- function(fil) {
   SpC <- read_csv(fil)
@@ -51,6 +53,7 @@ SpC_unformatted <- function(fil) {
   colnames(SpC)[1] <- "Date"
   colnames(SpC)[2] <- "SpC"
   SpC$Date <- mdy_hms(SpC$Date)
+  SpC<-SpC[order(as.Date(SpC$Date, format="%Y-%m-%d %H:%M:%S")),]
   return(SpC)}
 
 
@@ -240,7 +243,7 @@ write_csv(SpC, "02_Clean_data/Chem/SpC.csv")
 
 ###compile####
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
-file.names<-file.names[c(2,1,3,5,7)]
+file.names<-file.names[c(3,2,1,5,7)]
 
 data <- lapply(file.names,function(x) {read_csv(x)})
 library(plyr)

@@ -11,20 +11,22 @@ library(mmand)
 library(imputeTS)
 library(streamMetabolizer)
 
+site <- read_csv("04_Outputs/one_station_inputs/AM.csv")
+
 metabolism <- function(site) {
-  site<-left_join(samplingperiod,site)
+
   site$Mouth_Temp_C<- fahrenheit.to.celsius(site$Temp)
-  x<-c("Date","DO","depth","Q_m.s","Mouth_Temp_C",'K600_avg')
-  site<-site[,x]
-  site <- site[complete.cases(site[ , c('DO', 'depth')]), ]
 
   site<-rename(site,'DO.obs'='DO','temp.water'='Mouth_Temp_C','discharge'="Q_m.s")
   site$DO.sat<-Cs(site$temp.water)
   site$solar.time <-as.POSIXct(site$Date, format="%Y-%m-%d %H:%M:%S", tz="UTC")
   site$light<-calc_light(site$solar.time,  29.8, -82.6)
+
   site<-site[,-c(1)]
   y<-c("DO.obs","depth",'discharge',"temp.water", "DO.sat","solar.time","light" )
   site<-site[,y]
+  #site <- site[complete.cases(site), ]
+
   mm <- metab(bayes_specs, data=site)
   prediction2 <- mm@fit$daily %>% select(date,GPP_daily_mean,ER_daily_mean,K600_daily_mean)
   return(prediction2)
@@ -52,8 +54,8 @@ bins<- function(site) {
   (K5<-mean(bin5$K600_avg, na.rm=T))
 
   bayes_specs <- specs(bayes_name,
-                       K600_lnQ_nodes_centers = c(Q_m.s,Q_m.s2,Q_m.s3,Q_m.s4, Q_m.s5),
-                       K600_lnQ_nodes_meanlog= log(c(K,K2,K3,K4, K5)),
+                       K600_lnQ_nodes_centers = c(Q_m.s,Q_m.s2,Q_m.s3,Q_m.s4,Q_m.s5),
+                       K600_lnQ_nodes_meanlog= log(c(K,K2,K3,K4,K5)),
                        K600_lnQ_nodes_sdlog= 0.1,
                        K600_lnQ_nodediffs_sdlog = 0.05,
                        K600_daily_sigma_sigma= 0.24,
@@ -102,11 +104,20 @@ OS$ID<-'OS'
 ###AM######
 AM_input <- read_csv("04_Outputs/one_station_inputs/AM.csv")
 bayes_specs<-bins(AM_input)
-AM_output<-metabolism(AM_input)
+AM_input1<-AM_input[1:1916,]
+AM_output1<-metabolism(AM_input1)
+
+AM_input2<-AM_input[1918:5551,]
+AM_output2<-metabolism(AM_input2)
+
+AM_output<-rbind(AM_output1, AM_output2)
+
 AM2 <- read_csv("04_Outputs/two_station/AM.csv")
 AM<-compile(AM_output, AM2)
 AM$ID<-'AM'
 
+ggplot(AM, aes(x=Date)) +
+  geom_line(aes(y=GPPavg, color="GPP"),size=1)
 
 ######
 master_metabolism<-rbind(LF,GB)

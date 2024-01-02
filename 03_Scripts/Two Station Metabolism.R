@@ -77,13 +77,13 @@ two_station <- function(spring) {
 
   two<-left_join(two, two_GPPavg,by=c("day","Month","year"))
 
-  one<-filter(two,  ER<= -35)
-  two_NEP<-filter(two, ER> -35)
+  one<-filter(two,  ER<= -35 | ER> 0)
+  two<-filter(two, ER> -35 & ER< 0)
 
-  two_NEP$NEP<-two_NEP$GPPavg+two_NEP$ER
+  #two_NEP$NEP<-two_NEP$GPPavg+two_NEP$ER
   #two_NEP<-filter(two_NEP, ER<0)
 
-  return(list(two_NEP,one))}
+  return(list(two,one))}
 data_retrieval <- function(parameterCd, ventID) {
 
   startDate <- "2022-04-12"
@@ -131,7 +131,7 @@ AllenMill <- AllenMill %>% mutate(VentDO = case_when(Date <= '2022-07-20 13:00' 
                                                      Date  <= '2023-03-29 11:00' ~ 1.26,
                                                      Date  <= '2023-04-12 11:00' ~ 1.26,
                                                      Date  <= '2023-05-18 11:00' ~ 1.2884375,
-                                                     Date  <= '2023-11-21 11:00' ~ 1.2884375))
+                                                     Date  <= '2023-12-30 11:00' ~ 1.2884375))
 
 AllenMill$VentDO<-AllenMill$VentDO +4
 
@@ -152,7 +152,7 @@ AllenMill <- AllenMill %>% mutate(VentTemp_F= case_when(Date <= '2022-07-20 13:0
                                                         Date  <= '2023-04-12 11:00' ~72.60454545,
                                                         Date  <= '2023-04-26 11:00' ~73.47818182,
                                                         Date  <= '2023-05-18 11:00' ~71.76173913,
-                                                        Date  <= '2023-11-11 11:00' ~73.85097561))
+                                                        Date  <= '2023-12-30 11:00' ~73.85097561))
 AllenMill$VentTemp_F<-mean(AllenMill$VentTemp_F, na.rm = T)
 
 AllenMill<-prelim(AllenMill)
@@ -164,10 +164,10 @@ met_output<-two_station(AllenMill)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-# ggplot(col2, aes(x=Date)) +
-#   geom_line(aes(y=ER, color="ER"),size=1)+
-#   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+
-#   geom_hline(yintercept = 30)
+ggplot(two, aes(x=Date)) +
+  geom_line(aes(y=ER, color="ER"),size=1)+
+  geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+
+  geom_hline(yintercept = 30)
 
 write_csv(two, "04_Outputs/two_station/AM.csv")
 write_csv(one, "04_Outputs/one_station_inputs/AM.csv")
@@ -197,7 +197,8 @@ GB <- GB %>% mutate(VentDO= case_when(Date  <= '2022-06-13' ~ 6.253686,
                                       Date  <= '2023-04-26' ~ 4.685238095,
                                       Date  <= '2023-05-04' ~4.81268595,
                                       Date  <= '2023-05-18' ~4.44175,
-                                      Date  <= '2023-07-30' ~4.51725))
+                                      Date  <= '2023-12-30' ~4.51725))
+
 
 
 GB <- GB %>% mutate(VentTemp_F = case_when(Date <= '2022-07-08' ~ 77.2365,
@@ -210,7 +211,7 @@ GB <- GB %>% mutate(VentTemp_F = case_when(Date <= '2022-07-08' ~ 77.2365,
                                            Date  <= '2023-03-15' ~ 72.485,
                                            Date  <= '2023-05-03' ~ 72.6692562,
                                            Date  <= '2023-05-18' ~ 73.68,
-                                           Date  <= '2023-11-30' ~ 73.80225))
+                                           Date  <= '2023-12-30' ~ 73.80225))
 GB$VentTemp_F<-mean(GB$VentTemp_F, na.rm = T)
 
 GB<-prelim(GB)
@@ -222,7 +223,7 @@ met_output<-two_station(GB)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(one, aes(x=Date)) +
+ggplot(two, aes(x=Date)) +
   geom_line(aes(y=ER, color="ER"),size=1)+
   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+
   geom_hline(yintercept = 30)
