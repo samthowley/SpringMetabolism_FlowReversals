@@ -12,9 +12,10 @@ library(imputeTS)
 library(streamMetabolizer)
 
 site <- read_csv("04_Outputs/one_station_inputs/AM.csv")
-
+samplingperiod <- read_csv("samplingperiod.csv",
+                           col_types = cols(Date = col_datetime(format = "%m/%d/%Y %H:%M")))
 metabolism <- function(site) {
-
+  site<-left_join(samplingperiod, site)
   site$Mouth_Temp_C<- fahrenheit.to.celsius(site$Temp)
 
   site<-rename(site,'DO.obs'='DO','temp.water'='Mouth_Temp_C','discharge'="Q_m.s")
@@ -95,10 +96,13 @@ GB$ID<-'GB'
 
 ###OS######
 OS_input <- read_csv("04_Outputs/one_station_inputs/OS.csv")
+OS_input<-rename(OS_input, `Q_m.s`="Q_m/s", 'K600_avg'='K600_1d')
 bayes_specs<-bins(OS_input)
-OS_output<-metabolism(OS_input)
-OS2 <- read_csv("04_Outputs/two_station/OS.csv")
-OS<-compile(OS_output, OS2)
+OS<-metabolism(OS_input)
+OS<-rename(OS,'Date'='date','GPPavg'="GPP_daily_mean",
+                    'ER'='ER_daily_mean','K600_1d'='K600_daily_mean')
+OS$GPPavg[OS$GPPavg<0] <- 0
+OS$NEP<-OS$GPPavg+OS$ER
 OS$ID<-'OS'
 
 ###AM######
@@ -115,11 +119,14 @@ AM_output<-rbind(AM_output1, AM_output2)
 AM2 <- read_csv("04_Outputs/two_station/AM.csv")
 AM<-compile(AM_output, AM2)
 AM$ID<-'AM'
-
-ggplot(AM, aes(x=Date)) +
-  geom_line(aes(y=GPPavg, color="GPP"),size=1)
-
+##ID#######
+ID <- read_csv("04_Outputs/two_station/ID.csv")
+x<-c('Date', 'ER','GPPavg', 'K600_1d')
+ID<-ID[,x]
+ID$NEP<-ID$GPPavg+ID$ER
+ID$ID<-'ID'
 ######
-master_metabolism<-rbind(LF,GB)
+master_metabolism<-rbind(AM, OS, LF,GB, ID)
 write_csv(master_metabolism, "02_Clean_data/master_metabolism.csv")
 
+ggplot(master_metabolism, aes(Date, NEP)) + geom_line() + facet_wrap(~ ID, ncol=2)

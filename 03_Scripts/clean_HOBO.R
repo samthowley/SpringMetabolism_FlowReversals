@@ -39,7 +39,6 @@ DO_unformatted <- function(fil) {
   colnames(DO)[3] <- "Temp"
   DO$Date <- mdy_hms(DO$Date)
   DO<-filter(DO, DO>0)
-  DO<-DO[order(as.Date(DO$Date, format="%Y-%m-%d %H:%M:%S")),]
   return(DO)}
 SpC_formatted <- function(fil) {
   SpC <- read_csv(fil)
