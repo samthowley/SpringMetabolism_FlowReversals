@@ -1,25 +1,9 @@
 rm(list=ls())
 
 ####packages######
-library(ggpubr)
 library(tidyverse)
 library(readxl)
-library(dplyr)
-library(writexl)
-library(epitools)
-library(openxlsx)
-library(gridExtra)
-library(grid)
-library(lubridate)
-library(cowplot)
-library(weathermetrics)
 library(measurements)
-library(ggnewscale)
-library(StreamMetabolism)
-library(ggpmisc)
-library("hydroTSM")
-
-
 ####Otter#####
 
 Otter<- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/metabolism/Otter/DONE/Otter_not.xlsx")
@@ -32,19 +16,19 @@ Otter<- Otter %>%
 
 Otter$season <- time2season(Otter$Date, out.fmt = "seasons")
 
-Otter <-  Otter%>% 
+Otter <-  Otter%>%
   mutate(set= case_when(season=="spring"~ 'summer',
                         season=="summer"~ 'summer',
                         season=="autumm"~ 'summer',
                         season=="winter"~ 'winter'))
-Otter <- Otter %>% 
+Otter <- Otter %>%
   mutate(time= case_when(hour>= 0 & hour<=7 & set=='summer'~ 'ER',
                          hour>= 20 & hour<=23 & set=='summer'~ 'ER',
                          hour>= 0 & hour<=9 & set=='winter'~ 'ER',
                          hour>= 21 & hour<=23 & set=='winter'~ 'ER',))
 Otter$time[is.na(Otter$time)] <- 'AM'
 
-OtterER<-Otter %>% group_by(day,time,month) %>% 
+OtterER<-Otter %>% group_by(day,time,month) %>%
   summarize(ER = mean(not, na.rm = TRUE))
 OtterER<-filter(OtterER, time=='ER')
 Otter<-left_join(Otter, OtterER,by=c("day","month"))
@@ -52,7 +36,7 @@ Otter<-left_join(Otter, OtterER,by=c("day","month"))
 Otter$GPP<-Otter$not-Otter$ER
 Otter$GPP[Otter$GPP<0] <- 0
 
-Otter_GPPavg<-Otter %>% group_by(day,month) %>% 
+Otter_GPPavg<-Otter %>% group_by(day,month) %>%
   summarize(GPPavg = mean(GPP, na.rm=T))
 Otter<-left_join(Otter, Otter_GPPavg,by=c("day","month"))
 
@@ -81,8 +65,8 @@ OtBO<- Otter %>% mutate(RI = case_when(
 OtBO<-filter(OtBO, RI== "2")
 
 OtBO <- OtBO %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(OtBO$stage_avg, na.rm=T)
@@ -157,8 +141,8 @@ OtBO<- Otter %>% mutate(RI = case_when(
 OtBO<-filter(OtBO, RI== "2")
 
 OtBO <- OtBO %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(OtBO$stage_avg, na.rm=T)
@@ -236,8 +220,8 @@ OtBO<- Otter %>% mutate(RI = case_when(
 OtBO<-filter(OtBO, RI== "2")
 
 OtBO <- OtBO %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(OtBO$stage_avg, na.rm=T)
@@ -322,16 +306,16 @@ Otter$site<-"Otter"
 
 ####AllenMill##########
 
-AllenMill<- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/metabolism/Allen Mill/DONE/AllenMilltwo_NOT.xlsx", 
-                               col_types = c("date", "numeric", "numeric", 
-                                             "numeric", "numeric", "numeric", 
-                                             "numeric", "numeric", "numeric", 
-                                             "numeric", "numeric", "numeric", 
-                                             "numeric", "numeric", "numeric", 
-                                             "numeric", "numeric", "numeric", 
-                                             "numeric", "numeric", "numeric", 
-                                             "numeric", "numeric", "numeric", 
-                                             "numeric", "numeric", "numeric", 
+AllenMill<- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/metabolism/Allen Mill/DONE/AllenMilltwo_NOT.xlsx",
+                               col_types = c("date", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
+                                             "numeric", "numeric", "numeric",
                                              "numeric", "numeric"))
 AllenMill$stage_diff<-AllenMill$stage_avg-min(AllenMill$stage_avg, na.rm=T)
 
@@ -342,19 +326,19 @@ AllenMill<- AllenMill %>%
 
 AllenMill$season <- time2season(AllenMill$Date, out.fmt = "seasons")
 
-AllenMill <-  AllenMill%>% 
+AllenMill <-  AllenMill%>%
   mutate(set= case_when(season=="spring"~ 'summer',
                         season=="summer"~ 'summer',
                         season=="autumm"~ 'summer',
                         season=="winter"~ 'winter'))
-AllenMill <- AllenMill %>% 
+AllenMill <- AllenMill %>%
   mutate(time= case_when(hour>= 0 & hour<=7 & set=='summer'~ 'ER',
                          hour>= 20 & hour<=23 & set=='summer'~ 'ER',
                          hour>= 0 & hour<=9 & set=='winter'~ 'ER',
                          hour>= 21 & hour<=23 & set=='winter'~ 'ER',))
 AllenMill$time[is.na(AllenMill$time)] <- 'AM'
 
-AllenMillER<-AllenMill %>% group_by(day,time,month) %>% 
+AllenMillER<-AllenMill %>% group_by(day,time,month) %>%
   summarize(ER = mean(not, na.rm = TRUE))
 AllenMillER<-filter(AllenMillER, time=='ER')
 AllenMill<-left_join(AllenMill, AllenMillER,by=c("day","month"))
@@ -362,7 +346,7 @@ AllenMill<-left_join(AllenMill, AllenMillER,by=c("day","month"))
 AllenMill$GPP<-AllenMill$not-AllenMill$ER
 AllenMill$GPP[AllenMill$GPP<0] <- 0
 
-AllenMill_GPPavg<-AllenMill %>% group_by(day,month) %>% 
+AllenMill_GPPavg<-AllenMill %>% group_by(day,month) %>%
   summarize(GPPavg = mean(GPP, na.rm=T))
 AllenMill<-left_join(AllenMill, AllenMill_GPPavg,by=c("day","month"))
 
@@ -390,8 +374,8 @@ AMBO<- AllenMill %>% mutate(RI = case_when(
 AMBO<-filter(AMBO, RI== "2")
 
 AMBO <- AMBO %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(AMBO$stage_avg, na.rm=T)
@@ -469,8 +453,8 @@ AMFR<- AllenMill %>% mutate(RI = case_when(
 AMFR<-filter(AMFR, RI== "2")
 
 AMFR <- AMFR %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 ggplot(AMFR, aes(x=Date))+
@@ -556,8 +540,8 @@ AMBO<- AllenMill %>% mutate(RI = case_when(
 AMBO<-filter(AMBO, RI== "2")
 
 AMBO <- AMBO %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(AMBO$stage_avg, na.rm=T)
@@ -649,19 +633,19 @@ LF<- LF %>%
 
 LF$season <- time2season(LF$Date, out.fmt = "seasons")
 
-LF <-  LF%>% 
+LF <-  LF%>%
   mutate(set= case_when(season=="spring"~ 'summer',
                         season=="summer"~ 'summer',
                         season=="autumm"~ 'summer',
                         season=="winter"~ 'winter'))
-LF <- LF %>% 
+LF <- LF %>%
   mutate(time= case_when(hour>= 0 & hour<=7 & set=='summer'~ 'ER',
                          hour>= 20 & hour<=23 & set=='summer'~ 'ER',
                          hour>= 0 & hour<=9 & set=='winter'~ 'ER',
                          hour>= 21 & hour<=23 & set=='winter'~ 'ER',))
 LF$time[is.na(LF$time)] <- 'AM'
 
-LFER<-LF %>% group_by(day,time,month) %>% 
+LFER<-LF %>% group_by(day,time,month) %>%
   summarize(ER = mean(not, na.rm = TRUE))
 LFER<-filter(LFER, time=='ER')
 LF<-left_join(LF, LFER,by=c("day","month"))
@@ -669,7 +653,7 @@ LF<-left_join(LF, LFER,by=c("day","month"))
 LF$GPP<-LF$not-LF$ER
 LF$GPP[LF$GPP<0] <- 0
 
-LF_GPPavg<-LF %>% group_by(day,month) %>% 
+LF_GPPavg<-LF %>% group_by(day,month) %>%
   summarize(GPPavg = mean(GPP, na.rm=T))
 LF<-left_join(LF, LF_GPPavg,by=c("day","month"))
 
@@ -698,8 +682,8 @@ LFFR<- LF %>%mutate(RI = case_when(
 LFFR<-filter(LFFR, RI== "2")
 
 LFFR <- LFFR %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(LFFR$stage_avg, na.rm=T)
@@ -776,8 +760,8 @@ LFFR<- LF %>%mutate(RI = case_when(
 LFFR<-filter(LFFR, RI== "2")
 
 LFFR <- LFFR %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(LFFR$stage_avg, na.rm=T)
@@ -857,8 +841,8 @@ LFRR<- LF %>% mutate(RI = case_when(
 LFRR<-filter(LFRR, RI== "2")
 
 LFRR <- LFRR %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(LFRR$stage_avg, na.rm=T)
@@ -954,11 +938,11 @@ LF$site<-"LF"
 
 ######Ichetucknee#######
 
-Ich <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/Ichetucknee.xlsx", 
-                  col_types = c("date", "numeric", "numeric", 
-                                "numeric", "numeric", "numeric", 
-                                "numeric", "numeric", "numeric", 
-                                "numeric", "numeric", "numeric", 
+Ich <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/Ichetucknee.xlsx",
+                  col_types = c("date", "numeric", "numeric",
+                                "numeric", "numeric", "numeric",
+                                "numeric", "numeric", "numeric",
+                                "numeric", "numeric", "numeric",
                                 "numeric", "numeric", "numeric"))
 Ich$stage_diff<-Ich$stage-min(Ich$stage, na.rm=T)
 
@@ -975,8 +959,8 @@ IchRR<- Ich %>% mutate(RI = case_when(
 IchRR<-filter(IchRR, RI== "2")
 
 IchRR <- IchRR %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(IchRR$stage, na.rm=T)
@@ -1055,10 +1039,10 @@ IchRR<- Ich %>% mutate(RI = case_when(
   Date> "2023-01-10" & Date<"2023-05-11"~ 2))
 IchRR<-filter(IchRR, RI== "2")
 
-  
+
 IchRR <- IchRR %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(IchRR$stage, na.rm=T)
@@ -1138,8 +1122,8 @@ IchRR<- Ich %>% mutate(RI = case_when(
 IchRR<-filter(IchRR, RI== "2")
 
 IchRR <- IchRR %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(IchRR$stage, na.rm=T)
@@ -1231,11 +1215,11 @@ Ichetucknee$site<-"ID"
 
 
 ######GB#######
-GB <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/GilchristBlue.xlsx", 
-                 col_types = c("date", "numeric", "numeric", 
-                               "numeric", "numeric", "numeric", 
-                               "numeric", "numeric", "numeric", 
-                               "numeric", "numeric", "numeric", 
+GB <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/GilchristBlue.xlsx",
+                 col_types = c("date", "numeric", "numeric",
+                               "numeric", "numeric", "numeric",
+                               "numeric", "numeric", "numeric",
+                               "numeric", "numeric", "numeric",
                                "numeric", "numeric", "numeric"))
 GB$stage_diff<-GB$stage-min(GB$stage, na.rm=T)
 
@@ -1252,8 +1236,8 @@ GBRR<- GB %>% mutate(RI = case_when(
 GBRR<-filter(GBRR, RI== "2")
 
 GBRR <- GBRR %>%
-  arrange(days) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>% 
+  arrange(days) %>%
+  group_by(consec = cumsum(c(TRUE, diff(days) >= 1))) %>%
   ungroup()
 
 max(GBRR$stage, na.rm=T)
@@ -1345,11 +1329,11 @@ plot_grid(d08+ggtitle("ID: 08/2022"),d02+ggtitle("ID: 02/2023"),
 
 ### US 27####
 
-US27 <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/US27bridge.xlsx", 
-                   col_types = c("numeric", "numeric", "numeric", 
-                                 "numeric", "numeric", "numeric", 
-                                 "numeric", "date", "numeric", "numeric", 
-                                 "numeric", "numeric", "numeric", 
+US27 <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/US27bridge.xlsx",
+                   col_types = c("numeric", "numeric", "numeric",
+                                 "numeric", "numeric", "numeric",
+                                 "numeric", "date", "numeric", "numeric",
+                                 "numeric", "numeric", "numeric",
                                  "numeric", "numeric"))
 US27$depth<-conv_unit(US27$depth, "ft", "m")
 US27$depth<-US27$depth-(max(US27$depth, na.rm=T)-1.5)
@@ -1366,8 +1350,8 @@ US27RR<- US27 %>% mutate(RI = case_when(
 US27RR<-filter(US27RR, RI== "2")
 
 US27RR <- US27RR %>%
-  arrange(day) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(day) >= 1))) %>% 
+  arrange(day) %>%
+  group_by(consec = cumsum(c(TRUE, diff(day) >= 1))) %>%
   ungroup()
 
 US27RR$disturb_count<-US27RR$consec-63
@@ -1424,8 +1408,8 @@ US27RR<- US27 %>% mutate(RI = case_when(
 US27RR<-filter(US27RR, RI== "2")
 
 US27RR <- US27RR %>%
-  arrange(day) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(day) >= 1))) %>% 
+  arrange(day) %>%
+  group_by(consec = cumsum(c(TRUE, diff(day) >= 1))) %>%
   ungroup()
 
 max(US27RR$stage_avg, na.rm=T)
@@ -1482,8 +1466,8 @@ US27RR<- US27 %>% mutate(RI = case_when(
 US27RR<-filter(US27RR, RI== "2")
 
 US27RR <- US27RR %>%
-  arrange(day) %>% 
-  group_by(consec = cumsum(c(TRUE, diff(day) >= 1))) %>% 
+  arrange(day) %>%
+  group_by(consec = cumsum(c(TRUE, diff(day) >= 1))) %>%
   ungroup()
 
 US27RR$disturb_count<-US27RR$consec-29
@@ -1585,7 +1569,7 @@ recovery$IF <- factor(recovery$IF  , levels=c("h_high","h_brown","h_rev"))
 (f<-ggplot(recovery, aes(stage, shape=site, color=IF))+
     geom_point(aes(y=ratio_GPP), size=6)+
     geom_hline(yintercept = 1, linetype='dashed')+
-    scale_colour_manual(name="", values = cols, 
+    scale_colour_manual(name="", values = cols,
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("GPP Recovery")+
     xlab(h)+
@@ -1606,7 +1590,7 @@ recovery$IF <- factor(recovery$IF  , levels=c("h_high","h_brown","h_rev"))
 (g<-ggplot(recovery, aes(stage, shape=site, color=IF))+
     geom_point(aes(y=ratio_ER), size=6)+
     geom_hline(yintercept = 1, linetype='dashed')+
-    scale_colour_manual(name="", values = cols, 
+    scale_colour_manual(name="", values = cols,
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("ER Recovery")+
     xlab(h)+
@@ -1625,10 +1609,10 @@ recovery$IF <- factor(recovery$IF  , levels=c("h_high","h_brown","h_rev"))
           axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black")))
 
 h<-plot_grid(f,g, ncol=2)
-ggsave(filename="recovery.jpeg", 
-       plot = h, 
-       width =12, 
-       height = 5, 
+ggsave(filename="recovery.jpeg",
+       plot = h,
+       width =12,
+       height = 5,
        units = "in")
 
 
@@ -1636,7 +1620,7 @@ ggsave(filename="recovery.jpeg",
     geom_point(aes(y=ratio_ER), size=5,color="darkred")+
     geom_point(aes(y=ratio_GPP), size=5, color='darkgreen' )+
     geom_hline(yintercept = 1, linetype='dashed')+
-    
+
     ggtitle(" ", subtitle = "by Site")+
     xlab(" ")+
     ylab(title)+scale_y_continuous(trans='log10')+
@@ -1670,7 +1654,7 @@ box<-rbind(GPPbox, ERbox, stagebox)
 box<-filter(box, recovery<200 & recovery>0)
 
 cols<-c(ER='darkred', GPP='darkgreen', NEP='blue')
-j<-ggplot(box, aes(x=type, y=recovery)) + 
+j<-ggplot(box, aes(x=type, y=recovery)) +
   geom_boxplot(outlier.colour="black", outlier.size=1,fill=cols)+
   ggtitle(" ")+
   xlab(' ')+
