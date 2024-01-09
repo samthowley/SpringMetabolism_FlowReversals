@@ -2,6 +2,7 @@
 library(tidyverse)
 library(readxl)
 library(measurements)
+library(dataRetrieval)
 ###function####
 PT_formatted <- function(fil) {
   PT <- read_csv(fil)
@@ -153,25 +154,25 @@ FAWN<-rbind(AM_FAWN, LF_FAWN, GB_FAWN, OS_FAWN, ID_FAWN)
 ##Calculation#####
 
 stage<-left_join(PT, FAWN, by=c('Date', 'ID'))
-stage <- stage[complete.cases(stage[ , c('PT')]), ]
+stage <- stage[complete.cases(stage[ , c('PSI', 'PT')]), ]
 
-for(i in 1:nrow(stage)){if(stage$ID=='OS') {
+for(i in 1:nrow(stage)) {if(stage$ID[i]=='OS') {
 
   stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(0.6894/0.372))+0.6995}
 
-  else if (stage$ID=='ID'){
+  else if (stage$ID[i]=='ID'){
 
     stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.64))+0.11}
 
-  else if(stage$ID=='GB'){
+  else if(stage$ID[i]=='GB'){
 
     stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.47/0.634))+0.176}
 
-  else if(stage$ID=='LF'){
+  else if(stage$ID[i]=='LF'){
 
     stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(0.6894/0.372))+0.6995}
 
-  else if(stage$ID=='AM'){
+  else if(stage$ID[i]=='AM'){
 
     stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.41/0.634))+0.515}
 
@@ -181,3 +182,96 @@ stage<- filter(stage,depth<20)
 ggplot(stage, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=5)
 write_csv(stage, "02_Clean_data/Chem/depth.csv")
 
+
+###Interpolation####
+data_retrieval <- function(site_id) {
+  parameterCd <- c('00065')
+  startDate <- "2022-04-12"
+  endDate <- "2024-01-04"
+
+  river <- readNWISuv(site_id,parameterCd, startDate, endDate)
+  split<-split(river, river$site_no)
+
+  down <-split(river, river$site_no)[[2]]
+  down<-down[,c(3,4)]
+  down<-rename(down, 'Date'='dateTime', 'stage_down'='X_00065_00000')
+
+  up <-split(river, river$site_no)[[1]]
+  up<-up[,c(3,4)]
+  up<-rename(up, 'Date'='dateTime', 'stage_up'='X_00065_00000')
+
+  elevation_diff<-left_join(up,down, by='Date')
+
+  elevation_diff<- elevation_diff %>% mutate(minute = minute(Date))
+  elevation_diff<-filter(elevation_diff, minute==0)
+
+  return(elevation_diff)}
+stage_relationship <- function(site,elevation_diff) {
+  elevation_diff<-elevation_diff[,c(1,5)]
+
+  site<-left_join(site, elevation_diff)
+
+  summary(modInter<-lm( depth~ elevation, data = site))
+  cf <- coef(modInter)
+  (InterceptmodInter<- cf[1])
+  (SlopemodInter<- cf[2])
+
+  return(list(InterceptmodInter,SlopemodInter))}
+master<-read_csv("02_Clean_data/master.csv")
+x<-c('Date','depth','ID')
+
+AM<-filter(master, ID=='AM')
+site_id <- c('02319800','02320000')
+elevation_diff<-data_retrieval(site_id)
+elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.501
+(stage_slope<-stage_relationship(AM, elevation_diff))
+elevation_diff$depth<-elevation_diff$elevation*stage_slope[[2]]+stage_slope[[1]]
+elevation_diff$ID<-'AM'
+AM<-elevation_diff[,x]
+
+GB<-filter(master, ID=='GB')
+site_id <- c('02321958','02322500')
+elevation_diff<-data_retrieval(site_id)
+elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.79
+(stage_slope<-stage_relationship(GB, elevation_diff))
+elevation_diff$depth<-elevation_diff$elevation*stage_slope[[2]]+stage_slope[[1]]
+elevation_diff$ID<-'GB'
+GB<-elevation_diff[,x]
+
+OS<-filter(master, ID=='OS')
+site_id <- c('02323000','02323500')
+elevation_diff<-data_retrieval(site_id)
+elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.72
+(stage_slope<-stage_relationship(OS, elevation_diff))
+
+elevation_diff$depth<-elevation_diff$elevation*stage_slope[[2]]+stage_slope[[1]]
+elevation_diff$ID<-'OS'
+OS<-elevation_diff[,x]
+
+LF<-filter(master, ID=='LF')
+site_id <- '02323500'
+parameterCd <- c('00065')
+startDate <- "2022-04-12"
+endDate <- "2023-11-09"
+riverLF <- readNWISuv(site_id,parameterCd, startDate, endDate)
+riverLF<-riverLF[,c(1,3,2,4)]
+riverLF<-rename(riverLF, 'Date'='dateTime', 'elevation'='X_00065_00000')
+riverLF<- riverLF %>% mutate(minute = minute(Date))
+riverLF<-filter(riverLF, minute==0)
+riverLF<-riverLF[,c(2,1,3,5,4)]
+(stage_slope<-stage_relationship(LF, riverLF))
+riverLF$depth<-riverLF$elevation*stage_slope[[2]]+stage_slope[[1]]
+riverLF$ID<-'LF'
+LF<-riverLF[,x]
+
+
+ID<-filter(master, ID=='ID')
+SF<-read_csv("01_Raw_data/02322703_Level.csv",col_types = cols(Date = col_datetime(format = "%m/%d/%Y %H:%M")))
+SF<-rename(SF, 'elevation'="Level NAVD88")
+(stage_slope<-stage_relationship(ID, SF))
+SF$depth<-SF$elevation*stage_slope[[2]]+stage_slope[[1]]
+SF$ID<-'ID'
+ID<-SF[,x]
+
+stage<-rbind(AM, GB, LF, ID, OS)
+write_csv(stage, "02_Clean_data/Chem/depth.csv")

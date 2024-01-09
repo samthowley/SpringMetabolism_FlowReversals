@@ -49,45 +49,47 @@ extract_slope <- function(site) {
   GPP<-as.numeric(c(SlopesiteGPPavg))
   ER<-as.numeric(c(SlopesiteER))
 
-  site<- data.frame(NEP,GPP,ER)
-  return(site)}
+  return(list(NEP,GPP,ER))}
 
 #get data####
 
 master_chem <- read_csv("02_Clean_data/master.csv")
 master_met <- read_csv("02_Clean_data/master_metabolism.csv")
 master<-left_join(master_chem, master_met, by=c('ID','Date'))
+GB<-filter(master, ID=='GB')
+AM<-filter(master, ID=='AM')
+LF<-filter(master, ID=='LF')
+ID<-filter(master, ID=='ID')
+OS<-filter(master, ID=='OS')
 
-for(i in 1:nrow(master)){if(master$ID=='OS') {
+for(i in 1:nrow(master)){if(master$ID[i]=='OS') {
   master$u[i]<-(master$depth[i]*-0.0868+0.1579)*100
-  master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
+  master$depth_diff[i]<-master$depth[i]-min(OS$depth, na.rm=T)
 
 }
-  else if (master$ID=='ID'){
+  else if (master$ID[i]=='ID'){
     master$u[i]<-(master$depth[i]*-4.1+2.33)*100
-    master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
+    master$depth_diff[i]<-master$depth[i]-min(ID$depth, na.rm=T)
 
   }
-  else if(master$ID=='GB'){
+  else if(master$ID[i]=='GB'){
     master$u[i]<-(master[i]$depth*-0.768+0.51)*100
-    master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
+    master$depth_diff[i]<-master$depth[i]-min(GB$depth, na.rm=T)
 
   }
-  else if(master$ID=='LF'){
+  else if(master$ID[i]=='LF'){
     master$u[i]<- (-0.656*master$depth[i] + 0.44)*100
-    master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
+    master$depth_diff[i]<-master$depth[i]-min(LF$depth, na.rm=T)
 
   }
-  else if(master$ID=='AM'){
+  else if(master$ID[i]=='AM'){
     master$u[i]<-(master$depth[i]*-1.89+1.4)*100
-    master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
+    master$depth_diff[i]<-master$depth[i]-min(AM$deptH, na.rm=T)
   }
   else {master$u[i]<- NULL
-  master$RI <- NULL
   master$depth_diff[i] <- NULL}}
 
 ###Scatter plots#######
-
 
 (ID_sc<-ggplot(data=ID, aes(x=depth_diff)) +
     geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
@@ -210,25 +212,9 @@ lm(ER~depth_diff, data = OS)
 plot_grid(IU_sc, GB_sc, AM_sc, nrow = 1)
 
 #######slope######
+OS_slope<-extract_slope(AM)
+OS_x<- data.frame(OS_slope[[1]],OS_slope[[2]],OS_slope[[3]])
 
-for(i in 1:nrow(master)){if(master$ID=='OS') {
-  extract_slope(master)
-}
-  else if (master$ID=='ID'){
-    extract_slope(master)
-  }
-  else if(master$ID=='GB'){
-    extract_slope(master)
-  }
-  else if(master$ID=='LF'){
-    extract_slope(master)
-  }
-  else if(master$ID=='AM'){
-    extract_slope(master)
-  }
-  else {NEP<- NULL}}
-
-master$ID<-"OS"
 
 
 
@@ -274,13 +260,6 @@ slope<-ggplot(R_R2,aes(x=what,y=met))+
 
 
 #get data####
-OS<- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/Otter.xlsx",
-                col_types = c("date", "numeric", "numeric",
-                              "numeric", "numeric", "numeric",
-                              "numeric", "numeric", "numeric",
-                              "numeric", "numeric", "numeric",
-                              "numeric", "numeric", "numeric",
-                              "numeric", "numeric"))
 OS<-filter(OS, Date> '2022-07-20' & Date <='2023-09-07')
 OS$depth_diff<-OS$depth-min(OS$depth, na.rm=T)
 OS$u<-(OS$depth*-0.0868+0.1579)
@@ -288,12 +267,6 @@ OS$day <- as.Date(OS$Date)
 OS <- aggregate(OS, by=list(OS$day), FUN='mean')
 
 
-GB<- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/GilchristBlue.xlsx",
-                col_types = c("date", "numeric", "numeric",
-                              "numeric", "numeric", "numeric",
-                              "numeric", "numeric", "numeric",
-                              "numeric", "numeric", "numeric",
-                              "numeric", "numeric", "numeric"))
 GB<-filter(GB, Date> '2022-07-10' & Date <='2023-08-29')
 GB$depth_diff<-GB$depth-min(GB$depth, na.rm=T)
 GB$u<-(GB$depth*-0.483+0.35)
@@ -302,13 +275,6 @@ GB$day <- as.Date(GB$Date)
 GB <- aggregate(GB, by=list(GB$day), FUN='mean')
 
 
-LF <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/LittleFanning.xlsx",
-                 col_types = c("date", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric"))
 LF<-filter(LF, Date> '2022-07-12' & Date <='2023-09-07')
 LF$depth_diff<-LF$depth-min(LF$depth, na.rm=T)
 LF$u<- (-0.115*LF$depth + 0.169)
@@ -319,13 +285,6 @@ LF <- aggregate(LF, by=list(LF$day), FUN='mean')
 
 
 
-AM <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/AllenMill.xlsx",
-                 col_types = c("date", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric"))
 AM<-filter(AM, Date> '2022-07-20' & Date <='2023-9-20')
 AM$depth_diff<-AM$depth-min(AM$depth, na.rm=T)
 AM$"u"<-(AM$depth*-0.24+0.46)
@@ -334,12 +293,6 @@ AM <- aggregate(AM, by=list(AM$day), FUN='mean')
 
 
 
-ID <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/Ichetucknee.xlsx",
-                 col_types = c("date", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric",
-                               "numeric", "numeric", "numeric"))
 ID<-filter(ID, Date> '2022-07-20' & Date <='2023-08-24')
 ID$depth_diff<-ID$depth-min(ID$depth, na.rm=T)
 ID$u<-(ID$depth*-0.128+0.416)
@@ -348,10 +301,8 @@ ID <- aggregate(ID, by=list(ID$day), FUN='mean')
 
 
 
-IU <- read_excel("//ad.ufl.edu/ifas/SFRC/Groups/Hydrology/SpringsProject_Sam&Paul/Master/US27bridge.xlsx")
 IU$day <- as.Date(IU$Date)
 IU<- aggregate(IU, by=list(IU$day), FUN='mean')
-
 IU$depth<-conv_unit(IU$depth, "ft", "m")
 IU$depth<-IU$depth-(max(IU$depth, na.rm=T)-1.5)
 IU$depth_diff<-IU$depth-min(IU$depth, na.rm=T)

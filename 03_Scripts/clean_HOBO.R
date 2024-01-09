@@ -255,6 +255,3 @@ write_csv(master, "02_Clean_data/master.csv")
 detach("package:plyr", unload = TRUE)
 ggplot(master, aes(Date, DO)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
-
-GB<-filter(master, ID=='GB')
-ggplot(GB, aes(Date, DO)) + geom_line()

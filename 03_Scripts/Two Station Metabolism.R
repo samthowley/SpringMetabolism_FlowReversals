@@ -131,7 +131,7 @@ AllenMill <- AllenMill %>% mutate(VentDO = case_when(Date <= '2022-07-20 13:00' 
                                                      Date  <= '2023-03-29 11:00' ~ 1.26,
                                                      Date  <= '2023-04-12 11:00' ~ 1.26,
                                                      Date  <= '2023-05-18 11:00' ~ 1.2884375,
-                                                     Date  <= '2023-12-30 11:00' ~ 1.2884375))
+                                                     Date  <= '2024-01-05 11:00' ~ 1.2884375))
 
 AllenMill$VentDO<-AllenMill$VentDO +4
 
@@ -152,7 +152,7 @@ AllenMill <- AllenMill %>% mutate(VentTemp_F= case_when(Date <= '2022-07-20 13:0
                                                         Date  <= '2023-04-12 11:00' ~72.60454545,
                                                         Date  <= '2023-04-26 11:00' ~73.47818182,
                                                         Date  <= '2023-05-18 11:00' ~71.76173913,
-                                                        Date  <= '2023-12-30 11:00' ~73.85097561))
+                                                        Date  <= '2024-01-05 11:00' ~73.85097561))
 AllenMill$VentTemp_F<-mean(AllenMill$VentTemp_F, na.rm = T)
 
 AllenMill<-prelim(AllenMill)
@@ -197,7 +197,7 @@ GB <- GB %>% mutate(VentDO= case_when(Date  <= '2022-06-13' ~ 6.253686,
                                       Date  <= '2023-04-26' ~ 4.685238095,
                                       Date  <= '2023-05-04' ~4.81268595,
                                       Date  <= '2023-05-18' ~4.44175,
-                                      Date  <= '2023-12-30' ~4.51725))
+                                      Date  <= '2024-01-30' ~4.51725))
 
 
 
@@ -211,7 +211,7 @@ GB <- GB %>% mutate(VentTemp_F = case_when(Date <= '2022-07-08' ~ 77.2365,
                                            Date  <= '2023-03-15' ~ 72.485,
                                            Date  <= '2023-05-03' ~ 72.6692562,
                                            Date  <= '2023-05-18' ~ 73.68,
-                                           Date  <= '2023-12-30' ~ 73.80225))
+                                           Date  <= '2024-01-30' ~ 73.80225))
 GB$VentTemp_F<-mean(GB$VentTemp_F, na.rm = T)
 
 GB<-prelim(GB)
@@ -264,7 +264,7 @@ LF <- LF %>% mutate(VentDO= case_when(Date  <= '2022-06-13' ~ 1.93,
                                       Date  <= '2023-04-13' ~ 1.53,
                                       Date  <= '2023-04-19' ~ 1.704,
                                       Date  <= '2023-05-03' ~ 3.475384615,
-                                      Date  <= '2023-08-01' ~ 1.628292683))
+                                      Date  <= '2024-08-01' ~ 1.628292683))
 LF$VentDO[is.na(LF$VentDO)]<-mean(LF$VentDO, na.rm = T)
 
 
@@ -279,7 +279,7 @@ LF <- LF %>% mutate(VentTemp_F = case_when(Date <= '2022-07-08' ~ 74.28,
                                            Date  <= '2023-04-05' ~ 71.74,
                                            Date  <= '2023-04-19' ~ 73.278,
                                            Date  <= '2023-05-03' ~ 72.6692562,
-                                           Date  <= '2023-08-01' ~ 73.679375))
+                                           Date  <= '2024-08-01' ~ 73.679375))
 LF$VentTemp_F[is.na(LF$VentTemp_F)]<-mean(LF$VentTemp_F, na.rm = T)
 
 LF<-prelim(LF)
@@ -314,6 +314,13 @@ ventID<-'02322700'
 vent<-data_retrieval(parameterCd, ventID)
 
 ID <- master %>% filter(ID=='ID')
+ID<-ID[,-c(5)]
+IDdepth<-read_csv("02_Clean_data/Chem/depth.csv")
+IDdepth <- filter(IDdepth,ID=="ID")
+IDdepth<-IDdepth %>%mutate(day = day(Date),month = month(Date),year = year(Date))
+IDdepth<-IDdepth[,-c(1,3)]
+ID<-ID %>%mutate(day = day(Date),month = month(Date),year = year(Date))
+ID<-left_join(ID, IDdepth, by=c('day','month','year'))
 
 length<-2845
 width <-20
@@ -324,6 +331,7 @@ ID<-ID[,x]
 ID$depth<-na_interpolation(ID$depth)
 ID<-left_join(ID, vent, by=c('Date'))
 
+ID$depth<- ID$depth + 0.5
 ID$'velocity_m/s'<- -0.13*ID$depth + 0.42
 
 ID<-prelim(ID)

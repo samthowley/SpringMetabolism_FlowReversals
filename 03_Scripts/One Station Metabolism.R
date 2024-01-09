@@ -108,13 +108,7 @@ OS$ID<-'OS'
 ###AM######
 AM_input <- read_csv("04_Outputs/one_station_inputs/AM.csv")
 bayes_specs<-bins(AM_input)
-AM_input1<-AM_input[1:1916,]
-AM_output1<-metabolism(AM_input1)
-
-AM_input2<-AM_input[1918:5551,]
-AM_output2<-metabolism(AM_input2)
-
-AM_output<-rbind(AM_output1, AM_output2)
+AM_output<-metabolism(AM_input)
 
 AM2 <- read_csv("04_Outputs/two_station/AM.csv")
 AM<-compile(AM_output, AM2)
@@ -129,4 +123,6 @@ ID$ID<-'ID'
 master_metabolism<-rbind(AM, OS, LF,GB, ID)
 write_csv(master_metabolism, "02_Clean_data/master_metabolism.csv")
 
-ggplot(master_metabolism, aes(Date, NEP)) + geom_line() + facet_wrap(~ ID, ncol=2)
+ggplot(master_metabolism, aes(Date, ER)) + geom_line() + facet_wrap(~ ID, ncol=2)
+
+ggplot(AM, aes(Date, NEP)) + geom_line()
