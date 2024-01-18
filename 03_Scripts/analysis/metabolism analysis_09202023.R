@@ -64,6 +64,8 @@ slope_df <- function(site) {
 master_chem <- read_csv("02_Clean_data/master.csv")
 master_met <- read_csv("02_Clean_data/master_metabolism.csv")
 master<-left_join(master_chem, master_met, by=c('ID','Date'))
+master <- master[!duplicated(master[c('ID','Date')]),]
+
 
 for(i in 1:nrow(master)) {if(master$ID[i]=='OS') {
   master$u[i]<-(master$depth[i]*-0.0868+0.1579)*100}
@@ -230,7 +232,146 @@ NEP<-ggplot(master, aes(x=ID, y=NEP)) +
                size=1, show.legend=FALSE) + theme_sam
 
 (box<-plot_grid(GPP, NEP, ER, ncol=1))
+######cherry pick#####
+theme_chem<-theme()+theme(axis.text.x = element_blank(),
+      axis.text.y.right = element_text(size = 17, angle=0, color="purple"),
+      axis.text.y.left = element_text(size = 17, angle=0, color="black"),
+      axis.title.y =element_text(size = 17, color="black", angle=90),
+      axis.title.y.right =element_text(size = 17, color="purple", angle=270),
+      axis.title.x =element_blank(),
+      legend.position = "none",
+      plot.title = element_blank(),
+      panel.background = element_rect(fill = 'white'),
+      axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
+      axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
 
+theme_bland<-theme()+    theme(axis.text.x = element_blank(),
+                               axis.text.y = element_text(size = 17, angle=0),
+                               axis.title.y =element_text(size = 13, color = "black"),
+                               axis.title.y.right =element_text(size = 17, color = "blue"),
+                               axis.title.x =element_blank(),
+                               plot.title = element_text(size = 17),
+                               legend.position = "none",
+                               panel.background = element_rect(fill = 'white'),
+                               axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
+                               axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
+
+high<-expression(paste("High Stage Event"~ (h[high])))
+u<-expression(atop('Velocity',("m"~s^-1)))
+SpC<-'Conductivity'
+pCO2<-expression(paste(CO[2]~"ppm"))
+FR<-expression(paste("Flow Reversal"~ (h[reversal])))
+BO<-expression(paste("Brownout"~ (h[brown])))
+library(mmand)
+
+####LF#####
+LFFR<-filter(LF,  Date> "2023-02-01" & Date<"2023-04-13")
+LFFR$depth<-gaussianSmooth(LFFR$depth, 120)
+LFFR$depth_diff<-gaussianSmooth(LFFR$depth_diff, 120)
+
+
+(ch<-ggplot(LFFR, aes(x=Date))+
+    geom_line(aes(y=depth_diff), color="black", linewidth=0.8)+
+    ylab(h)+xlab('Date')+
+    ggtitle(high, subtitle = "LF")+
+    scale_y_continuous(n.breaks=3)+theme_bland)
+
+
+(cu<-ggplot(LFFR, aes(x=Date))+
+    geom_line(aes(y=u), color="black", linewidth=0.8)+
+    ylab(u)+xlab('Date')+
+    geom_hline(yintercept = 0, linetype='dashed')+
+    scale_y_continuous(n.breaks=3)+theme_bland)
+
+(c<-ggplot(LFFR, aes(x=Date))+
+    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
+    geom_line(aes(y=DO), color="black", linewidth=0.8)+
+    geom_hline(yintercept = 0, linetype='dashed')+
+    scale_y_continuous(
+      name = "DO mg/L",
+      sec.axis = sec_axis( trans=~.*1000, name=pCO2))+theme_chem)
+
+(LF<-plot_grid(ch,cu,c, align = "v", ncol = 1, rel_heights = c(0.3,0.2,0.5)))
+
+
+###Ot####
+OtBO<-filter(OS,  Date> "2023-12-18" & Date<"2024-01-11")
+
+(bu<-ggplot(OtBO, aes(x=Date))+
+    geom_line(aes(y=SpC), color="black", linewidth=0.8)+
+    ylab(SpC)+xlab('Date')+
+    geom_hline(yintercept = 0, linetype='dashed')+
+    scale_y_continuous(n.breaks=3)+theme_bland)
+
+(bh<-ggplot(OtBO, aes(x=Date))+
+    geom_line(aes(y=depth_diff), color="black", linewidth=0.8)+
+    ylab(h)+xlab('Date')+
+    ggtitle(FR, subtitle = "OS, 12/20/2023")+
+    scale_y_continuous(n.breaks=3)+theme_bland)
+
+(b<-ggplot(OtBO, aes(x=Date))+
+    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
+    geom_line(aes(y=DO), color="black", linewidth=0.8)+
+    geom_hline(yintercept = 0, linetype='dashed')+
+    scale_y_continuous(
+      name = "DO mg/L",
+      sec.axis = sec_axis( trans=~.*1000, name=pCO2))+theme_chem)
+
+(OSg<-plot_grid(bh,bu,b, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
+
+###AM#####
+AMFR<-filter(AM,  Date> "2023-12-14" & Date<"2024-01-09")
+AMFR$depth_diff<-gaussianSmooth(AMFR$depth_diff, 120)
+
+(au<-ggplot(AMFR, aes(x=Date))+
+    geom_line(aes(y=SpC), color="black", linewidth=0.8)+
+    scale_y_continuous(n.breaks=3)+
+    ylab(SpC)+xlab('Date')+
+    geom_hline(yintercept = 0, linetype='dashed')+theme_bland)
+
+(ah<-ggplot(AMFR, aes(x=Date))+
+    geom_line(aes(y=depth_diff), color="black", linewidth=0.8)+
+    ylab(h)+xlab('Date')+
+    ggtitle(FR, subtitle = "AM, 12/14/2023")+
+    scale_y_continuous(n.breaks=3)+theme_bland)
+
+(a<-ggplot(AMFR, aes(x=Date))+
+    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
+    geom_line(aes(y=DO), color="black", linewidth=0.8)+
+    geom_hline(yintercept = 0, linetype='dashed')+
+    scale_y_continuous(
+      name = "DO mg/L",
+      sec.axis = sec_axis( trans=~.*1000, name=pCO2)) +theme_chem)
+
+(AMg<-plot_grid(ah,au,a, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
+
+###GB#####
+GBFR<-filter(GB,  Date> "2023-12-18" & Date<"2024-01-09")
+GBFR$depth_diff<-gaussianSmooth(GBFR$depth_diff, 120)
+
+(au<-ggplot(GBFR, aes(x=Date))+
+    geom_line(aes(y=SpC), color="black", linewidth=0.8)+
+    scale_y_continuous(n.breaks=3)+
+    ylab(SpC)+xlab('Date')+
+    geom_hline(yintercept = 0, linetype='dashed')+theme_bland)
+
+(ah<-ggplot(GBFR, aes(x=Date))+
+    geom_line(aes(y=depth_diff), color="black", linewidth=0.8)+
+    ylab(h)+xlab('Date')+
+    ggtitle(FR, subtitle = "GB, 12/28/2023")+
+    scale_y_continuous(n.breaks=3)+theme_bland)
+
+(a<-ggplot(GBFR, aes(x=Date))+
+    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
+    geom_line(aes(y=DO), color="black", linewidth=0.8)+
+    geom_hline(yintercept = 0, linetype='dashed')+
+    scale_y_continuous(
+      name = "DO mg/L",
+      sec.axis = sec_axis( trans=~.*1000, name=pCO2)) +theme_chem)
+
+(GBg<-plot_grid(ah,au,a, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
+
+plot_grid(GBg, AMg, OSg, ncol = 3)
 ####together#####
 (scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=2))
 (boxplots<-plot_grid(box,slope,  ncol=2))
@@ -242,9 +383,11 @@ ggsave(filename="metabolism.jpeg",
        height = 14.5,
        units = "in")
 
-
 ggsave(filename="poster metabolism.jpeg",
        plot = together,
        width =17,
        height = 15.5,
        units = "in")
+
+ggplot(GB, aes(x=Date))+
+    geom_line(aes(y=CO2), color="purple", linewidth=0.8)
