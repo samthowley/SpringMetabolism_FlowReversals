@@ -123,6 +123,7 @@ ID$ID<-'ID'
 master_metabolism<-rbind(AM, OS, LF,GB, ID)
 write_csv(master_metabolism, "02_Clean_data/master_metabolism.csv")
 
-ggplot(master_metabolism, aes(Date, ER)) + geom_line() + facet_wrap(~ ID, ncol=2)
+
+ggplot(master_metabolism, aes(Date, GPPavg)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
 ggplot(AM, aes(Date, NEP)) + geom_line()

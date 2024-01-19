@@ -221,7 +221,7 @@ for(fil in file.names){
 file.names <- list.files(path="01_Raw_data/Hobo/GilchristBlue/SpC", pattern=".csv", full.names=TRUE)
 for(fil in file.names){
   SpC <- SpC_unformatted(fil)
-  SpC <- filter(SpC, SpC>100 & SpC < 450)
+  #SpC <- filter(SpC < 450)
   SpC_everything<-rbind(SpC_everything,SpC)}
 GB_SpC <- SpC_everything[!duplicated(SpC_everything[c('Date')]),]
 GB_SpC$ID<-'GB'
@@ -243,7 +243,7 @@ write_csv(SpC, "02_Clean_data/Chem/SpC.csv")
 
 ###compile####
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
-file.names<-file.names[c(3,2,5,7,1)]
+file.names<-file.names[c(3,6,1,2,5,7)]
 
 data <- lapply(file.names,function(x) {read_csv(x)})
 library(plyr)
@@ -253,5 +253,5 @@ master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0)
 
 write_csv(master, "02_Clean_data/master.csv")
 detach("package:plyr", unload = TRUE)
-ggplot(master, aes(Date, DO)) + geom_line() + facet_wrap(~ ID, ncol=2)
+ggplot(master, aes(Date, SpC)) + geom_line() + facet_wrap(~ ID, ncol=2)
 

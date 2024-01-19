@@ -187,7 +187,7 @@ write_csv(stage, "02_Clean_data/Chem/depth.csv")
 data_retrieval <- function(site_id) {
   parameterCd <- c('00065')
   startDate <- "2022-04-12"
-  endDate <- "2024-01-04"
+  endDate <- "2024-01-11"
 
   river <- readNWISuv(site_id,parameterCd, startDate, endDate)
   split<-split(river, river$site_no)
@@ -243,7 +243,6 @@ site_id <- c('02323000','02323500')
 elevation_diff<-data_retrieval(site_id)
 elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.72
 (stage_slope<-stage_relationship(OS, elevation_diff))
-
 elevation_diff$depth<-elevation_diff$elevation*stage_slope[[2]]+stage_slope[[1]]
 elevation_diff$ID<-'OS'
 OS<-elevation_diff[,x]
@@ -252,7 +251,7 @@ LF<-filter(master, ID=='LF')
 site_id <- '02323500'
 parameterCd <- c('00065')
 startDate <- "2022-04-12"
-endDate <- "2023-11-09"
+endDate <- "2023-11-11"
 riverLF <- readNWISuv(site_id,parameterCd, startDate, endDate)
 riverLF<-riverLF[,c(1,3,2,4)]
 riverLF<-rename(riverLF, 'Date'='dateTime', 'elevation'='X_00065_00000')

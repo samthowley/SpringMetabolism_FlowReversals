@@ -87,7 +87,7 @@ two_station <- function(spring) {
 data_retrieval <- function(parameterCd, ventID) {
 
   startDate <- "2022-04-12"
-  endDate <- "2023-11-09"
+  endDate <- "2024-01-11"
 
   vent_15sec<-readNWISuv(ventID,parameterCd,startDate,endDate)
   vent_15sec<-vent_15sec[,-c(1,2,5,7,8)]
@@ -131,7 +131,7 @@ AllenMill <- AllenMill %>% mutate(VentDO = case_when(Date <= '2022-07-20 13:00' 
                                                      Date  <= '2023-03-29 11:00' ~ 1.26,
                                                      Date  <= '2023-04-12 11:00' ~ 1.26,
                                                      Date  <= '2023-05-18 11:00' ~ 1.2884375,
-                                                     Date  <= '2024-01-05 11:00' ~ 1.2884375))
+                                                     Date  <= '2024-01-11 11:00' ~ 1.2884375))
 
 AllenMill$VentDO<-AllenMill$VentDO +4
 
@@ -152,7 +152,7 @@ AllenMill <- AllenMill %>% mutate(VentTemp_F= case_when(Date <= '2022-07-20 13:0
                                                         Date  <= '2023-04-12 11:00' ~72.60454545,
                                                         Date  <= '2023-04-26 11:00' ~73.47818182,
                                                         Date  <= '2023-05-18 11:00' ~71.76173913,
-                                                        Date  <= '2024-01-05 11:00' ~73.85097561))
+                                                        Date  <= '2024-01-11 11:00' ~73.85097561))
 AllenMill$VentTemp_F<-mean(AllenMill$VentTemp_F, na.rm = T)
 
 AllenMill<-prelim(AllenMill)
@@ -230,14 +230,6 @@ ggplot(two, aes(x=Date)) +
 
 write_csv(two, "04_Outputs/two_station/GB.csv")
 write_csv(one, "04_Outputs/one_station_inputs/GB.csv")
-
-
-
-
-
-
-
-
 
 ##LF####
 LF <- master %>% filter(ID=='LF')
