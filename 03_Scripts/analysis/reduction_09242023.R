@@ -99,7 +99,7 @@ GBFR<- GB %>% mutate(RI = case_when(
 GB_0723<-extract_reduce(GB, GBFR)
 
 GBFR<- GB %>% mutate(RI = case_when(
-  Date> "2023-12-18" & Date<"2024-01-01"~ 2))
+  Date> "2023-12-18" & Date<"2024-01-11"~ 2))
 GB_1223<-extract_reduce(GB, GBFR)
 
 
@@ -133,7 +133,7 @@ OtFR<- OS %>% mutate(RI = case_when(
 OS_0623<-extract_reduce(OS, OtFR)
 
 OtFR<- OS %>% mutate(RI = case_when(
-  Date> "2023-12-18" & Date<"2024-01-09"~ 2))
+  Date> "2023-12-18" & Date<"2024-01-11"~ 2))
 OS_1223<-extract_reduce(OS, OtFR)
 
 OS_tbl<-rbind(OS_0822,OS_0223,OS_0623,OS_1223)
@@ -191,7 +191,7 @@ AMFR<- AM %>% mutate(RI = case_when(
 AMFR_0823<-extract_reduce(AM, AMFR)
 
 AMFR<- AM %>% mutate(RI = case_when(
-  Date> "2023-12-12" & Date<"2024-01-01"~ 2))
+  Date> "2023-12-12" & Date<"2024-01-11"~ 2))
 AMFR_1224<-extract_reduce(AM, AMFR)
 
 AM_tbl<-rbind(AMFR_0223,AMFR_0623,AMFR_0823,AMFR_1224)
@@ -311,11 +311,7 @@ hdiff<-('h'~Delta)
 
 theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
                              axis.text.y = element_text(size = 27, angle=0),
-                             axis.title.y =element_text(size = 27, color="darkgreen"),
-                             axis.title.y.right =element_text(size = 27, color='darkred'),
-                             axis.title.x =element_text(size = 27),
-                             plot.title = element_text(size = 22, color="darkgreen"),
-                             legend.position = "bottom",
+                             legend.position = "right",
                              legend.text= element_text(size = 27),
                              panel.background = element_rect(fill = 'white'),
                              panel.grid.major = element_line(color = 'white'),
@@ -325,24 +321,31 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
 
 
 
-ggplot(R_R, aes(h, shape=ID, color=IF))+
+(a<-ggplot(R_R, aes(h, shape=ID, color=IF))+
     geom_point(aes(y=GPP_reduce), size=6)+
     geom_smooth(aes(x=h, y=GPP_reduce, group=a), color='darkgreen', size=0.75,
                 data=R_R, se = FALSE, method='lm')+
     scale_colour_manual(name="", values = cols,
                         labels=c("High depth Event", "Brownout","Flow Reversal"))+
     ggtitle("Backwater Flood Impacts on GPP")+
-    xlab(hdiff)+ylab("GPP Reduction (%)")+theme_sam
+    xlab(hdiff)+ylab("GPP Reduction (%)")+theme_sam+theme(
+      axis.title.y =element_text(size = 27, color="darkgreen"),
+      axis.title.x =element_text(size = 27),
+      plot.title = element_text(size = 22, color="darkgreen")))
 
 
-ggplot(R_R, aes(h, shape=ID, color= IF))+
+(b<-ggplot(R_R, aes(h, shape=ID, color= IF))+
     geom_point(aes(y=ER_reduce), size=6)+
     scale_colour_manual(name="", values = cols,
                         labels=c("High depth Event", "Brownout","Flow Reversal"))+
     ggtitle("Backwater Flood Impacts on ER")+
-    xlab(" ")+ylab("|ER| Increase (%)")+theme_sam
+    xlab(" ")+ylab("|ER| Increase (%)")+theme_sam+theme(
+      axis.title.y =element_text(size = 27, color="darkred"),
+      axis.title.x =element_text(size = 27),
+      plot.title = element_text(size = 22, color="darkred")))
 
-hs<-plot_grid(b, b1, nrow=1)
+
+(hs<-plot_grid(a, b, nrow=1))
 
 ggsave(filename="reduced.jpeg",
        plot = hs,

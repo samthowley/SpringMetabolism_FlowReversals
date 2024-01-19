@@ -2,7 +2,6 @@
 library(tidyverse)
 library(readxl)
 
-
 ####AM CO2#######
 file.names <- list.files(path="01_Raw_data/CampbellSci/AllenMill/Everything/interpolated", pattern=".xlsx", full.names=TRUE)
 
@@ -98,13 +97,13 @@ for(fil in file.names){
 }
 
 CO2<-rbind(CO2_everything,CO2_dat)
-CO2<-filter(CO2,CO2<10000)
+CO2<-filter(CO2,CO2>2500 & CO2<10000)
 GB_CO2 <- CO2[!duplicated(CO2[c('Date')]),]
 GB_CO2$ID<-'GB'
 GB_CO2a<-filter(GB_CO2, Date>'2023-12-19')
 
-ggplot(GB_CO2a, aes(x=Date))+
-  geom_line(aes(y=CO2), color="purple", linewidth=0.8)
+ggplot(GasDome_01112024, aes(x=...1))+
+  geom_line(aes(y=Smp...5), color="purple", linewidth=0.8)
 
 ####ID CO2#######
 

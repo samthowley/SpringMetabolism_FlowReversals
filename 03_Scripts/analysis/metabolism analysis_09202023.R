@@ -81,8 +81,10 @@ for(i in 1:nrow(master)) {if(master$ID[i]=='OS') {
 
 master<-master %>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))
 master$depth_diff<-master$depth-master$depth_min
+master$day<-as.Date(master$Date)
+master_met <- master[!duplicated(master[c('ID','day')]),]
 
-sites<-split(master,master$ID)
+sites<-split(master_met,master_met$ID)
 AM<-sites[[1]]
 GB<-sites[[2]]
 ID<-sites[[3]]
@@ -187,6 +189,19 @@ ggplot(master, aes(Date, u)) + geom_line() + facet_wrap(~ ID, ncol=2)
     xlab(h)+ggtitle("OS")+
     scale_x_continuous(n.breaks=4) +
     scale_y_continuous(n.breaks=3)+theme_sam)
+
+master_met<-filter(master_met, GPPavg<40)
+ggplot(data=master_met, aes(x=depth_diff)) +
+      geom_point(aes(y=GPPavg, color=day), size=1)+
+      geom_point(aes(y=ER, color=day), size=1)+
+  geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
+              data=master_met, se = FALSE, method='lm')+
+  geom_smooth(aes(x=depth_diff, y=ER), color='darkred', size=0.75,
+              data=master_met, se = FALSE, method='lm')+
+  scale_colour_gradient(low = "lightgray", high = "black", trans='date')+
+  facet_wrap(~ ID, ncol=3)+theme_sam+ylab(flux)+theme(legend.position = "none")
+
+
 #######slope######
 
 OS_x<-slope_df(OS)
@@ -310,18 +325,20 @@ OtBO<-filter(OS,  Date> "2023-12-18" & Date<"2024-01-11")
     scale_y_continuous(n.breaks=3)+theme_bland)
 
 (b<-ggplot(OtBO, aes(x=Date))+
-    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
     geom_line(aes(y=DO), color="black", linewidth=0.8)+
-    geom_hline(yintercept = 0, linetype='dashed')+
     scale_y_continuous(
-      name = "DO mg/L",
-      sec.axis = sec_axis( trans=~.*1000, name=pCO2))+theme_chem)
+      name = "DO mg/L")+theme_sam)
+
+(bm<-ggplot(OtBO, aes(x=Date))+
+    geom_line(aes(y=GPPavg), color="black", linewidth=0.8)+
+    theme_sam)
+
 
 (OSg<-plot_grid(bh,bu,b, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
 
 ###AM#####
-AMFR<-filter(AM,  Date> "2023-12-14" & Date<"2024-01-09")
-AMFR$depth_diff<-gaussianSmooth(AMFR$depth_diff, 120)
+AMFR<-filter(AM,  Date> "2023-12-15" & Date<"2024-01-11")
+# AMFR$depth_diff<-gaussianSmooth(AMFR$depth_diff, 120)
 
 (au<-ggplot(AMFR, aes(x=Date))+
     geom_line(aes(y=SpC), color="black", linewidth=0.8)+
@@ -336,18 +353,19 @@ AMFR$depth_diff<-gaussianSmooth(AMFR$depth_diff, 120)
     scale_y_continuous(n.breaks=3)+theme_bland)
 
 (a<-ggplot(AMFR, aes(x=Date))+
-    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
     geom_line(aes(y=DO), color="black", linewidth=0.8)+
-    geom_hline(yintercept = 0, linetype='dashed')+
     scale_y_continuous(
-      name = "DO mg/L",
-      sec.axis = sec_axis( trans=~.*1000, name=pCO2)) +theme_chem)
+      name = "DO mg/L")+theme_sam)
+
+(am<-ggplot(AMFR, aes(x=Date))+
+    geom_line(aes(y=GPPavg), color="black", linewidth=0.8)+
+    theme_sam)
 
 (AMg<-plot_grid(ah,au,a, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
 
 ###GB#####
-GBFR<-filter(GB,  Date> "2023-12-18" & Date<"2024-01-09")
-GBFR$depth_diff<-gaussianSmooth(GBFR$depth_diff, 120)
+GBFR<-filter(GB,  Date> "2023-12-01" & Date<"2024-01-11")
+# GBFR$depth_diff<-gaussianSmooth(GBFR$depth_diff, 120)
 
 (au<-ggplot(GBFR, aes(x=Date))+
     geom_line(aes(y=SpC), color="black", linewidth=0.8)+
@@ -362,12 +380,13 @@ GBFR$depth_diff<-gaussianSmooth(GBFR$depth_diff, 120)
     scale_y_continuous(n.breaks=3)+theme_bland)
 
 (a<-ggplot(GBFR, aes(x=Date))+
-    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
     geom_line(aes(y=DO), color="black", linewidth=0.8)+
-    geom_hline(yintercept = 0, linetype='dashed')+
     scale_y_continuous(
-      name = "DO mg/L",
-      sec.axis = sec_axis( trans=~.*1000, name=pCO2)) +theme_chem)
+      name = "DO mg/L") +theme_sam)
+
+(am<-ggplot(GBFR, aes(x=Date))+
+    geom_line(aes(y=GPPavg), color="black", linewidth=0.8)+
+    theme_sam)
 
 (GBg<-plot_grid(ah,au,a, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
 

@@ -221,7 +221,7 @@ for(fil in file.names){
 file.names <- list.files(path="01_Raw_data/Hobo/GilchristBlue/SpC", pattern=".csv", full.names=TRUE)
 for(fil in file.names){
   SpC <- SpC_unformatted(fil)
-  SpC <- filter(SpC < 450)
+  #SpC <- filter(SpC < 450)
   SpC_everything<-rbind(SpC_everything,SpC)}
 GB_SpC <- SpC_everything[!duplicated(SpC_everything[c('Date')]),]
 GB_SpC$ID<-'GB'
@@ -253,5 +253,5 @@ master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0)
 
 write_csv(master, "02_Clean_data/master.csv")
 detach("package:plyr", unload = TRUE)
-ggplot(master, aes(Date, CO2)) + geom_line() + facet_wrap(~ ID, ncol=2)
+ggplot(master, aes(Date, SpC)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
