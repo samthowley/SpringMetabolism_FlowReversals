@@ -36,7 +36,7 @@ prelim <- function(spring) {
   spring$deltaDO_rate<- (spring$deltaDO*spring$"Q_m/s"*24*3600)/area
 
   return(spring)}
-two_station <- function(spring) {
+two_station_parse <- function(spring) {
   spring$K600_avg<-gaussianSmooth(spring$K600_1d, 90)
   spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
   spring$not<-spring$deltaDO_rate-spring$K_reaeration
@@ -84,6 +84,47 @@ two_station <- function(spring) {
   #two_NEP<-filter(two_NEP, ER<0)
 
   return(list(two,one))}
+two_station <- function(spring) {
+  spring$K600_avg<-gaussianSmooth(spring$K600_1d, 90)
+  spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
+  spring$not<-spring$deltaDO_rate-spring$K_reaeration
+  spring$season <- time2season(spring$Date, out.fmt = "seasons")
+
+  spring<- spring %>%
+    mutate(hour = hour(Date),
+           Month=month(Date),
+           day=day(Date),
+           year=year(Date))
+
+  two <-  spring %>%
+    mutate(set= case_when(season=="spring"~ 'summer',
+                          season=="summer"~ 'summer',
+                          season=="autumm"~ 'autumm',
+                          season=="winter"~ 'winter'))
+
+  two <- two %>%
+    mutate(time= case_when(hour>= 0 & hour<=8 & set=='summer'~ 'ER',
+                           hour>= 21 & hour<=23 & set=='summer'~ 'ER',
+                           hour>= 0 & hour<=8 & set=='autumm'~ 'ER',
+                           hour>= 20 & hour<=23 & set=='autumm'~ 'ER',
+                           hour>= 0 & hour<=4 & set=='winter'~ 'ER',
+                           hour>= 20 & hour<=23 & set=='winter'~ 'ER'))
+  two$time[is.na(two$time)] <- 'AM'
+
+  twoER<-two%>% group_by(day,Month,year,time) %>%
+    summarize(ER = mean(not, na.rm=T))
+
+  twoER<-filter(twoER, time=='ER')
+  two<-left_join(two, twoER,by=c("day","Month","year"))
+
+  two$GPP<-two$not-two$ER
+  two$GPP[two$GPP<0] <- 0
+
+  two_GPPavg<-two%>% group_by(day,Month,year) %>%
+    summarize(GPPavg = mean(GPP, na.rm=T))
+
+  two<-left_join(two, two_GPPavg,by=c("day","Month","year"))
+  return(two)}
 data_retrieval <- function(parameterCd, ventID) {
 
   startDate <- "2022-04-12"
@@ -159,7 +200,7 @@ AllenMill<-prelim(AllenMill)
 
 AllenMill$K600_1d<- 7.2*AllenMill$'U/H' + 4
 
-met_output<-two_station(AllenMill)
+met_output<-two_station_parse(AllenMill)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
@@ -172,6 +213,7 @@ ggplot(two, aes(x=Date)) +
 write_csv(two, "04_Outputs/two_station/AM.csv")
 write_csv(one, "04_Outputs/one_station_inputs/AM.csv")
 
+AM_recov<-two_station(AllenMill)
 ##GB####
 GB <- master %>% filter(ID=='GB')
 
@@ -218,7 +260,7 @@ GB<-prelim(GB)
 
 GB$K600_1d<- 11*GB$'U/H'+4
 
-met_output<-two_station(GB)
+met_output<-two_station_parse(GB)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
@@ -230,6 +272,8 @@ ggplot(two, aes(x=Date)) +
 
 write_csv(two, "04_Outputs/two_station/GB.csv")
 write_csv(one, "04_Outputs/one_station_inputs/GB.csv")
+
+GB_recov<-two_station(GB)
 
 ##LF####
 LF <- master %>% filter(ID=='LF')
@@ -278,7 +322,7 @@ LF<-prelim(LF)
 
 LF$K600_1d<-LF$'U/H'*24.6+ 8.6
 
-met_output<-two_station(LF)
+met_output<-two_station_parse(LF)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
@@ -291,13 +335,7 @@ ggplot(one, aes(x=Date)) +
 write_csv(two, "04_Outputs/two_station/LF.csv")
 write_csv(one, "04_Outputs/one_station_inputs/LF.csv")
 
-
-
-
-
-
-
-
+LF_recov<-two_station(LF)
 
 ##ID####
 library(dataRetrieval)
@@ -306,13 +344,6 @@ ventID<-'02322700'
 vent<-data_retrieval(parameterCd, ventID)
 
 ID <- master %>% filter(ID=='ID')
-ID<-ID[,-c(5)]
-IDdepth<-read_csv("02_Clean_data/Chem/depth.csv")
-IDdepth <- filter(IDdepth,ID=="ID")
-IDdepth<-IDdepth %>%mutate(day = day(Date),month = month(Date),year = year(Date))
-IDdepth<-IDdepth[,-c(1,3)]
-ID<-ID %>%mutate(day = day(Date),month = month(Date),year = year(Date))
-ID<-left_join(ID, IDdepth, by=c('day','month','year'))
 
 length<-2845
 width <-20
@@ -332,23 +363,15 @@ ID$K600_1d<- 7.2*ID$'U/H'+1.1
 
 met_output<-two_station(ID)
 
-two<-data.frame(met_output[1]) #date column
-one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date)) +
+ggplot(met_output, aes(x=Date)) +
   geom_line(aes(y=ER, color="ER"),size=1)+
   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+
   geom_hline(yintercept = 30)
 
-write_csv(two, "04_Outputs/two_station/ID.csv")
-write_csv(one, "04_Outputs/one_station_inputs/ID.csv")
+write_csv(met_output, "04_Outputs/two_station/ID.csv")
 
-
-
-
-
-
-
+ID_recov<-two_station(ID)
 
 
 ##OS####
@@ -369,8 +392,22 @@ OS$K600_1d<-OS$'U/H'*33.55+1.8
 
 write_csv(OS, "04_Outputs/one_station_inputs/OS.csv")
 
+####For recovery analysis####
+x<-c('Date', 'DO','GPPavg', 'ER', 'depth', 'ID')
+AM_recov$ID<-'AM'
+GB_recov$ID<-'GB'
+LF_recov$ID<-'LF'
+ID_recov$ID<-'ID'
+recovery<-rbind(AM_recov, GB_recov, LF_recov,  ID_recov) #ID_recov
+recovery<-recovery[,x]
 
+OSmet<-read_csv("02_Clean_data/master_metabolism.csv")
+OSmet<-filter(OSmet, ID=='OS')
+OS_recov<-left_join(OS, OSmet, by='Date')
+OS_recov<-OS_recov[,x]
 
+recovery<-rbind(recovery,OS_recov) #ID_recov
+write_csv(recovery, "04_Outputs/ForRecovery.csv")
 
 
 

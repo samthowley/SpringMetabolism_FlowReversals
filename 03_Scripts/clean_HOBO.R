@@ -253,5 +253,5 @@ master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0)
 
 write_csv(master, "02_Clean_data/master.csv")
 detach("package:plyr", unload = TRUE)
-ggplot(master, aes(Date, SpC)) + geom_line() + facet_wrap(~ ID, ncol=2)
+ggplot(master, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=2)
 

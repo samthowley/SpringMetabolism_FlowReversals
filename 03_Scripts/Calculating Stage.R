@@ -267,10 +267,19 @@ LF<-riverLF[,x]
 ID<-filter(master, ID=='ID')
 SF<-read_csv("01_Raw_data/02322703_Level.csv",col_types = cols(Date = col_datetime(format = "%m/%d/%Y %H:%M")))
 SF<-rename(SF, 'elevation'="Level NAVD88")
-(stage_slope<-stage_relationship(ID, SF))
-SF$depth<-SF$elevation*stage_slope[[2]]+stage_slope[[1]]
-SF$ID<-'ID'
-ID<-SF[,x]
+SF$day<-as.Date(SF$Date)
+ID$day<-as.Date(ID$Date)
+SF<-SF[,-c(1,2,3,4,6)]
+ID<-left_join(ID, SF, by='day')
+
+summary(modInter<-lm( depth~ elevation, data = ID))
+cf <- coef(modInter)
+(InterceptmodInter<- cf[1])
+(SlopemodInter<- cf[2])
+
+ID$depth<-ID$elevation*SlopemodInter+InterceptmodInter
+ID$ID<-'ID'
+ID<-ID[,x]
 
 stage<-rbind(AM, GB, LF, ID, OS)
 write_csv(stage, "02_Clean_data/Chem/depth.csv")
