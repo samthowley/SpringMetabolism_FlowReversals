@@ -181,3 +181,247 @@ AM_tbl<-rbind(AMFR_02,AMFR_06,AMFR_08,AMFR_0124)
 AM_tbl$ID<-'AM'
 AM_tbl$num<-5
 AM_tbl$IF <- c("rev","bo",'bo','rev')
+
+####OS####
+OSFR<- OS %>% mutate(RI = case_when(
+  Date> "2022-08-10" & Date<"2022-10-18"~ 2))
+OSFR<-filter(OSFR, RI==2)
+ggplot(OSFR, aes(Date))+
+  geom_line(aes(y=ER), size=1)
+
+OSFR_08<-recovery_calc(OSFR)
+
+ggplot(OSFR_08, aes(count))+
+  geom_line(aes(y=ERmean), size=1)+
+  geom_line(aes(y=GPPmean), size=1)+
+  geom_line(aes(y=DOmean), size=1)
+OSFR_08<-filter(OSFR_08, count>50)
+
+OSFR_08<-extract_recovery(OSFR_08)
+
+
+
+OSFR<- OS %>% mutate(RI = case_when(
+  Date> "2023-12-18" & Date<"2024-01-11"~ 2))
+OSFR<-filter(OSFR, RI==2)
+ggplot(OSFR, aes(Date))+
+  geom_line(aes(y=DO), size=1)
+
+OSFR_12<-recovery_calc(OSFR)
+
+ggplot(OSFR_12, aes(count))+
+  geom_line(aes(y=ERmean), size=1)+
+  geom_line(aes(y=GPPmean), size=1)+
+  geom_line(aes(y=DOmean), size=1)
+OSFR_12<-extract_recovery(OSFR_12)
+
+OS_tbl<-rbind(OSFR_08,OSFR_12)
+OS_tbl$ID<-'OS'
+OS_tbl$num<-4
+OS_tbl$IF <- c('bo','rev')
+
+####LF####
+LFFR<- LF %>% mutate(RI = case_when(
+  Date> "2023-01-30" & Date<"2023-03-20"~ 2))
+LFFR<-filter(LFFR, RI==2)
+ggplot(LFFR, aes(Date))+
+  geom_line(aes(y=DO), size=1)
+
+LFFR_02<-recovery_calc(LFFR)
+
+LFFR_02<-filter(LFFR_02, count>30)
+ggplot(LFFR_02, aes(count))+
+  geom_line(aes(y=ERmean), size=1)+
+  geom_line(aes(y=GPPmean), size=1)+
+  geom_line(aes(y=DOmean), size=1)
+
+LFFR_02<-extract_recovery(LFFR_02)
+
+
+LFFR<- LF %>% mutate(RI = case_when(
+  Date> "2023-06-01" & Date<"2023-08-01"~ 2))
+LFFR<-filter(LFFR, RI==2)
+ggplot(LFFR, aes(Date))+
+  geom_line(aes(y=DO), size=1)
+
+LFFR_06<-recovery_calc(LFFR)
+
+ggplot(LFFR_06, aes(count))+
+  geom_line(aes(y=ERmean), size=1)+
+  geom_line(aes(y=GPPmean), size=1)+
+  geom_line(aes(y=DOmean), size=1)
+LFFR_06<-extract_recovery(LFFR_06)
+
+LFFR<- LF %>% mutate(RI = case_when(
+  Date> "2023-08-01" & Date<"2023-10-06"~ 2))
+LFFR<-filter(LFFR, RI==2)
+ggplot(LFFR, aes(Date))+
+  geom_line(aes(y=ER), size=1)
+
+LFFR_08<-recovery_calc(LFFR)
+
+ggplot(LFFR_08, aes(count))+
+  geom_line(aes(y=ERmean), size=1)+
+  geom_line(aes(y=GPPmean), size=1)+
+  geom_line(aes(y=DOmean), size=1)
+LFFR_08<-extract_recovery(LFFR_08)
+
+
+LF_tbl<-rbind(LFFR_02,LFFR_06,LFFR_08)
+LF_tbl$ID<-'LF'
+LF_tbl$num<-2
+LF_tbl$IF <- c("h","h",'h')
+
+
+####GB####
+GBFR<- GB %>% mutate(RI = case_when(
+  Date> "2023-07-10" & Date<"2023-8-21"~ 2))
+GBFR<-filter(GBFR, RI==2)
+ggplot(GBFR, aes(Date))+
+  geom_line(aes(y=DO), size=1)
+
+GBFR_08<-recovery_calc(GBFR)
+
+ggplot(GBFR_08, aes(count))+
+  geom_line(aes(y=ERmean), size=1)+
+  geom_line(aes(y=GPPmean), size=1)+
+  geom_line(aes(y=DOmean), size=1)
+
+GBFR_08<-extract_recovery(GBFR_08)
+
+
+GBFR<- GB %>% mutate(RI = case_when(
+  Date> "2023-12-01" & Date<"2024-01-11"~ 2))
+GBFR<-filter(GBFR, RI==2)
+ggplot(GBFR, aes(Date))+
+  geom_line(aes(y=GPPavg), size=1)
+
+GBFR_12<-recovery_calc(GBFR)
+
+ggplot(GBFR_12, aes(count))+
+  geom_line(aes(y=ERmean), size=1)+
+  geom_line(aes(y=GPPmean), size=1)+
+  geom_line(aes(y=DOmean), size=1)
+GBFR_12<-extract_recovery(GBFR_12)
+
+GBFR<- GB %>% mutate(RI = case_when(
+  Date> "2022-08-01" & Date<"2022-10-20"~ 2))
+GBFR<-filter(GBFR, RI==2)
+ggplot(GBFR, aes(Date))+
+  geom_line(aes(y=ER), size=1)
+
+GBFR_0822<-recovery_calc(GBFR)
+
+ggplot(GBFR_0822, aes(count))+
+  geom_line(aes(y=ERmean), size=1)+
+  geom_line(aes(y=GPPmean), size=1)+
+  geom_line(aes(y=DOmean), size=1)
+GBFR_0822<-extract_recovery(GBFR_0822)
+
+
+GB_tbl<-rbind(GBFR_0822,GBFR_08,GBFR_12)
+GB_tbl$ID<-'GB'
+GB_tbl$num<-3
+GB_tbl$IF <- c("h","h",'rev')
+
+
+####ID####
+IDFR<- ID %>% mutate(RI = case_when(
+  Date> "2023-02-10" & Date<"2023-03-15"~ 2))
+IDFR<-filter(IDFR, RI==2)
+ggplot(IDFR, aes(Date))+
+  geom_line(aes(y=depth), size=1)
+
+IDFR_02<-recovery_calc(IDFR)
+
+IDFR_02<-filter(IDFR_02, count>23)
+ggplot(IDFR_02, aes(count))+
+  geom_line(aes(y=ERmean, color='ER'), size=1)+
+  geom_line(aes(y=GPPmean, color='GPP'), size=1)+
+  geom_line(aes(y=DOmean, color='DO'), size=1)
+
+IDFR_02<-extract_recovery(IDFR_02)
+
+
+IDFR<- ID %>% mutate(RI = case_when(
+  Date> "2023-08-01" & Date<"2023-10-31"~ 2))
+IDFR<-filter(IDFR, RI==2)
+ggplot(IDFR, aes(Date))+
+  geom_line(aes(y=ER), size=1)
+
+IDFR_0822<-recovery_calc(IDFR)
+
+ggplot(IDFR_0822, aes(count))+
+  geom_line(aes(y=ERmean, color='ER'), size=1)+
+  geom_line(aes(y=GPPmean, color='GPP'), size=1)+
+  geom_line(aes(y=DOmean, color='DO'), size=1)
+IDFR_0822<-extract_recovery(IDFR_0822)
+
+
+
+ID_tbl<-rbind(IDFR_0822,IDFR_02)
+ID_tbl$ID<-'ID'
+ID_tbl$num<-1
+ID_tbl$IF <- c("h","h")
+
+
+###compile####
+recov<-rbind(ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl)
+
+write_csv(recov, "04_Outputs/recovery_analysis.csv")
+
+recov$a<-'a'
+cols<-c(
+  "h"="deepskyblue3",
+  "bo"="burlywood4",
+  "rev"="black")
+recov$IF <- factor(recov$IF  , levels=c("h","bo","rev"))
+
+h<-expression(paste( h[i]-h[min]~(Δh)))
+hdiff<-('h'~Delta)
+
+theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
+                             axis.text.y = element_text(size = 27, angle=0),
+                             legend.position = "right",
+                             legend.text= element_text(size = 27),
+                             panel.background = element_rect(fill = 'white'),
+                             panel.grid.major = element_line(color = 'white'),
+                             panel.grid.minor = element_line(color = 'white'),
+                             axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
+                             axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
+
+
+
+(f<-ggplot(recov, aes(depth, shape=ID, color=IF))+
+    geom_point(aes(y=GPP_recov), size=6)+
+    geom_hline(yintercept = 1, linetype='dashed')+
+    scale_colour_manual(name="", values = cols,
+                        labels=c("High Stage Event", "Brownout","Flow Reversal"))+
+    ggtitle("GPP Recovery")+
+    xlab(hdiff)+
+    ylab(title)+scale_y_continuous(trans='log10')+theme_sam+
+    theme(
+          axis.title.y =element_text(size = 25, color='darkgreen'),
+          plot.title = element_text(size = 27, color='darkgreen')))
+
+(g<-ggplot(recovery, aes(depth, shape=site, color=IF))+
+    geom_point(aes(y=ratio_ER), size=6)+
+    geom_hline(yintercept = 1, linetype='dashed')+
+    scale_colour_manual(name="", values = cols,
+                        labels=c("High Stage Event", "Brownout","Flow Reversal"))+
+    ggtitle("ER Recovery")+
+    xlab(h)+
+    ylab(title)+scale_y_continuous(trans='log10')+
+    theme(axis.text.x = element_text(size = 27, angle=0),
+          axis.text.y = element_text(size = 27, angle=0),
+          axis.title.y =element_text(size = 25, color='darkred'),
+          axis.title.x =element_text(size = 27),
+          plot.title = element_text(size = 27, color='darkred'),
+          legend.position = "none",
+          legend.text= element_text(size = 27),
+          panel.background = element_rect(fill = 'white'),
+          panel.grid.major = element_line(color = 'white'),
+          panel.grid.minor = element_line(color = 'white'),
+          axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
+          axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black")))
+
