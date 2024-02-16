@@ -9,6 +9,7 @@ PT_formatted <- function(fil) {
   PT<-PT[,c(1,2)]
   colnames(PT)[1] <- "Date"
   colnames(PT)[2] <- "PT"
+  PT$ID<-strsplit(basename(fil), '_')[[1]][1]
   return(PT)}
 PT_unformatted <- function(fil) {
   PT <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
@@ -16,144 +17,80 @@ PT_unformatted <- function(fil) {
   colnames(PT)[1] <- "Date"
   colnames(PT)[2] <- "PT"
   PT$Date <- mdy_hms(PT$Date)
+  PT$ID<-strsplit(basename(fil), '_')[[1]][1]
   return(PT)}
-FAWN_formatted <- function(fil) {
-  FAWN <- read_csv(fil)
-  colnames(FAWN)[1] <- "Date"
-  FAWN$PSI<-conv_unit(FAWN$`BP avg (mb)`, "mbar", "psi")
-  return(FAWN)}
 FAWN_unformatted <- function(fil) {
   FAWN <- read_csv(fil,col_types = cols(`FAWN Station` = col_skip(),
                                         Period = col_datetime(format = "%m/%d/%Y %H:%M"),
                                         `N (# obs)` = col_skip()))
   colnames(FAWN)[1] <- "Date"
   FAWN$PSI<-conv_unit(FAWN$`BP avg (mb)`, "mbar", "psi")
+  FAWN$gageID<-strsplit(basename(fil), '_')[[1]][1]
   return(FAWN)}
-
-
-
 
 ###PT####
 PT_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/Allen Mill/PT/formatted", pattern=".csv", full.names=TRUE)
+file.names <- list.files(path="01_Raw_data/Hobo/PT/formatted", pattern=".csv", full.names=TRUE)
 for(fil in file.names){
   PT <- PT_formatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-file.names <- list.files(path="01_Raw_data/Hobo/Allen Mill/PT", pattern=".csv", full.names=TRUE)
+  PT_everything<-rbind(PT_everything,PT)
+  PT_everything <- PT_everything[!duplicated(PT_everything[c('Date','ID')]),]
+}
+
+file.names <- list.files(path="01_Raw_data/Hobo/PT/unformatted", pattern=".csv", full.names=TRUE)
 for(fil in file.names){
   PT <- PT_unformatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-AM_PT <- PT_everything[!duplicated(PT_everything[c('Date')]),]
-AM_PT$ID<-'AM'
+  PT_everything<-rbind(PT_everything,PT)
+  PT_everything <- PT_everything[!duplicated(PT_everything[c('Date','ID')]),]
+  }
 
-PT_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/Little Fanning/stage/formatted", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  PT <- PT_formatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-file.names <- list.files(path="01_Raw_data/Hobo/Little Fanning/stage", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  PT <- PT_unformatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-LF_PT <- PT_everything[!duplicated(PT_everything[c('Date')]),]
-LF_PT$ID<-'LF'
+PT_everything<-filter(PT_everything, PT<30)
+PT_everything<-PT_everything %>%
+  mutate(ID = ifelse(as.character(ID) == "AllenMillPond", "AM", as.character(ID)),
+         ID = ifelse(as.character(ID) == "AllenMill", "AM", as.character(ID)),
 
-PT_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/Ichetucknee/PT/formatted", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  PT <- PT_formatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-file.names <- list.files(path="01_Raw_data/Hobo/Ichetucknee/PT", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  PT <- PT_unformatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-ID_PT <- PT_everything[!duplicated(PT_everything[c('Date')]),]
-ID_PT$ID<-'ID'
+         ID = ifelse(as.character(ID) == "GilchristBlue", "GB", as.character(ID)),
+         ID = ifelse(as.character(ID) == "GilBlue", "GB", as.character(ID)),
+         ID = ifelse(as.character(ID) == "GilchristBluel", "GB", as.character(ID)),
+         ID = ifelse(as.character(ID) == "GilchrsitBlue", "GB", as.character(ID)),
 
-PT_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/Otter/PT/formatted", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  PT <- PT_formatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-file.names <- list.files(path="01_Raw_data/Hobo/Otter/PT", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  PT <- PT_unformatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-OS_PT <- PT_everything[!duplicated(PT_everything[c('Date')]),]
-OS_PT$ID<-'OS'
+         ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
+         ID = ifelse(as.character(ID) == "Ichetuckneel", "ID", as.character(ID)),
 
-PT_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/GilchristBlue/stage/formatted", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  PT <- PT_formatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-file.names <- list.files(path="01_Raw_data/Hobo/GilchristBlue/stage", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  PT <- PT_unformatted(fil)
-  PT_everything<-rbind(PT_everything,PT)}
-GB_PT <- PT_everything[!duplicated(PT_everything[c('Date')]),]
-GB_PT$ID<-'GB'
+         ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
 
-PT<-rbind(OS_PT, GB_PT, ID_PT, LF_PT, AM_PT)
+         ID = ifelse(as.character(ID) == "Otter", "OS", as.character(ID)))
+
+PT_everything<-PT_everything %>%
+  mutate(stageID =case_when(
+    ID =="OS" ~"1",
+    ID == "AM"~"1",
+    ID  == "GB"~ "2",
+    ID== "ID"~ "2",
+    ID  == "LF"~"3"))
+
+#ggplot(PT_everything, aes(Date, PT)) + geom_line() + facet_wrap(~ stageID, ncol=5)
 
 ###FAWN####
 FAWN_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/Allen Mill/FAWN/formatted", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  FAWN <- FAWN_formatted(fil)
-  FAWN_everything<-rbind(FAWN_everything,FAWN)}
-file.names <- list.files(path="01_Raw_data/Hobo/Allen Mill/FAWN", pattern=".csv", full.names=TRUE)
+
+file.names <- list.files(path="01_Raw_data/Hobo/FAWN", pattern=".csv", full.names=TRUE)
 for(fil in file.names){
   FAWN <- FAWN_unformatted(fil)
-  FAWN_everything<-rbind(FAWN_everything,FAWN)}
-AM_FAWN <- FAWN_everything[!duplicated(FAWN_everything[c('Date')]),]
-AM_FAWN$ID<-'AM'
+  FAWN_everything<-rbind(FAWN_everything,FAWN)
+  FAWN_everything <- FAWN_everything[!duplicated(FAWN_everything[c('Date','gageID')]),]
+}
 
-FAWN_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/Little Fanning/FAWN/formatted", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  FAWN <- FAWN_formatted(fil)
-  FAWN_everything<-rbind(FAWN_everything,FAWN)}
-file.names <- list.files(path="01_Raw_data/Hobo/Little Fanning/FAWN", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  FAWN <- FAWN_unformatted(fil)
-  FAWN_everything<-rbind(FAWN_everything,FAWN)}
-LF_FAWN <- FAWN_everything[!duplicated(FAWN_everything[c('Date')]),]
-LF_FAWN$ID<-'LF'
-
-FAWN_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/GilchristBlue/FAWN/formatted", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  FAWN <- FAWN_formatted(fil)
-  FAWN_everything<-rbind(FAWN_everything,FAWN)}
-file.names <- list.files(path="01_Raw_data/Hobo/GilchristBlue/FAWN", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  FAWN <- FAWN_unformatted(fil)
-  FAWN_everything<-rbind(FAWN_everything,FAWN)}
-GB_FAWN <- FAWN_everything[!duplicated(FAWN_everything[c('Date')]),]
-GB_FAWN$ID<-'GB'
-
-FAWN_everything<-data.frame()
-file.names <- list.files(path="01_Raw_data/Hobo/Ichetucknee/FAWN", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  FAWN <- FAWN_unformatted(fil)
-  FAWN_everything<-rbind(FAWN_everything,FAWN)}
-ID_FAWN <- FAWN_everything[!duplicated(FAWN_everything[c('Date')]),]
-ID_FAWN$ID<-'ID'
-
-file.names <- list.files(path="01_Raw_data/Hobo/Otter/FAWN", pattern=".csv", full.names=TRUE)
-FAWN_everything<-data.frame()
-for(fil in file.names){
-  FAWN <- FAWN_unformatted(fil)
-  FAWN_everything<-rbind(FAWN_everything,FAWN)}
-OS_FAWN <- FAWN_everything[!duplicated(FAWN_everything[c('Date')]),]
-OS_FAWN$ID<-'OS'
-
-FAWN<-rbind(AM_FAWN, LF_FAWN, GB_FAWN, OS_FAWN, ID_FAWN)
+FAWN_everything<-FAWN_everything %>%
+  mutate(stageID =case_when(
+    gageID =="Mayo" ~"1",
+    gageID  == "Alachua"~ "2",
+    gageID  == "Bronson"~"3"))
+#ggplot(FAWN_everything, aes(Date, PSI)) + geom_line() + facet_wrap(~ stageID, ncol=5)
 
 ##Calculation#####
 
-stage<-left_join(PT, FAWN, by=c('Date', 'ID'))
+stage<-left_join(PT_everything, FAWN_everything, by=c('stageID', 'Date'))
 stage <- stage[complete.cases(stage[ , c('PSI', 'PT')]), ]
 
 for(i in 1:nrow(stage)) {if(stage$ID[i]=='OS') {
@@ -177,17 +114,14 @@ for(i in 1:nrow(stage)) {if(stage$ID[i]=='OS') {
     stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.41/0.634))+0.515}
 
   else {stage$depth[i]<- NULL }}
-
-stage<- filter(stage,depth<20)
-ggplot(stage, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=5)
-write_csv(stage, "02_Clean_data/Chem/depth.csv")
+write_csv(stage, "02_Clean_data/Chem/PSI.csv")
 
 
 ###Interpolation####
 data_retrieval <- function(site_id) {
   parameterCd <- c('00065')
-  startDate <- "2022-04-12"
-  endDate <- "2024-01-11"
+  startDate <- "2022-05-12"
+  endDate <- "2024-02-05"
 
   river <- readNWISuv(site_id,parameterCd, startDate, endDate)
   split<-split(river, river$site_no)
@@ -217,7 +151,7 @@ stage_relationship <- function(site,elevation_diff) {
   (SlopemodInter<- cf[2])
 
   return(list(InterceptmodInter,SlopemodInter))}
-master<-read_csv("02_Clean_data/master.csv")
+master<-read_csv("02_Clean_data/Chem/PSI.csv")
 x<-c('Date','depth','ID')
 
 AM<-filter(master, ID=='AM')
@@ -251,7 +185,7 @@ LF<-filter(master, ID=='LF')
 site_id <- '02323500'
 parameterCd <- c('00065')
 startDate <- "2022-04-12"
-endDate <- "2023-11-11"
+endDate <- "2024-02-05"
 riverLF <- readNWISuv(site_id,parameterCd, startDate, endDate)
 riverLF<-riverLF[,c(1,3,2,4)]
 riverLF<-rename(riverLF, 'Date'='dateTime', 'elevation'='X_00065_00000')
@@ -265,12 +199,47 @@ LF<-riverLF[,x]
 
 
 ID<-filter(master, ID=='ID')
-SF<-read_csv("01_Raw_data/02322703_Level.csv",col_types = cols(Date = col_datetime(format = "%m/%d/%Y %H:%M")))
-SF<-rename(SF, 'elevation'="Level NAVD88")
+SF<- read_csv("01_Raw_data/02322703_Level.csv",
+              col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+SF<-SF %>%rename('elevation'="Level NAVD88") %>%filter(Date>'2021-04-02')
+
 (stage_slope<-stage_relationship(ID, SF))
 SF$depth<-SF$elevation*stage_slope[[2]]+stage_slope[[1]]
+SF$depth[SF$depth<0] <- NA
+SF$depth<-SF$depth+(1-min(SF$depth, na.rm = T))
 SF$ID<-'ID'
 ID<-SF[,x]
 
-stage<-rbind(AM, GB, LF, ID, OS)
+startDate <- "2022-05-12"
+endDate <- "2024-02-05"
+parameterCd <- c('00065')
+ventID<-'02322700'
+
+IU<- readNWISuv(ventID,parameterCd, startDate, endDate)
+IU<-IU %>% rename('Date'='dateTime')%>%
+  mutate(min=minute(Date)) %>% filter(min==0) %>%
+  mutate(ID='IU', depth=X_00065_00000-13.72)
+IU<-IU[,x]
+ID<-filter(ID, Date>"2022-05-12")
+
+stage<-rbind(AM, GB, LF, ID, OS, IU)
+
+ggplot(stage, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=2)
+
 write_csv(stage, "02_Clean_data/Chem/depth.csv")
+
+#Combine#####
+
+stage<-read_csv("02_Clean_data/Chem/depth.csv")
+master<-read_csv("02_Clean_data/master_chem1.csv")
+
+stage<-stage %>% mutate(day=day(Date), mnth=month(Date), yr=year(Date))
+master<-master %>% mutate(day=day(Date), mnth=month(Date), yr=year(Date))
+
+stage<-stage[,-1]
+master<-left_join(master, stage, by=c('ID', 'day', 'mnth', 'yr'))
+master <- master[!duplicated(master[c('Date','ID','DO')]),]
+
+ggplot(master, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=2)
+
+write_csv(master, "02_Clean_data/master_depth2.csv")

@@ -10,12 +10,21 @@ library("hydroTSM")
 library(mmand)
 library(imputeTS)
 library(streamMetabolizer)
+library(dataRetrieval)
 
-site <- read_csv("04_Outputs/one_station_inputs/AM.csv")
-samplingperiod <- read_csv("samplingperiod.csv",
-                           col_types = cols(Date = col_datetime(format = "%m/%d/%Y %H:%M")))
-metabolism <- function(site) {
+
+samplingperiod <- data.frame(Date = rep(seq(from=as.POSIXct("2021-03-29 00:00", tz="UTC"),
+                                            to=as.POSIXct("2024-02-05 00:00", tz="UTC"),by="hour")))
+samplingperiod<-samplingperiod %>% mutate(hr=hour(Date),day=day(Date),mnth=month(Date),yr=year(Date))
+
+
+metabolism <- function(samplingperiod,site) {
   site<-left_join(samplingperiod, site)
+  site <- site[!duplicated(site[c('Date')]),]
+  site$Temp[site$Temp < 65] <- mean(site$Temp, na.rm=T)
+  site$Temp[site$Temp > 80] <- mean(site$Temp, na.rm=T)
+
+
   site$Mouth_Temp_C<- fahrenheit.to.celsius(site$Temp)
 
   site<-rename(site,'DO.obs'='DO','temp.water'='Mouth_Temp_C','discharge'="Q_m.s")
@@ -74,56 +83,112 @@ compile<- function(site_output, site2) {
   site$NEP<-site$GPPavg+site$ER
   return(site)}
 
-samplingperiod <- read_csv("samplingperiod.csv",col_types = cols(Date = col_datetime(format = "%m/%d/%Y %H:%M")))
-
 bayes_name <- mm_name(type='bayes', pool_K600="binned", err_obs_iid=TRUE, err_proc_iid=TRUE)
 
 ###LF######
 LF_input <- read_csv("04_Outputs/one_station_inputs/LF.csv")
 bayes_specs<-bins(LF_input)
-LF_output<-metabolism(LF_input)
+LF_output<-metabolism(samplingperiod,LF_input)
 LF2 <- read_csv("04_Outputs/two_station/LF.csv")
 LF<-compile(LF_output, LF2)
 LF$ID<-'LF'
 
+#ggplot(LF, aes(Date, ER))+geom_line()
 ###GB######
 GB_input <- read_csv("04_Outputs/one_station_inputs/GB.csv")
 bayes_specs<-bins(GB_input)
-GB_output<-metabolism(GB_input)
+GB_output<-metabolism(samplingperiod,GB_input)
 GB2 <- read_csv("04_Outputs/two_station/GB.csv")
 GB<-compile(GB_output, GB2)
 GB$ID<-'GB'
+
+ggplot(GB, aes(Date, ER))+geom_line()
 
 ###OS######
 OS_input <- read_csv("04_Outputs/one_station_inputs/OS.csv")
 OS_input<-rename(OS_input, `Q_m.s`="Q_m/s", 'K600_avg'='K600_1d')
 bayes_specs<-bins(OS_input)
-OS<-metabolism(OS_input)
+OS<-metabolism(samplingperiod,OS_input)
 OS<-rename(OS,'Date'='date','GPPavg'="GPP_daily_mean",
                     'ER'='ER_daily_mean','K600_1d'='K600_daily_mean')
 OS$GPPavg[OS$GPPavg<0] <- 0
 OS$NEP<-OS$GPPavg+OS$ER
 OS$ID<-'OS'
+ggplot(OS, aes(Date, ER))+geom_line()
 
 ###AM######
 AM_input <- read_csv("04_Outputs/one_station_inputs/AM.csv")
 bayes_specs<-bins(AM_input)
-AM_output<-metabolism(AM_input)
+AM_output<-metabolism(samplingperiod,AM_input)
 
 AM2 <- read_csv("04_Outputs/two_station/AM.csv")
 AM<-compile(AM_output, AM2)
 AM$ID<-'AM'
+ggplot(AM, aes(Date, ER))+geom_line()
+
 ##ID#######
 ID <- read_csv("04_Outputs/two_station/ID.csv")
 x<-c('Date', 'ER','GPPavg', 'K600_1d')
 ID<-ID[,x]
 ID$NEP<-ID$GPPavg+ID$ER
 ID$ID<-'ID'
+
+###IU#######
+startDate <- "2022-05-12"
+endDate <- "2024-02-05"
+parameterCd <- c('00010','00300','00065')
+ventID<-'02322700'
+
+IU<- readNWISuv(ventID,parameterCd, startDate, endDate)
+IU<-IU %>% rename('Date'='dateTime', 'temp.water'='X_00010_00000', 'DO.obs'='X_00300_00000')%>%
+  mutate(depth=X_00065_00000-13.72)%>%
+  mutate(min=minute(Date)) %>% filter(min==0) %>%
+  mutate(DO.sat= Cs(temp.water), solar.time=as.POSIXct(Date, format="%Y-%m-%d %H:%M:%S", tz="UTC"),
+         light=calc_light(solar.time,  29.8, -82.6) )
+
+y<-c("DO.obs","depth","temp.water", "DO.sat","solar.time","light" )
+IU<-IU[,y]
+
+bayes_name <- mm_name(type='bayes', pool_K600='normal', err_obs_iid=TRUE, err_proc_iid=TRUE)
+bayes_specs <- specs(bayes_name, K600_daily_meanlog_meanlog=0.1, K600_daily_meanlog_sdlog=0.001, GPP_daily_lower=0,
+                     burnin_steps=1000, saved_steps=1000)
+mm<- metab(bayes_specs, IU)
+IU <- mm@fit$daily %>% select(date,GPP_daily_mean,ER_daily_mean,K600_daily_mean)
+
+IU<-rename(IU,'Date'='date','GPPavg'="GPP_daily_mean",
+                    'ER'='ER_daily_mean','K600_1d'='K600_daily_mean')
+IU$GPPavg[IU$GPPavg<0] <- 0
+
+x<-c('Date', 'ER','GPPavg', 'K600_1d')
+IU<-IU[,x]
+IU$NEP<-IU$GPPavg+IU$ER
+IU$ID<-'IU'
+
+ggplot(IU, aes(Date)) +
+  geom_point(aes(y=GPPavg,color='GPP'))
+
+
+# master_metabolism<-read_csv("02_Clean_data/master_metabolism.csv")
+# master_metabolism<-rbind(master_metabolism, IU)
+# write_csv(master_metabolism, "02_Clean_data/master_metabolism.csv")
 ######
-master_metabolism<-rbind(AM, OS, LF,GB, ID)
-write_csv(master_metabolism, "02_Clean_data/master_metabolism.csv")
+master_metabolism<-rbind(AM, OS, LF,GB, ID, IU)
+write_csv(master_metabolism, "02_Clean_data/master_metabolism3.csv")
+
+master_metabolism<-read_csv("02_Clean_data/master_metabolism3.csv")
+# master_metabolism<-master_metabolism %>%filter(ID !='LF') %>%
+#   rbind(LF)
+# master_metabolism<-rbind(master_metabolism, LF)
 
 
-ggplot(master_metabolism, aes(Date, GPPavg)) + geom_line() + facet_wrap(~ ID, ncol=2)
+master<-read_csv("02_Clean_data/master_depth2.csv")
+master_all<-left_join(master_metabolism,master, by=c('ID','Date'))
+master_all <- master_all[!duplicated(master_all[c('Date','ID')]),]
+master_all$GPPavg[master_all$GPPavg>30] <- 30
 
-ggplot(AM, aes(Date, NEP)) + geom_line()
+ggplot(master_all, aes(Date)) +
+  geom_line(aes(y=GPPavg,color='GPP'))+
+ facet_wrap(~ ID, ncol=2)
+
+
+write_csv(master_all, "02_Clean_data/master_met4.csv")

@@ -52,21 +52,7 @@ extract_reduce <- function(ID,IDFR) {
 
 #get data####
 
-master_chem <- read_csv("02_Clean_data/master.csv")
-master_met <- read_csv("02_Clean_data/master_metabolism.csv")
-master<-left_join(master_chem, master_met, by=c('ID','Date'))
-
-for(i in 1:nrow(master)) {if(master$ID[i]=='OS') {
-  master$u[i]<-(master$depth[i]*-0.0868+0.1579)*100}
-  else if (master$ID[i]=='ID'){
-    master$u[i]<-(master$depth[i]*-4.1+2.33)*100}
-  else if(master$ID[i]=='GB'){
-    master$u[i]<-(master$depth[i]*-0.768+0.51)*100}
-  else if(master$ID[i]=='LF'){
-    master$u[i]<- (master$depth[i]*-0.656 + 0.44)*100}
-  else if(master$ID[i]=='AM'){
-    master$u[i]<-(master$depth[i]*-1.89+1.4)*100}
-  else {master$u[i]<- NULL }}
+master<- read_csv("02_Clean_data/master_met4.csv")
 
 master<-master %>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))
 master$depth_diff<-master$depth-master$depth_min
@@ -77,6 +63,7 @@ GB<-IDs[[2]]
 ID<-IDs[[3]]
 LF<-IDs[[4]]
 OS<-IDs[[5]]
+IU<-IDs[[6]]
 
 ####GB####
 
@@ -99,7 +86,7 @@ GBFR<- GB %>% mutate(RI = case_when(
 GB_0723<-extract_reduce(GB, GBFR)
 
 GBFR<- GB %>% mutate(RI = case_when(
-  Date> "2023-12-18" & Date<"2024-01-11"~ 2))
+  Date> "2023-12-18" & Date<"2024-02-11"~ 2))
 GB_1223<-extract_reduce(GB, GBFR)
 
 
@@ -133,7 +120,7 @@ OtFR<- OS %>% mutate(RI = case_when(
 OS_0623<-extract_reduce(OS, OtFR)
 
 OtFR<- OS %>% mutate(RI = case_when(
-  Date> "2023-12-18" & Date<"2024-01-11"~ 2))
+  Date> "2023-12-18" & Date<"2024-02-11"~ 2))
 OS_1223<-extract_reduce(OS, OtFR)
 
 OS_tbl<-rbind(OS_0822,OS_0223,OS_0623,OS_1223)
@@ -162,10 +149,10 @@ OSmod_0723<-extract_reduce(OS, Otmod)
 Otmod<- Otter_mod %>% mutate(RI = case_when(Date>'2023-12-01' ~ 2))
 OSmod_1223<-extract_reduce(OS, Otmod)
 
-OSmod_tbl<-rbind(OSmod_0622,OSmod_0623,OSmod_0723,OSmod_1223)
+OSmod_tbl<-rbind(OSmod_0622,OSmod_0623,OSmod_0723)
 OSmod_tbl$ID<-'OS'
 OSmod_tbl$num<-4
-OSmod_tbl$IF <- c("h","h",'h','h')
+OSmod_tbl$IF <- c("h","h",'h')
 ####AllenMill##########
 
 # AMFRcheck<-filter(AMFR,RI==2 )
@@ -228,7 +215,7 @@ AMmod_tbl$IF <- c("h","h",'h','h','h')
 
 ####LF############
 # LFFRcheck<-filter(LFFR,RI==2 )
-# ggplot(LF, aes(Date, depth, colour=RI)) + geom_line()+
+# ggplot(LFFRcheck, aes(Date, depth, colour=RI)) + geom_line()+
 #   geom_hline(yintercept = 1)+
 #   geom_hline(yintercept = 1.31)
 
@@ -250,18 +237,19 @@ LFFR<- LF %>% mutate(RI = case_when(
   Date> "2023-08-19" & Date<"2023-10-06"~ 2))
 LF_0923<-extract_reduce(LF, LFFR)
 
-# LFFR<- LF %>% mutate(RI = case_when(
-#   Date> "2023-12-06" & Date<"2024-01-31"~ 2))
+LFFR<- LF %>% mutate(RI = case_when(
+   Date> "2023-12-06" & Date<"2024-02-11"~ 2))
+LF_0124<-extract_reduce(LF, LFFR)
 
-LF_tbl<-rbind(LF_0223,LF_0723,LF_0923)
+LF_tbl<-rbind(LF_0223,LF_0723,LF_0923,LF_0124)
 LF_tbl$ID<-'LF'
 LF_tbl$num<-2
-LF_tbl$IF <- c("h","h",'h')
+LF_tbl$IF <- c("h","h",'h','h')
 ######ID#######
 # IDFRcheck<-filter(IDFR,RI==2 )
 # ggplot(IDFRcheck, aes(Date, depth, colour=RI)) + geom_line()+
-#   geom_hline(yintercept = 0.76)+
-#   geom_hline(yintercept = 1.17)
+#   geom_hline(yintercept = 1)+
+#   geom_hline(yintercept = 1.31)
 
 ID<- ID %>% mutate(RI = case_when(
   depth<0.76 ~ "low",
@@ -280,22 +268,56 @@ IDFR<- ID %>% mutate(RI = case_when(
   Date> "2023-08-30" & Date<"2023-10-31"~ 2))
 ID_0923<-extract_reduce(ID, IDFR)
 
-# IDFR<- ID %>% mutate(RI = case_when(
-#   Date> "2023-12-01" & Date<"2024-01-31"~ 2))
+IDFR<- ID %>% mutate(RI = case_when(
+  Date> "2023-12-01" & Date<"2024-01-31"~ 2))
+ID_0124<-extract_reduce(ID, IDFR)
 
-ID_tbl<-rbind(ID_0223,ID_0823,ID_0923)
+ID_tbl<-rbind(ID_0223,ID_0823,ID_0923,ID_0124)
 ID_tbl$ID<-'ID'
 ID_tbl$num<-1
-ID_tbl$IF <- c("h","h",'h')
+ID_tbl$IF <- c("h","h",'h','h')
 
+######IU#######
+IU<-filter(IU, Date>'2022-05-02')
+
+IUFRcheck<-filter(IUFR,RI==2 )
+ggplot(IU, aes(Date, depth)) + geom_line()+
+  geom_hline(yintercept = 0.9)+
+  geom_hline(yintercept = 1.17)
+
+IU<- IU %>% mutate(RI = case_when(
+  depth<0.9 ~ "low",
+  depth<1.17 ~ "moderate",
+  depth>=1.17 ~ "high"))
+
+IUFR<- IU %>% mutate(RI = case_when(
+  Date> "2022-08-20" & Date<"2022-10-20"~ 2))
+IU_0822<-extract_reduce(IU, IUFR)
+
+IUFR<- IU %>% mutate(RI = case_when(
+  Date> "2023-01-01" & Date<"2023-05-01"~ 2))
+IU_0123<-extract_reduce(IU, IUFR)
+
+IUFR<- IU %>% mutate(RI = case_when(
+  Date> "2023-06-30" & Date<"2023-10-31"~ 2))
+IU_0623<-extract_reduce(IU, IUFR)
+
+IUFR<- IU %>% mutate(RI = case_when(
+  Date> "2023-12-01" & Date<"2024-01-31"~ 2))
+IU_0124<-extract_reduce(IU, IUFR)
+
+IU_tbl<-rbind(IU_0822,IU_0123,IU_0623,IU_0124)
+IU_tbl$ID<-'IU'
+IU_tbl$num<-1
+IU_tbl$IF <- c("h","h",'h','h')
 ###########
-R_R<-rbind(ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl, OSmod_tbl, AMmod_tbl)
+R_R<-rbind(IU_tbl, ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl, OSmod_tbl,
+           AMmod_tbl)
 
 R_R$GPP_reduce<-(1-(R_R$GPP/R_R$GPP0))*100
 R_R$ER_reduce<-(1-(R_R$ER0/R_R$ER))*100
-# R_R$GPP_reduction[R_R$GPP_reduction<1] <- NA
-# R_R$ER_reduction[R_R$ER_reduction<1] <- NA
 R_R$GPP_reduce[R_R$GPP_reduce<0] <- NA
+R_R$ER_reduce[R_R$ER_reduce<0] <- NA
 
 write_csv(R_R, "04_Outputs/reduction_analysis.csv")
 
@@ -311,7 +333,7 @@ hdiff<-('h'~Delta)
 
 theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
                              axis.text.y = element_text(size = 27, angle=0),
-                             legend.position = "right",
+                             legend.position = "none",
                              legend.text= element_text(size = 27),
                              panel.background = element_rect(fill = 'white'),
                              panel.grid.major = element_line(color = 'white'),
@@ -323,10 +345,8 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
 
 (a<-ggplot(R_R, aes(h, shape=ID, color=IF))+
     geom_point(aes(y=GPP_reduce), size=6)+
-    geom_smooth(aes(x=h, y=GPP_reduce, group=a), color='darkgreen', size=0.75,
-                data=R_R, se = FALSE, method='lm')+
     scale_colour_manual(name="", values = cols,
-                        labels=c("High depth Event", "Brownout","Flow Reversal"))+
+                        labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("Backwater Flood Impacts on GPP")+
     xlab(hdiff)+ylab("GPP Reduction (%)")+theme_sam+theme(
       axis.title.y =element_text(size = 27, color="darkgreen"),
@@ -337,13 +357,15 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
 (b<-ggplot(R_R, aes(h, shape=ID, color= IF))+
     geom_point(aes(y=ER_reduce), size=6)+
     scale_colour_manual(name="", values = cols,
-                        labels=c("High depth Event", "Brownout","Flow Reversal"))+
+                        labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("Backwater Flood Impacts on ER")+
     xlab(" ")+ylab("|ER| Increase (%)")+theme_sam+theme(
       axis.title.y =element_text(size = 27, color="darkred"),
       axis.title.x =element_text(size = 27),
       plot.title = element_text(size = 22, color="darkred")))
-
+RR_noID<- R_R %>% filter(ID != 'ID')
+summary(lm(ER_reduce ~ h, data=RR_noID))
+summary(lm(GPP_reduce ~ h, data=RR_noID))
 
 (hs<-plot_grid(a, b, nrow=1))
 
