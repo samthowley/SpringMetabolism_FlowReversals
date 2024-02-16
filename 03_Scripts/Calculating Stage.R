@@ -199,6 +199,7 @@ LF<-riverLF[,x]
 
 
 ID<-filter(master, ID=='ID')
+<<<<<<< HEAD
 SF<- read_csv("01_Raw_data/02322703_Level.csv",
               col_types = cols(Date = col_date(format = "%m/%d/%Y")))
 SF<-SF %>%rename('elevation'="Level NAVD88") %>%filter(Date>'2021-04-02')
@@ -209,6 +210,23 @@ SF$depth[SF$depth<0] <- NA
 SF$depth<-SF$depth+(1-min(SF$depth, na.rm = T))
 SF$ID<-'ID'
 ID<-SF[,x]
+=======
+SF<-read_csv("01_Raw_data/02322703_Level.csv",col_types = cols(Date = col_datetime(format = "%m/%d/%Y %H:%M")))
+SF<-rename(SF, 'elevation'="Level NAVD88")
+SF$day<-as.Date(SF$Date)
+ID$day<-as.Date(ID$Date)
+SF<-SF[,-c(1,2,3,4,6)]
+ID<-left_join(ID, SF, by='day')
+
+summary(modInter<-lm( depth~ elevation, data = ID))
+cf <- coef(modInter)
+(InterceptmodInter<- cf[1])
+(SlopemodInter<- cf[2])
+
+ID$depth<-ID$elevation*SlopemodInter+InterceptmodInter
+ID$ID<-'ID'
+ID<-ID[,x]
+>>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
 
 startDate <- "2022-05-12"
 endDate <- "2024-02-05"

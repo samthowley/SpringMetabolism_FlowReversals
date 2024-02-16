@@ -208,6 +208,10 @@ master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0)
 master <- master[!duplicated(master[c('Date','ID')]),]
 master<-rbind(master, IU)
 detach("package:plyr", unload = TRUE)
+<<<<<<< HEAD
+=======
+ggplot(master, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=2)
+>>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
 
 
 ggplot(master, aes(Date, pH)) + geom_line() + facet_wrap(~ ID, ncol=2)

@@ -88,7 +88,10 @@ two_station_parse <- function(spring) {
 two_station <- function(spring) {
   spring$K600_avg<-gaussianSmooth(spring$K600_1d, 90)
   spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
+<<<<<<< HEAD
 
+=======
+>>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
   spring$not<-spring$deltaDO_rate-spring$K_reaeration
   spring$season <- time2season(spring$Date, out.fmt = "seasons")
 
@@ -403,6 +406,7 @@ ID_recov$ID<-'ID'
 recovery<-rbind(AM_recov, GB_recov, LF_recov,  ID_recov) #ID_recov
 recovery<-recovery[,x]
 
+<<<<<<< HEAD
 met<-read_csv("02_Clean_data/master_metabolism3.csv")
 OSmet<-filter(met, ID=='OS')
 OS_recov<-left_join(OS, OSmet, by='Date')
@@ -415,6 +419,14 @@ IU_recov<-IU_recov[,x]
 
 recovery<-rbind(recovery,OS_recov,IU_recov) #ID_recov
 
+=======
+OSmet<-read_csv("02_Clean_data/master_metabolism.csv")
+OSmet<-filter(OSmet, ID=='OS')
+OS_recov<-left_join(OS, OSmet, by='Date')
+OS_recov<-OS_recov[,x]
+
+recovery<-rbind(recovery,OS_recov) #ID_recov
+>>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
 write_csv(recovery, "04_Outputs/ForRecovery.csv")
 
 
