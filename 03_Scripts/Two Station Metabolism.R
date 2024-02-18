@@ -10,9 +10,10 @@ library("hydroTSM")
 library(mmand)
 library(imputeTS)
 
-master <- read_csv("02_Clean_data/master.csv")
+master <- read_csv("02_Clean_data/master_depth2.csv")
 
 prelim <- function(spring) {
+  spring$depth<-gaussianSmooth(spring$depth, 90)
   spring$"velocity_m/s_abs"<-abs(spring$"velocity_m/s")
   spring$"Q_m/s"<-width*spring$depth*spring$"velocity_m/s_abs"
 
@@ -87,6 +88,10 @@ two_station_parse <- function(spring) {
 two_station <- function(spring) {
   spring$K600_avg<-gaussianSmooth(spring$K600_1d, 90)
   spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
+<<<<<<< HEAD
+
+=======
+>>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
   spring$not<-spring$deltaDO_rate-spring$K_reaeration
   spring$season <- time2season(spring$Date, out.fmt = "seasons")
 
@@ -128,7 +133,7 @@ two_station <- function(spring) {
 data_retrieval <- function(parameterCd, ventID) {
 
   startDate <- "2022-04-12"
-  endDate <- "2024-01-11"
+  endDate <- "2024-02-11"
 
   vent_15sec<-readNWISuv(ventID,parameterCd,startDate,endDate)
   vent_15sec<-vent_15sec[,-c(1,2,5,7,8)]
@@ -327,7 +332,7 @@ met_output<-two_station_parse(LF)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(one, aes(x=Date)) +
+ggplot(two, aes(x=Date)) +
   geom_line(aes(y=ER, color="ER"),size=1)+
   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+
   geom_hline(yintercept = 30)
@@ -401,12 +406,27 @@ ID_recov$ID<-'ID'
 recovery<-rbind(AM_recov, GB_recov, LF_recov,  ID_recov) #ID_recov
 recovery<-recovery[,x]
 
+<<<<<<< HEAD
+met<-read_csv("02_Clean_data/master_metabolism3.csv")
+OSmet<-filter(met, ID=='OS')
+OS_recov<-left_join(OS, OSmet, by='Date')
+OS_recov<-OS_recov[,x]
+
+IUmet<-filter(met, ID=='IU')
+IU <- master %>% filter(ID=='IU')
+IU_recov<-left_join(IU, IUmet, by=c('Date','ID'))
+IU_recov<-IU_recov[,x]
+
+recovery<-rbind(recovery,OS_recov,IU_recov) #ID_recov
+
+=======
 OSmet<-read_csv("02_Clean_data/master_metabolism.csv")
 OSmet<-filter(OSmet, ID=='OS')
 OS_recov<-left_join(OS, OSmet, by='Date')
 OS_recov<-OS_recov[,x]
 
 recovery<-rbind(recovery,OS_recov) #ID_recov
+>>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
 write_csv(recovery, "04_Outputs/ForRecovery.csv")
 
 

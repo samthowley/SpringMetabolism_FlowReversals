@@ -23,6 +23,7 @@ DO<-"DO mg/L"
 h<-expression(paste( h[i]-h[min]~(m)))
 u<-expression(paste('Velocity'~("m"~s^-1)))
 slopey<-expression(paste('g'~O[2]/m^3/'day'))
+poster_x<-'Depth Above Minimum'
 theme_sam<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
                              axis.text.y = element_text(size = 24, angle=0),
                              axis.title.y =element_text(size = 24, color = "black"),
@@ -32,52 +33,58 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
                              panel.background = element_rect(fill = 'white'),
                              axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
                              axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
+theme_poster<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
+                             axis.text.y = element_text(size = 24, angle=0),
+                             axis.title.y =element_blank(),
+                             axis.title.x =element_blank(),
+                             plot.title = element_text(size = 24),
+                             legend.position = "none",
+                             panel.background = element_rect(fill = 'white'),
+                             axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
+                             axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
+
 extract_slope <- function(site) {
   (siteNEP<-lm(NEP ~ depth_diff, data = site))
   cf <- coef(siteNEP)
   (SlopesiteNEP <- cf[2])
+  (SlopeInterNEP <- cf[1])
+
 
   (siteGPPavg<-lm(GPPavg ~ depth_diff, data = site))
   cf <- coef(siteGPPavg)
   (SlopesiteGPPavg <- cf[2])
+  (SlopeInterGPPavg <- cf[1])
 
   (siteER<-lm(ER*-1~ depth_diff, data = site))
   cf <- coef(siteER)
   (SlopesiteER <- cf[2])
+  (SlopeInterER <- cf[1])
 
   NEP<-as.numeric(c(SlopesiteNEP))
   GPP<-as.numeric(c(SlopesiteGPPavg))
   ER<-as.numeric(c(SlopesiteER))
 
-  return(list(NEP,GPP,ER))}
+  NEPInter<-as.numeric(c(SlopeInterNEP))
+  GPPInter<-as.numeric(c(SlopeInterGPPavg))
+  ERInter<-as.numeric(c(SlopeInterER))
+
+  return(list(NEP,GPP,ER,SlopeInterNEP,SlopeInterGPPavg,SlopeInterER))}
 slope_df <- function(site) {
   slopes<-extract_slope(site)
-  df<- data.frame(slopes[[1]],slopes[[2]],slopes[[3]])
+  df<- data.frame(slopes[[1]],slopes[[2]],slopes[[3]],slopes[[4]],slopes[[5]],slopes[[6]])
   df<-pivot_longer(df, cols = 1:3, values_to = 'met') #wide to long
   df$name[df$name == 'slopes..1..'] <- 'NEP'
   df$name[df$name == 'slopes..2..'] <- 'GPP'
   df$name[df$name == 'slopes..3..'] <- 'ER'
+  df$name[df$name == 'slopes..4..'] <- 'NEPInter'
+  df$name[df$name == 'slopes..5..'] <- 'GPPInter'
+  df$name[df$name == 'slopes..6..'] <- 'ERInter'
+
   return(df)}
 
 #get data####
 
-master_chem <- read_csv("02_Clean_data/master.csv")
-master_met <- read_csv("02_Clean_data/master_metabolism.csv")
-master<-left_join(master_chem, master_met, by=c('ID','Date'))
-master <- master[!duplicated(master[c('ID','Date')]),]
-
-
-for(i in 1:nrow(master)) {if(master$ID[i]=='OS') {
-  master$u[i]<-(master$depth[i]*-0.0868+0.1579)*100}
-  else if (master$ID[i]=='ID'){
-    master$u[i]<-(master$depth[i]*-4.1+2.33)*100}
-  else if(master$ID[i]=='GB'){
-    master$u[i]<-(master$depth[i]*-0.768+0.51)*100}
-  else if(master$ID[i]=='LF'){
-    master$u[i]<- (master$depth[i]*-0.656 + 0.44)*100}
-  else if(master$ID[i]=='AM'){
-    master$u[i]<-(master$depth[i]*-1.89+1.4)*100}
-  else {master$u[i]<- NULL }}
+master<- read_csv("02_Clean_data/master_met4.csv")
 
 master<-master %>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))
 master$depth_diff<-master$depth-master$depth_min
@@ -90,44 +97,41 @@ GB<-sites[[2]]
 ID<-sites[[3]]
 LF<-sites[[4]]
 OS<-sites[[5]]
+IU<-sites[[6]]
 
-ggplot(master, aes(Date, u)) + geom_line() + facet_wrap(~ ID, ncol=2)
+
+#ggplot(master, aes(Date, u)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
 ###Scatter plots#######
 
 (ID_sc<-ggplot(data=ID, aes(x=depth_diff)) +
+   geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
+   geom_point(aes(y=ER*-1), size=1, color='darkred')+
+   geom_point(aes(y=NEP), size=1, color='blue')+
+   ylab(flux)+scale_color_manual(values='black')+
+   geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
+               data=ID, se = FALSE, method='lm')+
+   geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
+               data=ID, se = FALSE, method='lm')+
+   geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
+               data=ID, se = FALSE, method='lm')+
+   xlab(poster_x)+ggtitle("ID")+
+   scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_poster)
+
+
+(IU_sc<-ggplot(data=IU, aes(x=depth_diff)) +
     geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
     geom_point(aes(y=ER*-1), size=1, color='darkred')+
     geom_point(aes(y=NEP), size=1, color='blue')+
-    ylab(flux)+scale_colour_manual(name="", values = col)+
+    ylab(flux)+scale_color_manual(values='black')+
     geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
-                data=ID, se = FALSE, method='lm')+
+                data=IU, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-                data=ID, se = FALSE, method='lm')+
+                data=IU, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-                data=ID, se = FALSE, method='lm')+
-    scale_x_continuous(n.breaks=4) +scale_y_continuous(n.breaks=3)+theme_sam)
-
-    xlab(h)+ggtitle("ID")
-
-#
-# (IU_sc<-ggplot(data=IU, aes(x=depth_diff)) +
-#     geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
-#     geom_point(aes(y=ER*-1), size=1, color='darkred')+
-#     geom_point(aes(y=NEP), size=1, color='blue')+
-#     ylab(flux)+scale_color_manual(values='black')+
-#     geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
-#                 data=IU, se = FALSE, method='lm')+
-#     geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-#                 data=IU, se = FALSE, method='lm')+
-#     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-#                 data=IU, se = FALSE, method='lm')+
-#     xlab(h)+ggtitle("IU")+
-#     scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_sam)
-#
-# lm(NEP~depth_diff, data = IU)
-# lm(ER~depth_diff, data = IU)
-# lm(GPPavg~depth_diff, data = IU)
+                data=IU, se = FALSE, method='lm')+
+    xlab(poster_x)+ggtitle("IU")+
+    scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_sam)
 
 
   (AM_sc<-ggplot(data=AM, aes(x=depth_diff)) +
@@ -143,7 +147,7 @@ ggplot(master, aes(Date, u)) + geom_line() + facet_wrap(~ ID, ncol=2)
                 data=AM, se = FALSE, method='lm')+
     xlab(h)+ggtitle("AM")+
       scale_x_continuous(n.breaks=4) +
-      scale_y_continuous(n.breaks=3)+ theme_sam)
+      scale_y_continuous(n.breaks=3)+ theme_poster)
 
 (LF_sc<-ggplot(data=LF, aes(x=depth_diff)) +
     geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
@@ -156,9 +160,8 @@ ggplot(master, aes(Date, u)) + geom_line() + facet_wrap(~ ID, ncol=2)
                 data=LF, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
                 data=LF, se = FALSE, method='lm')+
-    xlab(h)+ggtitle("LF")+
-    scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_sam)
+    xlab(h)+ggtitle("LF")+scale_x_continuous(n.breaks=4) +
+    scale_y_continuous(n.breaks=3)+theme_poster)
 
 (GB_sc<-ggplot(data=GB, aes(x=depth_diff)) +
     geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
@@ -171,9 +174,8 @@ ggplot(master, aes(Date, u)) + geom_line() + facet_wrap(~ ID, ncol=2)
                 data=GB, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
                 data=GB, se = FALSE, method='lm')+
-    xlab(h)+ggtitle("GB")+
-    scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_sam)
+    xlab(h)+ggtitle("GB")+scale_x_continuous(n.breaks=4) +
+    scale_y_continuous(n.breaks=3)+theme_poster)
 
 (OS_sc<-ggplot(data=OS, aes(x=depth_diff)) +
     geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
@@ -186,21 +188,8 @@ ggplot(master, aes(Date, u)) + geom_line() + facet_wrap(~ ID, ncol=2)
                 data=OS, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
                 data=OS, se = FALSE, method='lm')+
-    xlab(h)+ggtitle("OS")+
-    scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_sam)
-
-master_met<-filter(master_met, GPPavg<40)
-ggplot(data=master_met, aes(x=depth_diff)) +
-      geom_point(aes(y=GPPavg, color=day), size=1)+
-      geom_point(aes(y=ER, color=day), size=1)+
-  geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
-              data=master_met, se = FALSE, method='lm')+
-  geom_smooth(aes(x=depth_diff, y=ER), color='darkred', size=0.75,
-              data=master_met, se = FALSE, method='lm')+
-  scale_colour_gradient(low = "lightgray", high = "black", trans='date')+
-  facet_wrap(~ ID, ncol=3)+theme_sam+ylab(flux)+theme(legend.position = "none")
-
+    xlab(h)+ggtitle("OS")+scale_x_continuous(n.breaks=4) +
+    scale_y_continuous(n.breaks=3)+theme_poster)
 
 #######slope######
 
@@ -209,17 +198,19 @@ GB_x<-slope_df(GB)
 ID_x<-slope_df(ID)
 LF_x<-slope_df(LF)
 AM_x<-slope_df(AM)
+IU_x<-slope_df(IU)
 
-slope<-rbind(OS_x, GB_x, LF_x, ID_x, AM_x)
+
+slope<-rbind(OS_x, GB_x, LF_x, ID_x, AM_x,IU_x)
 
 q<-c("ER"='darkred', "GPP"='darkgreen', "NEP"='blue')
 
-ggplot(slope,aes(x=name,y=met))+
+slope<-ggplot(slope,aes(x=name,y=met))+
   geom_boxplot(outlier.color="black", fill=q)+
-  ggtitle("Slope Among Sites for GPP, ER and NEP")+
-  ylab(slopey)+xlab("")+theme_sam
+  ggtitle("Metabolic Response to Rising Stage")+
+  ylab("(Metabolic Flux)/(Depth Above Minimum)")+xlab("")+theme_sam
 #####box plots#########
-master$ID <- factor(master$ID , levels=c("ID", "GB", "LF", "OS", "AM"))
+master$ID <- factor(master$ID , levels=c("IU","ID", "GB", "LF", "OS", "AM"))
 
 ER<-ggplot(master, aes(x=ID, y=ER)) +
   geom_boxplot(outlier.colour="black", outlier.size=1,fill='darkred')+
@@ -392,9 +383,9 @@ GBFR<-filter(GB,  Date> "2023-12-01" & Date<"2024-01-11")
 
 plot_grid(GBg, AMg, OSg, ncol = 3)
 ####together#####
-(scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=2))
-(boxplots<-plot_grid(box,slope,  ncol=2))
-together<-plot_grid(scatter, boxplots, nrow=2, rel_heights = c(3/5,1.7/5))
+scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=2)
+boxplots<-plot_grid(box,slope,  ncol=2)
+together<-plot_grid(boxplots,scatter, nrow=2, rel_heights = c(3/5,1.7/5))
 
 ggsave(filename="metabolism.jpeg",
        plot = together,
