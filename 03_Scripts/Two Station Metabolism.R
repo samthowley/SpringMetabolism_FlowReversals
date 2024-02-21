@@ -88,10 +88,6 @@ two_station_parse <- function(spring) {
 two_station <- function(spring) {
   spring$K600_avg<-gaussianSmooth(spring$K600_1d, 90)
   spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
-<<<<<<< HEAD
-
-=======
->>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
   spring$not<-spring$deltaDO_rate-spring$K_reaeration
   spring$season <- time2season(spring$Date, out.fmt = "seasons")
 

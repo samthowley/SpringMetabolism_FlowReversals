@@ -93,7 +93,11 @@ LF2 <- read_csv("04_Outputs/two_station/LF.csv")
 LF<-compile(LF_output, LF2)
 LF$ID<-'LF'
 
-#ggplot(LF, aes(Date, ER))+geom_line()
+###post#####
+LF<-filter(master_metabolism, ID=='LF')
+ggplot(LF, aes(Date, GPPavg))+geom_line()
+LF<- LF %>% filter(ER< -5) %>% filter(GPPavg <27)
+
 ###GB######
 GB_input <- read_csv("04_Outputs/one_station_inputs/GB.csv")
 bayes_specs<-bins(GB_input)
@@ -176,10 +180,8 @@ master_metabolism<-rbind(AM, OS, LF,GB, ID, IU)
 write_csv(master_metabolism, "02_Clean_data/master_metabolism3.csv")
 
 master_metabolism<-read_csv("02_Clean_data/master_metabolism3.csv")
-# master_metabolism<-master_metabolism %>%filter(ID !='LF') %>%
-#   rbind(LF)
-# master_metabolism<-rbind(master_metabolism, LF)
-
+master_metabolism<-master_metabolism %>%filter(ID !='LF') %>%
+ rbind(LF)
 
 master<-read_csv("02_Clean_data/master_depth2.csv")
 master_all<-left_join(master_metabolism,master, by=c('ID','Date'))
