@@ -6,14 +6,10 @@ library(measurements)
 library(zoo)
 library(cowplot)
 # siteBO<-LFFR
-recovery_calc <- function(siteBO) {
-  x<-c("Date","DO","depth","ER","GPPavg")
-=======
 
 recovery_calc <- function(siteBO) {
   x<-c("Date","DO","depth","ER","GPPavg")
   siteBO<-siteBO[,x]
->>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
 
   siteBO <- siteBO %>%
     group_by(count = cumsum(c(TRUE, diff(Date) >= 1))) %>%
@@ -21,11 +17,8 @@ recovery_calc <- function(siteBO) {
 
   ind <- which.max(siteBO$depth)
   siteBO_prior <- siteBO[seq_len(ind - 1), ]
-<<<<<<< HEAD
   siteBO_prior<-filter(siteBO_prior, count<10)
-=======
   siteBO_prior<-filter(siteBO_prior, count<20)
->>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
   siteBO_disturb <- siteBO[ind:nrow(siteBO), ]
 
   GPP_prior<-mean(siteBO_prior$GPPavg, na.rm=T)
@@ -41,11 +34,8 @@ recovery_calc <- function(siteBO) {
   u<-
     siteBO_disturb %>%
     mutate( ERmean= rollapply(ER_ratio,4,mean, fill=NA, partial=TRUE, align='left'))
-<<<<<<< HEAD
   u<-u[,c(16,1)]
-=======
   u<-u[,c(11,1)]
->>>>>>> fec5f6b4128729d630d5c856ff5cb1feedf453b1
   siteBO_disturb<-left_join(siteBO_disturb,u,by=c('Date'))
 
   v<-
