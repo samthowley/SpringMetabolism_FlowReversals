@@ -131,5 +131,22 @@ k600 <- k600[complete.cases(k600[ , c('k600_1d')]), ]
 split<-k600 %>% split(k600$ID)
 write.xlsx(split, file = '04_Outputs/rC_k600.xlsx')
 
+#Roving DO####
+rov_everything<-data.frame()
+file.names <- list.files(path="01_Raw_data/Hobo/Roving DO", pattern=".csv", full.names=TRUE)
+for(fil in file.names){
+  rov <- read_csv(fil)
+  rov<-rov[,c(1,2)]
+  colnames(rov)[1] <- "Date"
+  colnames(rov)[2] <- "DO"
+  rov$ID<-strsplit(basename(fil), '_')[[1]][2]
+  rov<-rov %>% mutate(day=day(Date), month=month(Date), yr=year(Date)) %>% group_by(day, month, yr, ID) %>%
+    mutate(ventDO=mean(DO, na.rm=T), Date=as.Date(Date))
+  rov <- rov[!duplicated(rov[c('Date','ID')]),]
+
+  rov_everything<-rbind(rov_everything,rov)
+  }
+
 #####
 
+strsplit(basename(fil), '_')
