@@ -176,9 +176,9 @@ master_metabolism<-rbind(AM, OS, LF,GB, ID, IU)
 write_csv(master_metabolism, "02_Clean_data/master_metabolism3.csv")
 
 master_metabolism<-read_csv("02_Clean_data/master_metabolism3.csv")
-# master_metabolism<-master_metabolism %>%filter(ID !='LF') %>%
-#   rbind(LF)
-# master_metabolism<-rbind(master_metabolism, LF)
+master_metabolism<-master_metabolism %>%filter(ID !='LF') %>%
+  rbind(LF)
+master_metabolism<-rbind(master_metabolism, LF)
 
 
 master<-read_csv("02_Clean_data/master_depth2.csv")
