@@ -36,7 +36,7 @@ GasDome <- function(gas,stream) {
   gas$SchmidtCO2hi<-1742-91.24*gas$mouthTemp_C+2.208*gas$mouthTemp_C^2-0.0219*gas$mouthTemp_C^3
 
   gas<-gas %>%
-    group_by(day,month, yr,ID) %>%
+    group_by(day,month, yr,ID,rep) %>%
     mutate(cat = cur_group_id(), .before = c('ID', 'day')) %>%
     mutate(pCO2_water=max(CO2, na.rm=T)/1000000, day=as.Date(Date),
            pCO2_air=min(gas$CO2, na.rm=T)/1000000)%>%
@@ -46,7 +46,7 @@ GasDome <- function(gas,stream) {
     split(.$cat) %>%
     map(~ lm(CO2 ~ Date, data = .x)) %>%
     map_dfr(~ as.data.frame(t(as.matrix(coef(.))))) %>% rename('slope'='Date') %>%
-    mutate(cat= 1:75)%>%left_join(gas, by='cat')
+    mutate(cat= 1:124)%>%left_join(gas, by='cat')
 
   gas$deltaCO2_atm<- (abs(gas$slope)*2/1000000) #change in CO2 during float
 
@@ -64,19 +64,24 @@ GasDome <- function(gas,stream) {
   (gas$KCO2_1d<-gas$KCO2_md/gas$depth)
   (gas$k600_1d<- as.numeric(gas$k600_md/gas$depth))
 
-  x<-c("day","depth","KO2_1d","KCO2_1d","k600_1d","ID")
+  x<-c("day","depth","KO2_1d","KCO2_1d","k600_1d","ID",'rep')
   gas<-gas[,x]
-  gas <- gas[!duplicated(gas[c('k600_1d','ID')]),]
+  #gas <- gas[!duplicated(gas[c('k600_1d','ID')]),]
 
   return(gas)
 }
 
+#MAKE A FOLDER FOR EOSENSE GAS DOME. NEED TO MAKE A NEW SECTION FOR VAISALA IN ORDER TO
+#INCLUDE VAISALA MULTIPLIER
+
 #compile Gas Dome####
+library(tools)
 gas<-data.frame()
 file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/AllenMill",pattern=".csv", full.names=TRUE)
 for(fil in file.names){
   site <- read_csv(fil)
   site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  site$rep<-strsplit(file_path_sans_ext(fil), '_')[[1]][5]
   gas<-rbind(gas,site)
 }
 
@@ -85,6 +90,7 @@ file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/Gilchrist Blue",p
 for(fil in file.names){
   site <- read_csv(fil)
   site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  site$rep<-strsplit(file_path_sans_ext(fil), '_')[[1]][5]
   gas<-rbind(gas,site)
 }
 
@@ -92,6 +98,7 @@ file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/Ichetucknee",patt
 for(fil in file.names){
   site <- read_csv(fil)
   site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  site$rep<-strsplit(file_path_sans_ext(fil), '_')[[1]][5]
   gas<-rbind(gas,site)
 }
 
@@ -99,6 +106,7 @@ file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/LittleFanning",pa
 for(fil in file.names){
   site <- read_csv(fil)
   site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  site$rep<-strsplit(file_path_sans_ext(fil), '_')[[1]][5]
   gas<-rbind(gas,site)
 }
 
@@ -106,6 +114,7 @@ file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/Otter",pattern=".
 for(fil in file.names){
   site <- read_csv(fil)
   site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  site$rep<-strsplit(file_path_sans_ext(fil), '_')[[1]][5]
   gas<-rbind(gas,site)
 }
 
@@ -120,13 +129,16 @@ write_csv(gas, "04_Outputs/compiled_GasDome.csv")
 #calculate####
 k600<-GasDome(gas, stream)
 k600<-rename(k600, 'Date'='day')
+k600 <- k600[!duplicated(k600[c('k600_1d','ID','rep')]),]
+k600 <- k600[complete.cases(k600[ ,c('depth')]), ]
 
 u <- read_csv("01_Raw_data/u.csv")
 u$Date<-mdy(u$Date)
 
-k600<-left_join(u,k600, by=c('Date','ID'))
+k600<-left_join(k600,u, by=c('Date','ID'))
 k600$uh<-k600$u/k600$depth
-k600 <- k600[complete.cases(k600[ , c('k600_1d')]), ]
+x<-c("Date","depth","u","ID",'rep',"KO2_1d","KCO2_1d","uh","k600_1d", "VentDO", "VentTemp")
+k600<-k600[,x]
 
 split<-k600 %>% split(k600$ID)
 write.xlsx(split, file = '04_Outputs/rC_k600.xlsx')

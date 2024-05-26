@@ -1,13 +1,11 @@
 rm(list=ls())
 ##packages######
 library(ggpubr)
-library(readxl)
 library(grid)
-library(lubridate)
 library(cowplot)
 library(weathermetrics)
 library(measurements)
-library(StreamMetabolism)
+library(streamMetabolizer)
 library(corrplot)
 library(dataRetrieval)
 library(ggpmisc)
@@ -18,7 +16,7 @@ NEPflux<-expression(paste('NEP'~'(g'~O[2]/m^2/'day)'))
 flux<-expression(paste((g~O[2]/m^2/'day')))
 GPPflux<-expression(paste('GPP'~'(g'~O[2]/m^2/'day)'))
 ERflux<-expression(paste('ER'~'(g'~O[2]/m^2/'day)'))
-col<-c(NEP ='blue', GPPavg='darkgreen',ER ='darkred')
+col<-c(NEP ='blue', GPP='darkgreen',ER ='darkred')
 DO<-"DO mg/L"
 h<-expression(paste( h[i]-h[min]~(m)))
 u<-expression(paste('Velocity'~("m"~s^-1)))
@@ -50,10 +48,10 @@ extract_slope <- function(site) {
   (SlopeInterNEP <- cf[1])
 
 
-  (siteGPPavg<-lm(GPPavg ~ depth_diff, data = site))
-  cf <- coef(siteGPPavg)
-  (SlopesiteGPPavg <- cf[2])
-  (SlopeInterGPPavg <- cf[1])
+  (siteGPP<-lm(GPP ~ depth_diff, data = site))
+  cf <- coef(siteGPP)
+  (SlopesiteGPP <- cf[2])
+  (SlopeInterGPP <- cf[1])
 
   (siteER<-lm(ER*-1~ depth_diff, data = site))
   cf <- coef(siteER)
@@ -61,14 +59,14 @@ extract_slope <- function(site) {
   (SlopeInterER <- cf[1])
 
   NEP<-as.numeric(c(SlopesiteNEP))
-  GPP<-as.numeric(c(SlopesiteGPPavg))
+  GPP<-as.numeric(c(SlopesiteGPP))
   ER<-as.numeric(c(SlopesiteER))
 
   NEPInter<-as.numeric(c(SlopeInterNEP))
-  GPPInter<-as.numeric(c(SlopeInterGPPavg))
+  GPPInter<-as.numeric(c(SlopeInterGPP))
   ERInter<-as.numeric(c(SlopeInterER))
 
-  return(list(NEP,GPP,ER,SlopeInterNEP,SlopeInterGPPavg,SlopeInterER))}
+  return(list(NEP,GPP,ER,SlopeInterNEP,SlopeInterGPP,SlopeInterER))}
 slope_df <- function(site) {
   slopes<-extract_slope(site)
   df<- data.frame(slopes[[1]],slopes[[2]],slopes[[3]],slopes[[4]],slopes[[5]],slopes[[6]])
@@ -83,33 +81,33 @@ slope_df <- function(site) {
   return(df)}
 
 #get data####
+metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
+metabolism<-metabolism[,c('ER','GPP','NEP', 'Date', 'ID')]
+metabolism<-metabolism %>%rename('day'='Date') %>% mutate(day=as.Date(day))
+depth<-read_csv('02_Clean_data/master_depth2.csv')
+depth$day<-as.Date(depth$Date)
+master<-left_join(depth,metabolism, by=c('ID','day'))
 
-master<- read_csv("02_Clean_data/master_met4.csv")
+master<- master[!duplicated(master[c('ID','Date')]),]
+master<-master%>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))%>%
+  mutate(depth_diff= depth-depth_min)
 
-master<-master %>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))
-master$depth_diff<-master$depth-master$depth_min
-master$day<-as.Date(master$Date)
-master_met <- master[!duplicated(master[c('ID','day')]),]
-
-sites<-split(master_met,master_met$ID)
+sites<-split(master,master$ID)
+names(sites)
 AM<-sites[[1]]
 GB<-sites[[2]]
 ID<-sites[[3]]
-LF<-sites[[4]]
-OS<-sites[[5]]
-IU<-sites[[6]]
-
-
-#ggplot(master, aes(Date, u)) + geom_line() + facet_wrap(~ ID, ncol=2)
-
+IU<-sites[[4]]
+LF<-sites[[5]]
+OS<-sites[[6]]
 ###Scatter plots#######
 
 (ID_sc<-ggplot(data=ID, aes(x=depth_diff)) +
-   geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
+   geom_point(aes(y=GPP), size=1, color='darkgreen')+
    geom_point(aes(y=ER*-1), size=1, color='darkred')+
    geom_point(aes(y=NEP), size=1, color='blue')+
    ylab(flux)+scale_color_manual(values='black')+
-   geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
+   geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
                data=ID, se = FALSE, method='lm')+
    geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
                data=ID, se = FALSE, method='lm')+
@@ -117,14 +115,14 @@ IU<-sites[[6]]
                data=ID, se = FALSE, method='lm')+
    xlab(poster_x)+ggtitle("ID")+
    scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_poster)
-lm(GPPavg ~ depth_diff, data = ID)
+lm(GPP ~ depth_diff, data = ID)
 
 (IU_sc<-ggplot(data=IU, aes(x=depth_diff)) +
-    geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
+    geom_point(aes(y=GPP), size=1, color='darkgreen')+
     geom_point(aes(y=ER*-1), size=1, color='darkred')+
     geom_point(aes(y=NEP), size=1, color='blue')+
     ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
+    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
                 data=IU, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
                 data=IU, se = FALSE, method='lm')+
@@ -134,12 +132,12 @@ lm(GPPavg ~ depth_diff, data = ID)
     scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_sam)
 
 
-  (AM_sc<-ggplot(data=AM, aes(x=depth_diff)) +
-    geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
+(AM_sc<-ggplot(data=AM, aes(x=depth_diff)) +
+    geom_point(aes(y=GPP), size=1, color='darkgreen')+
     geom_point(aes(y=ER*-1), size=1, color='darkred')+
     geom_point(aes(y=NEP), size=1, color='blue')+
     ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
+    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
                 data=AM, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
                 data=AM, se = FALSE, method='lm')+
@@ -150,11 +148,11 @@ lm(GPPavg ~ depth_diff, data = ID)
       scale_y_continuous(n.breaks=3)+ theme_poster)
 
 (LF_sc<-ggplot(data=LF, aes(x=depth_diff)) +
-    geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
+    geom_point(aes(y=GPP), size=1, color='darkgreen')+
     geom_point(aes(y=ER*-1), size=1, color='darkred')+
     geom_point(aes(y=NEP), size=1, color='blue')+
     ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
+    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
                 data=LF, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
                 data=LF, se = FALSE, method='lm')+
@@ -164,11 +162,11 @@ lm(GPPavg ~ depth_diff, data = ID)
     scale_y_continuous(n.breaks=3)+theme_poster)
 
 (GB_sc<-ggplot(data=GB, aes(x=depth_diff)) +
-    geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
+    geom_point(aes(y=GPP), size=1, color='darkgreen')+
     geom_point(aes(y=ER*-1), size=1, color='darkred')+
     geom_point(aes(y=NEP), size=1, color='blue')+
     ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
+    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
                 data=GB, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
                 data=GB, se = FALSE, method='lm')+
@@ -177,12 +175,13 @@ lm(GPPavg ~ depth_diff, data = ID)
     xlab(h)+ggtitle("GB")+scale_x_continuous(n.breaks=4) +
     scale_y_continuous(n.breaks=3)+theme_poster)
 
+
 (OS_sc<-ggplot(data=OS, aes(x=depth_diff)) +
-    geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
+    geom_point(aes(y=GPP), size=1, color='darkgreen')+
     geom_point(aes(y=ER*-1), size=1, color='darkred')+
     geom_point(aes(y=NEP), size=1, color='blue')+
     ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPPavg), color='darkgreen', size=0.75,
+    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
                 data=OS, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
                 data=OS, se = FALSE, method='lm')+
@@ -201,42 +200,43 @@ AM_x<-slope_df(AM)
 IU_x<-slope_df(IU)
 
 
-slope<-rbind(OS_x, GB_x, LF_x, ID_x, AM_x,IU_x)
+slope_df<-rbind(OS_x, GB_x, LF_x, ID_x, AM_x,IU_x)
 
 q<-c("ER"='darkred', "GPP"='darkgreen', "NEP"='blue')
 expression(paste('slope'~'(g'~O[2]/m^2/'day)'/'h'))
 
-slope<-ggplot(slope,aes(x=name,y=met))+
+(slope<-ggplot(slope_df,aes(x=name,y=met))+
   geom_boxplot(outlier.color="black", fill=q)+
   ggtitle("Metabolic Response to Rising Stage")+
-  ylab(expression(paste('Slope'~'(g'~O[2]/m^2/'day)'/'h')))+xlab("")+theme_sam
+  ylab(expression(paste('Slope'~'(g'~O[2]/m/'day)')))+xlab("")+theme_sam)
+
 #####box plots#########
 master$ID <- factor(master$ID , levels=c("IU","ID", "GB", "LF", "OS", "AM"))
 
-ER<-ggplot(master, aes(x=ID, y=ER)) +
-  geom_boxplot(outlier.colour="black", outlier.size=1,fill='darkred')+
+(ER<-ggplot(master, aes(x=ID, y=ER)) +
+  geom_boxplot(outlier.colour="black", outlier.shape=NA,fill='darkred',coef=0)+
   ylab(flux)+
   ggtitle(ERflux)+
   ylim(0,-40)+
-  scale_y_continuous(n.breaks=3)+
+  scale_y_continuous(n.breaks=3, limits=c(-25,0))+
   stat_summary(fun=mean, colour="white", geom="point",
-               size=1, show.legend=FALSE) + theme_sam
+               size=1, show.legend=FALSE) + theme_sam)
 
-GPP<-ggplot(master, aes(x=ID, y=GPPavg)) +
-  geom_boxplot(outlier.colour="black", outlier.size=1,fill="darkgreen")+
+(GPP<-ggplot(master, aes(x=ID, y=GPP)) +
+  geom_boxplot(outlier.colour="black", outlier.shape=NA,fill="darkgreen", coef=0)+
   ggtitle(GPPflux)+
   stat_summary(fun=mean, colour="white", geom="point",
                size=1, show.legend=FALSE) +
-  scale_y_continuous(n.breaks=3)+theme_sam
+  scale_y_continuous(n.breaks=3,  limits=c(0,15))+theme_sam)
 
-NEP<-ggplot(master, aes(x=ID, y=NEP)) +
-  geom_boxplot(outlier.colour="black", outlier.size=1,fill="blue")+
+(NEP<-ggplot(master, aes(x=ID, y=NEP)) +
+  geom_boxplot(outlier.colour="black", outlier.shape=NA,fill="blue", coef=0)+
   ylab(flux)+
   ggtitle(NEPflux)+
   ylim(20,-20)+
-  scale_y_continuous(n.breaks=3)+
+  scale_y_continuous(n.breaks=3, limits=c(-10, 5))+
   stat_summary(fun=mean, colour="white", geom="point",
-               size=1, show.legend=FALSE) + theme_sam
+               size=1, show.legend=FALSE) + theme_sam)
 
 (box<-plot_grid(GPP, NEP, ER, ncol=1))
 ######cherry pick#####
@@ -251,6 +251,7 @@ theme_chem<-theme()+theme(axis.text.x = element_blank(),
       panel.background = element_rect(fill = 'white'),
       axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
       axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
+
 
 theme_bland<-theme()+    theme(axis.text.x = element_blank(),
                                axis.text.y = element_text(size = 17, angle=0),
@@ -269,19 +270,26 @@ SpC<-'Conductivity'
 pCO2<-expression(paste(CO[2]~"ppm"))
 FR<-expression(paste("Flow Reversal"~ (h[reversal])))
 BO<-expression(paste("Brownout"~ (h[brown])))
-library(mmand)
 
 ####LF#####
-LFFR<-filter(LF,  Date> "2023-02-01" & Date<"2023-04-13")
-LFFR$depth<-gaussianSmooth(LFFR$depth, 120)
-LFFR$depth_diff<-gaussianSmooth(LFFR$depth_diff, 120)
+library(mmand)
+library(openxlsx)
+LF_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "LF")
+rel_u <- lm(u ~ depth, data=LF_rC)
+(cf <- coef(rel_u))
+LF$u<-(LF$depth*cf[2]+cf[1])
+
+LFFR<-filter(LF,  Date> "2022-12-06" & Date<"2023-05-20")
+LFFR$depth_diff<-gaussianSmooth(LFFR$depth_diff, 60)
+LFFR$u<-gaussianSmooth(LFFR$u, 60)
+LFFR$depth_diff<-gaussianSmooth(LFFR$depth_diff, 60)
 
 
 (ch<-ggplot(LFFR, aes(x=Date))+
     geom_line(aes(y=depth_diff), color="black", linewidth=0.8)+
     ylab(h)+xlab('Date')+
     ggtitle(high, subtitle = "LF")+
-    scale_y_continuous(n.breaks=3)+theme_bland)
+    scale_y_continuous(n.breaks=3)+theme_sam)
 
 
 (cu<-ggplot(LFFR, aes(x=Date))+
@@ -298,44 +306,55 @@ LFFR$depth_diff<-gaussianSmooth(LFFR$depth_diff, 120)
       name = "DO mg/L",
       sec.axis = sec_axis( trans=~.*1000, name=pCO2))+theme_chem)
 
-(LF<-plot_grid(ch,cu,c, align = "v", ncol = 1, rel_heights = c(0.3,0.2,0.5)))
+(LFg<-plot_grid(ch,cu,c, align = "v", ncol = 1, rel_heights = c(0.3,0.2,0.5)))
 
 
-###Ot####
-OtBO<-filter(OS,  Date> "2023-12-18" & Date<"2024-01-11")
+###Ot
+OS_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "OS")
+rel_u <- lm(u ~ depth, data=OS_rC)
+(cf <- coef(rel_u))
+OS$u<-(OS$depth*cf[2]+cf[1])
+
+OtBO<-filter(OS,  Date> "2022-08-18" & Date<"2022-11-11")
+OtBO$u<-gaussianSmooth(OtBO$u, 70)
+OtBO$depth_diff<-gaussianSmooth(OtBO$depth_diff, 70)
 
 (bu<-ggplot(OtBO, aes(x=Date))+
-    geom_line(aes(y=SpC), color="black", linewidth=0.8)+
-    ylab(SpC)+xlab('Date')+
+    geom_line(aes(y=u), color="black", linewidth=0.8)+
+    ylab(h)+xlab('Date')+
     geom_hline(yintercept = 0, linetype='dashed')+
-    scale_y_continuous(n.breaks=3)+theme_bland)
+    scale_y_continuous(n.breaks=3)+theme_bland+theme(axis.text.x=element_text(size=10)))
 
 (bh<-ggplot(OtBO, aes(x=Date))+
     geom_line(aes(y=depth_diff), color="black", linewidth=0.8)+
-    ylab(h)+xlab('Date')+
-    ggtitle(FR, subtitle = "OS, 12/20/2023")+
+    ylab(u)+xlab('Date')+
+    geom_hline(yintercept = 0, linetype='dashed')+
     scale_y_continuous(n.breaks=3)+theme_bland)
 
+OtBO<-filter(OtBO, CO2>2000)
 (b<-ggplot(OtBO, aes(x=Date))+
+    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
     geom_line(aes(y=DO), color="black", linewidth=0.8)+
+    geom_hline(yintercept = 0, linetype='dashed')+
     scale_y_continuous(
-      name = "DO mg/L")+theme_sam)
-
-(bm<-ggplot(OtBO, aes(x=Date))+
-    geom_line(aes(y=GPPavg), color="black", linewidth=0.8)+
-    theme_sam)
-
+      name = "DO mg/L",
+      sec.axis = sec_axis( trans=~.*1000, name=pCO2))+theme_chem)
 
 (OSg<-plot_grid(bh,bu,b, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
 
 ###AM#####
+AM_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "AM")
+rel_u <- lm(u ~ depth, data=AM_rC)
+(cf <- coef(rel_u))
+AM$u<-(AM$depth*cf[2]+cf[1])
+
 AMFR<-filter(AM,  Date> "2023-12-15" & Date<"2024-01-11")
 # AMFR$depth_diff<-gaussianSmooth(AMFR$depth_diff, 120)
 
 (au<-ggplot(AMFR, aes(x=Date))+
-    geom_line(aes(y=SpC), color="black", linewidth=0.8)+
+    geom_line(aes(y=u), color="black", linewidth=0.8)+
     scale_y_continuous(n.breaks=3)+
-    ylab(SpC)+xlab('Date')+
+    ylab(u)+xlab('Date')+
     geom_hline(yintercept = 0, linetype='dashed')+theme_bland)
 
 (ah<-ggplot(AMFR, aes(x=Date))+
@@ -345,59 +364,31 @@ AMFR<-filter(AM,  Date> "2023-12-15" & Date<"2024-01-11")
     scale_y_continuous(n.breaks=3)+theme_bland)
 
 (a<-ggplot(AMFR, aes(x=Date))+
+    geom_line(aes(y=CO2/1000), color="purple", linewidth=0.8)+
     geom_line(aes(y=DO), color="black", linewidth=0.8)+
+    geom_hline(yintercept = 0, linetype='dashed')+
     scale_y_continuous(
-      name = "DO mg/L")+theme_sam)
-
-(am<-ggplot(AMFR, aes(x=Date))+
-    geom_line(aes(y=GPPavg), color="black", linewidth=0.8)+
-    theme_sam)
+      name = "DO mg/L",
+      sec.axis = sec_axis( trans=~.*1000, name=pCO2))+theme_chem)
 
 (AMg<-plot_grid(ah,au,a, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
 
-###GB#####
-GBFR<-filter(GB,  Date> "2023-12-01" & Date<"2024-01-11")
-# GBFR$depth_diff<-gaussianSmooth(GBFR$depth_diff, 120)
-
-(au<-ggplot(GBFR, aes(x=Date))+
-    geom_line(aes(y=SpC), color="black", linewidth=0.8)+
-    scale_y_continuous(n.breaks=3)+
-    ylab(SpC)+xlab('Date')+
-    geom_hline(yintercept = 0, linetype='dashed')+theme_bland)
-
-(ah<-ggplot(GBFR, aes(x=Date))+
-    geom_line(aes(y=depth_diff), color="black", linewidth=0.8)+
-    ylab(h)+xlab('Date')+
-    ggtitle(FR, subtitle = "GB, 12/28/2023")+
-    scale_y_continuous(n.breaks=3)+theme_bland)
-
-(a<-ggplot(GBFR, aes(x=Date))+
-    geom_line(aes(y=DO), color="black", linewidth=0.8)+
-    scale_y_continuous(
-      name = "DO mg/L") +theme_sam)
-
-(am<-ggplot(GBFR, aes(x=Date))+
-    geom_line(aes(y=GPPavg), color="black", linewidth=0.8)+
-    theme_sam)
-
-(GBg<-plot_grid(ah,au,a, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
-
-plot_grid(GBg, AMg, OSg, ncol = 3)
+hypoxia<-plot_grid(LFg, AMg, OSg, ncol = 3)
 ####together#####
 scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=2)
 boxplots<-plot_grid(box,slope,  ncol=2)
 together<-plot_grid(boxplots,scatter, nrow=2, rel_heights = c(3/5,1.7/5))
 
-ggsave(filename="metabolism.jpeg",
+ggsave(filename="master.jpeg",
        plot = together,
        width =12,
        height = 14.5,
        units = "in")
 
-ggsave(filename="poster metabolism.jpeg",
-       plot = together,
+ggsave(filename="poster master.jpeg",
+       plot = boxplots,
        width =17,
-       height = 15.5,
+       height = 12,
        units = "in")
 
 ggplot(GB, aes(x=Date))+
