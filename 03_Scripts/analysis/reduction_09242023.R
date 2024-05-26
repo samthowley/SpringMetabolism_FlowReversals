@@ -22,7 +22,6 @@ extract_reduce <- function(ID,IDFR) {
   ER0<-mean(ID_low$ER, na.rm=T)
   GPP0<-mean(ID_low$GPPavg, na.rm=T)
   h0<-mean(ID_low$depth_diff, na.rm=T)
-  u0<-mean(ID_low$u, na.rm=T)
 
   IDFR<-filter(IDFR, RI== "2")
 
@@ -30,22 +29,19 @@ extract_reduce <- function(ID,IDFR) {
   NEP<-min(IDFR$NEP, na.rm = T)
   ER<-min(IDFR$ER, na.rm = T)
   GPP<-min(IDFR$GPPavg, na.rm = T)
-  u<-max(IDFR$u, na.rm = T)
   date<-min(IDFR$Date, na.rm = T)
 
-  IDFR_ls<-list(h0,u0,ER0,GPP0,h,u,GPP,ER,date)
+  IDFR_ls<-list(h0,ER0,GPP0,h,GPP,ER,date)
   df<- data.frame(IDFR_ls[[1]],IDFR_ls[[2]],IDFR_ls[[3]],
                   IDFR_ls[[4]],IDFR_ls[[5]],IDFR_ls[[6]],
-                  IDFR_ls[[7]],IDFR_ls[[8]],IDFR_ls[[9]])
+                  IDFR_ls[[7]])
   colnames(df)[1]<-'h0'
-  colnames(df)[2]<-'u0'
-  colnames(df)[3]<-'ER0'
-  colnames(df)[4]<-'GPP0'
-  colnames(df)[5]<-'h'
-  colnames(df)[6]<-'u'
-  colnames(df)[7]<-'GPP'
-  colnames(df)[8]<-'ER'
-  colnames(df)[9]<-'date'
+  colnames(df)[2]<-'ER0'
+  colnames(df)[3]<-'GPP0'
+  colnames(df)[4]<-'h'
+  colnames(df)[5]<-'GPP'
+  colnames(df)[6]<-'ER'
+  colnames(df)[7]<-'date'
 
 
   return(df)}
@@ -280,10 +276,10 @@ ID_tbl$IF <- c("h","h",'h','h')
 ######IU#######
 IU<-filter(IU, Date>'2022-05-02')
 
-IUFRcheck<-filter(IUFR,RI==2 )
-ggplot(IU, aes(Date, depth)) + geom_line()+
-  geom_hline(yintercept = 0.9)+
-  geom_hline(yintercept = 1.17)
+# IUFRcheck<-filter(IUFR,RI==2 )
+# ggplot(IU, aes(Date, depth)) + geom_line()+
+#   geom_hline(yintercept = 0.9)+
+#   geom_hline(yintercept = 1.17)
 
 IU<- IU %>% mutate(RI = case_when(
   depth<0.9 ~ "low",

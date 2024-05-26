@@ -5,7 +5,7 @@ library(readxl)
 library(writexl)
 library(openxlsx)
 library(weathermetrics)
-master <- read_csv("02_Clean_data/master.csv")
+library(lme4)
 #k600 calculation constants######
 dome_length<-0.38
 dome_width<-0.22
@@ -16,171 +16,137 @@ domeVol_L<-15.466
 domeFoot_L<-83.6
 R<-0.08205
 dome_length<-0.38
-#######
+
+
+stream <- read_csv("02_Clean_data/master_depth2.csv")
+gas <- read_csv("04_Outputs/compiled_GasDome.csv")
 
 GasDome <- function(gas,stream) {
-  stream<-stream %>%  rename("CO2_enviro"='CO2')%>% mutate(day=day(Date), hour=hour(Date))
-  y<-c("CO2_enviro",'Temp','depth',"day","hour")
+  stream<-stream %>%  rename("CO2_enviro"='CO2')%>% mutate(day=day(Date), hour=hour(Date), month=month(Date),yr=year(Date))
+  y<-c("CO2_enviro",'Temp','depth',"day","hour", 'month', 'yr', 'ID')
   stream<-stream[,y]
-  gas<-gas %>% mutate(day=day(Date), hour=hour(Date))
-  gas<-left_join(gas, stream,by=c('hour', 'day'), relationship = "many-to-many")
-  day <- as.Date(gas$Date)[1]
 
-  mouthTemp_F<-mean(gas$Temp, na.rm=T)
-  mouthTemp_C<-fahrenheit.to.celsius(mouthTemp_F)
-  mouthTemp_K<-mouthTemp_C+273.15
-  SchmidtO2hi<-1568-86.04*mouthTemp_C+2.142*mouthTemp_C^2-0.0216*mouthTemp_C^3
-  SchmidtCO2hi<-1742-91.24*mouthTemp_C+2.208*mouthTemp_C^2-0.0219*mouthTemp_C^3
+  gas<-gas %>% mutate(day=day(Date), hour=hour(Date), month=month(Date),yr=year(Date))
+  gas<-left_join(gas, stream,by=c('hour', 'day', 'month', 'yr', 'ID'), relationship = "many-to-many")
 
-  pCO2_water<-	mean(gas$CO2_enviro, na.rm=T)/1000000
-  depth<-mean(gas$depth, na.rm=T)
+  gas$mouthTemp_F<-mean(gas$Temp, na.rm=T)
+  gas$mouthTemp_C<-fahrenheit.to.celsius(gas$mouthTemp_F)
+  gas$mouthTemp_K<-gas$mouthTemp_C+273.15
+  gas$SchmidtO2hi<-1568-86.04*gas$mouthTemp_C+2.142*gas$mouthTemp_C^2-0.0216*gas$mouthTemp_C^3
+  gas$SchmidtCO2hi<-1742-91.24*gas$mouthTemp_C+2.208*gas$mouthTemp_C^2-0.0219*gas$mouthTemp_C^3
 
-  (m<-lm(CO2~Date, data = gas))
-  cf <- coef(m)
-  (slope <- cf[2])
-  deltaCO2_atm<- ((slope*-1)*2/1000000) #change in CO2 during float
-  pCO2_air<-max(gas$CO2, na.rm=T)/1000000
+  gas<-gas %>%
+    group_by(day,month, yr,ID) %>%
+    mutate(cat = cur_group_id(), .before = c('ID', 'day')) %>%
+    mutate(pCO2_water=max(CO2, na.rm=T)/1000000, day=as.Date(Date),
+           pCO2_air=min(gas$CO2, na.rm=T)/1000000)%>%
+    ungroup
 
-  n<-(deltaCO2_atm*domeVol_L/R/mouthTemp_K)
-  FCO2<-n/domeFoot_m2*60
-  exp<-2400*((1/mouthTemp_K)-(1/298.15))
-  (KH<-0.034*exp(exp)) #mol/L/atm
-  KH_1000<-KH*1000
+  gas<-gas %>%
+    split(.$cat) %>%
+    map(~ lm(CO2 ~ Date, data = .x)) %>%
+    map_dfr(~ as.data.frame(t(as.matrix(coef(.))))) %>% rename('slope'='Date') %>%
+    mutate(cat= 1:75)%>%left_join(gas, by='cat')
 
-  KCO2_md<-(FCO2/KH_1000/(pCO2_air-pCO2_water))*24 #m/d
-  kO2<-KCO2_md*(SchmidtCO2hi/SchmidtO2hi)^(-2/3)
-  k600_md<- KCO2_md*(600/SchmidtCO2hi)^(-2/3) #m/d
+  gas$deltaCO2_atm<- (abs(gas$slope)*2/1000000) #change in CO2 during float
 
-  (KO2_1d<-kO2/depth)
-  (KCO2_1d<-KCO2_md/depth)
-  (k600_1d<- as.numeric(k600_md/depth))
-  return(list(day, depth, k600_1d))
+  gas$n<-(gas$deltaCO2_atm*domeVol_L/R/gas$mouthTemp_K)
+  gas$FCO2<-gas$n/domeFoot_m2*60
+  gas$exp<-2400*((1/gas$mouthTemp_K)-(1/298.15))
+  gas$KH<-0.034*((gas$exp)*(gas$exp))#mol/L/atm
+  gas$KH_1000<-gas$KH*1000
+
+  gas$KCO2_md<-(gas$FCO2/gas$KH_1000/(gas$pCO2_water-gas$pCO2_air))*24 #m/d
+  gas$kO2<-gas$KCO2_md*(gas$SchmidtCO2hi/gas$SchmidtO2hi)^(-2/3)
+  gas$k600_md<- gas$KCO2_md*(600/gas$SchmidtCO2hi)^(-2/3) #m/d
+
+  (gas$KO2_1d<-gas$kO2/gas$depth)
+  (gas$KCO2_1d<-gas$KCO2_md/gas$depth)
+  (gas$k600_1d<- as.numeric(gas$k600_md/gas$depth))
+
+  x<-c("day","depth","KO2_1d","KCO2_1d","k600_1d","ID")
+  gas<-gas[,x]
+  gas <- gas[!duplicated(gas[c('k600_1d','ID')]),]
+
+  return(gas)
 }
-k600_list <- function(stage,k600,date) {
-  col2<-list(stage,k600) #stage and k600 columns
-  col2<-as.data.frame(do.call(cbind, col2))
-  col2<- col2 %>% rename('stage'="V1",'k600'="V2") #assign correct column names
 
-  col1<-data.frame(date=date) #date column
-  col1<-pivot_longer(col1, cols = 1:23, values_to = 'Date') #wide to long
-  col1<-col1[,-c(1)]
-
-  done<-cbind(col1, col2)
-  return(done)}
-
-##### AM k600 ########
-x<-c('Date','CO2')
-k600<- vector("numeric")
-stage<- vector("numeric")
-date<- vector("integer")
-
-stream<-master%>%filter(ID=="AM")
+#compile Gas Dome####
+gas<-data.frame()
 file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/AllenMill",pattern=".csv", full.names=TRUE)
-
-for(i in file.names){
-  gas<-read_csv(i)
-  output<-GasDome(gas, stream)
-  stage[i] <- output[2]
-  k600[i] <- output[3]
-  date[i]<-output[1]
+for(fil in file.names){
+  site <- read_csv(fil)
+  site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  gas<-rbind(gas,site)
 }
 
-done_AM<-k600_list(stage, k600,date)
-write_csv(done_AM, "04_Outputs/k600/GB.csv")
-##### GB k600 ########
-x<-c('Date','CO2')
-k600<- vector("numeric")
-stage<- vector("numeric")
-date<- vector("integer")
 
-stream<-master%>%filter(ID=="GB")
 file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/Gilchrist Blue",pattern=".csv", full.names=TRUE)
-
-for(i in file.names){
-  gas<-read_csv(i)
-  output<-GasDome(gas, stream)
-  stage[i] <- output[2]
-  k600[i] <- output[3]
-  date[i]<-output[1]
+for(fil in file.names){
+  site <- read_csv(fil)
+  site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  gas<-rbind(gas,site)
 }
 
-done_GB<-k600_list(stage, k600,date)
-write_csv(done_GB, "04_Outputs/k600/GB.csv")
-
-##### ID k600 ########
-x<-c('Date','CO2')
-k600<- vector("numeric")
-stage<- vector("numeric")
-date<- vector("integer")
-
-stream<-master%>%filter(ID=="ID")
 file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/Ichetucknee",pattern=".csv", full.names=TRUE)
-
-for(i in file.names){
-  gas<-read_csv(i)
-  output<-GasDome(gas, stream)
-  stage[i] <- output[2]
-  k600[i] <- output[3]
-  date[i]<-output[1]
+for(fil in file.names){
+  site <- read_csv(fil)
+  site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  gas<-rbind(gas,site)
 }
 
-done_ID<-k600_list(stage, k600,date)
-write_csv(done_ID, "04_Outputs/k600/ID.csv")
-
-
-##### LF k600 ########
-x<-c('Date','CO2')
-k600<- vector("numeric")
-stage<- vector("numeric")
-date<- vector("integer")
-
-stream<-master%>%filter(ID=="LF")
 file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/LittleFanning",pattern=".csv", full.names=TRUE)
-
-for(i in file.names){
-  gas<-read_csv(i)
-  output<-GasDome(gas, stream)
-  stage[i] <- output[2]
-  k600[i] <- output[3]
-  date[i]<-output[1]
+for(fil in file.names){
+  site <- read_csv(fil)
+  site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  gas<-rbind(gas,site)
 }
 
-done_LF<-k600_list(stage, k600,date)
-write_csv(done_LF, "04_Outputs/k600/LF.csv")
-
-
-
-##### OS k600 ########
-x<-c('Date','CO2')
-k600<- vector("numeric")
-stage<- vector("numeric")
-date<- vector("integer")
-
-stream<-master%>%filter(ID=="OS")
 file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/Otter",pattern=".csv", full.names=TRUE)
-
-for(i in file.names){
-  gas<-read_csv(i)
-  output<-GasDome(gas, stream)
-  stage[i] <- output[2]
-  k600[i] <- output[3]
-  date[i]<-output[1]
+for(fil in file.names){
+  site <- read_csv(fil)
+  site$ID<-strsplit(basename(fil), '_')[[1]][1]
+  gas<-rbind(gas,site)
 }
 
-done_OS<-k600_list(stage, k600,date)
-write_csv(done_OS, "04_Outputs/k600/OS.csv")
+gas<-gas %>%
+  mutate(ID = ifelse(as.character(ID) == "AllenMill", "AM", as.character(ID)),
+         ID = ifelse(as.character(ID) == "GilchristBlue", "GB", as.character(ID)),
+         ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
+         ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
+         ID = ifelse(as.character(ID) == "Otter", "OS", as.character(ID)))
 
+write_csv(gas, "04_Outputs/compiled_GasDome.csv")
+#calculate####
+k600<-GasDome(gas, stream)
+k600<-rename(k600, 'Date'='day')
 
+u <- read_csv("01_Raw_data/u.csv")
+u$Date<-mdy(u$Date)
 
+k600<-left_join(u,k600, by=c('Date','ID'))
+k600$uh<-k600$u/k600$depth
+k600 <- k600[complete.cases(k600[ , c('k600_1d')]), ]
 
-##############
-# w<-c('Date', 'CO2')
-# destination_folder<-"01_Raw_data/CampbellSci/GasDome/Otter"
-# file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome/Otter/raw", full.names=TRUE, pattern = '.xlsx')
-# lapply(file.names, function(x, sheet='Sheet2') {
-#   t <- read_xlsx(x, sheet = 'Sheet2')
-#   t<-t[,w]
-#   t$CO2<-t$CO2*6
-#   write_csv(t,gsub("xlsx", "csv", x), paste0(destination_folder,"/", basename(x)))
-# })
+split<-k600 %>% split(k600$ID)
+write.xlsx(split, file = '04_Outputs/rC_k600.xlsx')
 
+#Roving DO####
+rov_everything<-data.frame()
+file.names <- list.files(path="01_Raw_data/Hobo/Roving DO", pattern=".csv", full.names=TRUE)
+for(fil in file.names){
+  rov <- read_csv(fil)
+  rov<-rov[,c(1,2)]
+  colnames(rov)[1] <- "Date"
+  colnames(rov)[2] <- "DO"
+  rov$ID<-strsplit(basename(fil), '_')[[1]][2]
+  rov<-rov %>% mutate(day=day(Date), month=month(Date), yr=year(Date)) %>% group_by(day, month, yr, ID) %>%
+    mutate(ventDO=mean(DO, na.rm=T), Date=as.Date(Date))
+  rov <- rov[!duplicated(rov[c('Date','ID')]),]
+
+  rov_everything<-rbind(rov_everything,rov)
+  }
+
+#####
+
+strsplit(basename(fil), '_')

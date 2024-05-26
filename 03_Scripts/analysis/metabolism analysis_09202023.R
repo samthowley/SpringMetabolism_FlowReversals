@@ -117,7 +117,7 @@ IU<-sites[[6]]
                data=ID, se = FALSE, method='lm')+
    xlab(poster_x)+ggtitle("ID")+
    scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_poster)
-
+lm(GPPavg ~ depth_diff, data = ID)
 
 (IU_sc<-ggplot(data=IU, aes(x=depth_diff)) +
     geom_point(aes(y=GPPavg), size=1, color='darkgreen')+
@@ -204,11 +204,12 @@ IU_x<-slope_df(IU)
 slope<-rbind(OS_x, GB_x, LF_x, ID_x, AM_x,IU_x)
 
 q<-c("ER"='darkred', "GPP"='darkgreen', "NEP"='blue')
+expression(paste('slope'~'(g'~O[2]/m^2/'day)'/'h'))
 
 slope<-ggplot(slope,aes(x=name,y=met))+
   geom_boxplot(outlier.color="black", fill=q)+
   ggtitle("Metabolic Response to Rising Stage")+
-  ylab("(Metabolic Flux)/(Depth Above Minimum)")+xlab("")+theme_sam
+  ylab(expression(paste('Slope'~'(g'~O[2]/m^2/'day)'/'h')))+xlab("")+theme_sam
 #####box plots#########
 master$ID <- factor(master$ID , levels=c("IU","ID", "GB", "LF", "OS", "AM"))
 
