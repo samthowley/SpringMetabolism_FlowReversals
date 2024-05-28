@@ -107,14 +107,13 @@ OS<-sites[[6]]
    geom_point(aes(y=ER*-1), size=1, color='darkred')+
    geom_point(aes(y=NEP), size=1, color='blue')+
    ylab(flux)+scale_color_manual(values='black')+
-   geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
-               data=ID, se = FALSE, method='lm')+
-   geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-               data=ID, se = FALSE, method='lm')+
-   geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-               data=ID, se = FALSE, method='lm')+
-   xlab(poster_x)+ggtitle("ID")+
-   scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_poster)
+   geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,data=ID, se = FALSE, method='lm')+
+   geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,data=ID, se = FALSE, method='lm')+
+   geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,data=ID, se = FALSE, method='lm')+
+   xlab(" ")+ggtitle("ID")+
+   scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
+   theme_poster+theme(axis.title.x = element_text(size = 20),
+                      axis.title.y = element_text(size = 20)))
 lm(GPP ~ depth_diff, data = ID)
 
 (IU_sc<-ggplot(data=IU, aes(x=depth_diff)) +
@@ -173,7 +172,9 @@ lm(GPP ~ depth_diff, data = ID)
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
                 data=GB, se = FALSE, method='lm')+
     xlab(h)+ggtitle("GB")+scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_poster)
+    scale_y_continuous(n.breaks=3)+theme_poster+
+    theme(axis.title.x = element_text(size = 20),
+          axis.title.y = element_text(size = 20)))
 
 
 (OS_sc<-ggplot(data=OS, aes(x=depth_diff)) +
@@ -190,6 +191,7 @@ lm(GPP ~ depth_diff, data = ID)
     xlab(h)+ggtitle("OS")+scale_x_continuous(n.breaks=4) +
     scale_y_continuous(n.breaks=3)+theme_poster)
 
+cherrypick_scatter<-plot_grid(ID_sc,GB_sc, ncol=1, align = 'v')
 #slope######
 
 OS_x<-slope_df(OS)
@@ -379,9 +381,11 @@ AMFR$u<-gaussianSmooth(AMFR$u, 6)
 
 hypoxia<-plot_grid(LFg, OSg, AMg, ncol = 3, align='h')
 ####together#####
+library(gridGraphics)
 scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=2)
 boxplots<-plot_grid(box,slope,  ncol=2)
 together<-plot_grid(boxplots,scatter, nrow=2, rel_heights = c(3/5,1.7/5))
+scatter_ex<-plot_grid(box,cherrypick_scatter,  ncol=2)
 
 ggsave(filename="flood types.jpeg",
        plot = hypoxia,
@@ -400,6 +404,12 @@ ggsave(filename="poster master.jpeg",
        width =17,
        height = 12,
        units = "in")
+ggsave(filename="scatter_ex.jpeg",
+       plot = scatter_ex,
+       width =17,
+       height = 12,
+       units = "in")
+
 
 ggplot(ID, aes(x=Date))+
     geom_line(aes(y=DO), linewidth=0.8)+theme_bland+ylab('DO mg/L')+

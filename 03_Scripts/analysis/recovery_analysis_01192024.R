@@ -422,10 +422,10 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("GPP Recovery")+
     xlab(h)+
-    ylab(y)+scale_y_continuous(trans='log10')+
+    ylab(y)+scale_y_continuous(trans='log10', limits = c(0.3,3))+
     theme_sam+theme(
       axis.title.y =element_text(size = 25, color='darkgreen'),
-      plot.title = element_text(size = 27, color='darkgreen')))
+        plot.title = element_text(size = 27, color='darkgreen')))
 summary(lm(log10(GPP_ratio) ~ h_diff, data=recov))
 summary(lm(log10(ER_ratio) ~ h_diff, data=recov))
 
@@ -438,7 +438,7 @@ summary(lm(log10(ER_ratio) ~ h_diff, data=recov))
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("ER Recovery")+
     xlab(hdiff)+
-    ylab(y)+scale_y_continuous(trans='log10')+theme_sam+
+    ylab(y)+scale_y_continuous(trans='log10', limits = c(0.3,3))+theme_sam+
     theme(
       axis.title.y =element_text(size = 25, color='darkred'),
       plot.title = element_text(size = 27, color='darkred')))
@@ -458,7 +458,7 @@ ggsave(filename="recovery_magnitude.jpeg",
     ggtitle("GPP Recovery")+
     xlab('River Reversal Frequency')+
     scale_x_discrete(limits=c("IU","ID","LF","GB","OS","AM"))+
-    ylab(y)+scale_y_continuous(trans='log10')+theme_sam+
+    ylab(y)+scale_y_continuous(trans='log10', limits = c(0.3,3))+theme_sam+
     theme(
       axis.title.y =element_text(size = 25, color='darkgreen'),
       plot.title = element_text(size = 27, color='darkgreen'),
@@ -472,7 +472,7 @@ ggsave(filename="recovery_magnitude.jpeg",
     ggtitle("ER Recovery")+
     xlab("River Reversal Frequency")+
     scale_x_discrete(limits=c("IU","ID","LF","GB","OS","AM"))+
-    ylab(y)+scale_y_continuous(trans='log10')+theme_sam+
+    ylab(y)+scale_y_continuous(trans='log10', limits = c(0.3,3))+theme_sam+
     theme(
       axis.title.y =element_text(size = 25, color='darkred'),
       plot.title = element_text(size = 27, color='darkred'),

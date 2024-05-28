@@ -355,7 +355,8 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
     xlab(h)+ylab("GPP Reduction (%)")+theme_sam+theme(
       axis.title.y =element_text(size = 27, color="darkgreen"),
       axis.title.x =element_text(size = 27),
-      plot.title = element_text(size = 22, color="darkgreen")))
+      plot.title = element_text(size = 22, color="darkgreen"))+
+      scale_y_continuous(limits = c(0,100)))
 
 
 (b<-ggplot(R_R, aes(h, shape=ID, color= IF))+
@@ -366,9 +367,10 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
     xlab(hdiff)+ylab("|ER| Increase (%)")+theme_sam+theme(
       axis.title.y =element_text(size = 27, color="darkred"),
       axis.title.x =element_text(size = 27),
-      plot.title = element_text(size = 22, color="darkred")))
+      plot.title = element_text(size = 22, color="darkred"))+
+    scale_y_continuous(limits = c(0,100)))
 summary(lm(ER_reduce ~ h, data=R_R))
-summary(lm(GPP_reduce ~ h, data=RR_noID))
+summary(lm(GPP_reduce ~ h, data=R_R))
 
 (flood_mag<-plot_grid(a, b, nrow=1))
 
@@ -389,14 +391,15 @@ ggsave(filename="reduced_mag.jpeg",
       axis.title.y =element_text(size = 27, color="darkred"),
       axis.title.x =element_text(size = 27),
       axis.text.x=element_text(size=18),
-      plot.title = element_text(size = 22, color="darkred")))
+      plot.title = element_text(size = 22, color="darkred"))+
+    scale_y_continuous(limits = c(0,100)))
 summary(lm(ER_reduce ~ h, data=R_R))
 summary(lm(GPP_reduce ~ h, data=RR_noID))
 
-(flood_mag<-plot_grid(a, c, nrow=1))
+(flood_site<-plot_grid(a, c, nrow=1))
 
 ggsave(filename="reduced_site.jpeg",
-       plot = flood_mag,
+       plot = flood_site,
        width =12,
        height = 5.5,
        units = "in")
