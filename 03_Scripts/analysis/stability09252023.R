@@ -8,7 +8,9 @@ library(cowplot)
 library("broom")
 library(car)
 library(imputeTS)
-library(zoo)
+library(corrplot)
+library(grwat)
+
 
 flux<-expression(paste('g'~O[2]/m^2/'day'))
 colstwo <- c("ER" = "red","depth" = "blue","GPP" = "green3")
@@ -63,6 +65,18 @@ autocorrelation <- function(site) {
 #get data####
 master<- read_csv("02_Clean_data/master_metabolism4.csv")
 
+master<- master %>% mutate(disturb = case_when(
+  ID=='ID' & depth>1.5 ~ 1,
+  ID=='GB' & depth>0.65 ~ 1,
+  ID=='LF' & depth>0.5 ~ 1,
+  ID=='AM' & depth>1.2 ~ 1,
+  ID=='OS' & depth>1.05 ~ 1,
+  ID=='IU' & depth> 1.7 ~ 1))
+master$disturb[is.na(master$disturb)]<-2
+master<-filter(master, disturb==2)
+
+#ggplot(master, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=2)
+
 master<-master %>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))%>%
   mutate(depth_diff= depth-depth_min)
 
@@ -77,6 +91,8 @@ ID<-sites[[3]]
 IU<-sites[[4]]
 LF<-sites[[5]]
 OS<-sites[[6]]
+
+ggplot(GB, aes(Date)) +geom_line(aes(y=GPP,color='mean'))+geom_hline(yintercept = 0.85)
 
 #CoV###########
 

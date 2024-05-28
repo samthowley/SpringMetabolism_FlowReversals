@@ -184,7 +184,6 @@ AMFR_0623<-filter(AMFR_0623, count<50)
 (AMFR_0623<-recovery_calc(AMFR_0623))
 
 
-
 AMFR<- AM %>% mutate(RI = case_when(
   Date> "2023-07-20" & Date<"2023-10-31"~ 2))
 AMFR<-filter(AMFR, RI==2)
@@ -193,7 +192,6 @@ ggplot(AMFR, aes(Date))+geom_line(aes(y=depth), size=1)
 AMFR_0823<-check_ratios(AMFR)
 #ggplot(AMFR_0823, aes(x=count,y=hmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_0823<-recovery_calc(AMFR_0823))
-
 
 
 AMFR<- AM %>% mutate(RI = case_when(Date> "2023-11-20" & Date<"2024-01-15"~ 2))
@@ -214,21 +212,22 @@ AM_tbl$IF <- c("rev","bo",'bo','rev')
 ####OS####
 OSFR<- OS %>% mutate(RI = case_when(Date> "2022-07-15" & Date<"2022-10-20"~ 2))
 OSFR<-filter(OSFR, RI==2)
-ggplot(OSFR, aes(Date))+
-  geom_line(aes(y=GPP), size=1)
+# ggplot(OSFR, aes(Date))+
+#   geom_line(aes(y=GPP), size=1)
 OSFR_08<-check_ratios(OSFR)
 #ggplot(OSFR_08, aes(x=count,y=hmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (OSFR_0822<-recovery_calc(OSFR_08))
 
 
-OSFR<- OS %>% mutate(RI = case_when(Date> "2023-05-07" & Date<"2023-10-20"~ 2))
+OSFR<- OS %>% mutate(RI = case_when(Date> "2023-05-07" & Date<"2023-07-23"~ 2))
 OSFR<-filter(OSFR, RI==2)
-#ggplot(OSFR, aes(Date))+geom_line(aes(y=depth), size=1)
+ggplot(OSFR, aes(Date))+geom_line(aes(y=depth), size=1)
 OSFR_0723<-check_ratios(OSFR)
-OSFR_0723<-filter(OSFR_0723, count<66)
-#ggplot(OSFR_0723, aes(x=count,y=hmean))+geom_point(size=1)+geom_smooth(method = "lm")
+ggplot(OSFR_0723, aes(x=count,y=GPPmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (OSFR_0723<-recovery_calc_FR(OSFR_0723))
+OSFR_0723$GPP_recov<-NA
 
+OSFR_0723$ER_recov<-NA
 
 OSFR<- OS %>% mutate(RI = case_when( Date> "2023-11-18" & Date<"2024-04-11"~ 2))
 OSFR<-filter(OSFR, RI==2)
@@ -290,7 +289,7 @@ LF_tbl$IF <- c("h","h","h")
 GBFR<- GB %>% mutate(RI = case_when(
   Date> "2022-07-01" & Date<"2022-12-20"~ 2))
 GBFR<-filter(GBFR, RI==2)
-#ggplot(GBFR, aes(Date))+ geom_line(aes(y=depth), size=1)
+ggplot(GBFR, aes(Date))+ geom_line(aes(y=depth), size=1)
 
 GBFR_0822<-check_ratios(GBFR)
 GBFR_0822<-filter(GBFR_0822, count<120)
@@ -299,13 +298,13 @@ ggplot(GBFR_0822, aes(count))+geom_point(aes(y=hmean))
 
 
 GBFR<- GB %>% mutate(RI = case_when(
-  Date> "2023-11-10" & Date<"2024-04-11"~ 2))
+  Date> "2023-11-10" & Date<"2024-01-27"~ 2))
 GBFR<-filter(GBFR, RI==2)
-#ggplot(GBFR, aes(Date))+ geom_point(aes(y=depth), size=1)
+ggplot(GBFR, aes(Date))+ geom_point(aes(y=depth), size=1)
 GBFR_1224<-check_ratios(GBFR)
-GBFR_1224<-filter(GBFR_1224, count<60)
-ggplot(GBFR_1224, aes(count))+ geom_point(aes(y=hmean))
-GBFR_1224<-recovery_calc(GBFR_1224)
+#GBFR_1224<-filter(GBFR_1224, count<60)
+ggplot(GBFR_1224, aes(count))+ geom_point(aes(y=GPPmean))
+(GBFR_1224<-recovery_calc_FR(GBFR_1224))
 
 
 GB_tbl<-rbind(GBFR_0822,GBFR_1224)
@@ -401,12 +400,7 @@ cols<-c(
   "bo"="burlywood4",
   "rev"="black")
 
-recov$IF<- factor(recov$IF, levels=c("h","bo","rev"))
-
-h<-expression(paste( h[i]-h[min]~(Δh)))
-hdiff<-('h'~Delta)
 y<-expression(paste( (Stage[Recovery])/(Metabolic[Recovery])))
-
 recov$IF <- factor(recov$IF  , levels=c("h","bo","rev"))
 h<-expression(paste( h[i]-h[min]~(Δh)))
 hdiff<-('h'~Delta)
@@ -427,11 +421,11 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
     scale_colour_manual(name="", values = cols,
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("GPP Recovery")+
-    xlab(hdiff)+
+    xlab(h)+
     ylab(y)+scale_y_continuous(trans='log10')+
     theme_sam+theme(
       axis.title.y =element_text(size = 25, color='darkgreen'),
-      plot.title = element_text(size = 27, color='darkgreen'))
+      plot.title = element_text(size = 27, color='darkgreen')))
 summary(lm(log10(GPP_ratio) ~ h_diff, data=recov))
 summary(lm(log10(ER_ratio) ~ h_diff, data=recov))
 
@@ -450,41 +444,44 @@ summary(lm(log10(ER_ratio) ~ h_diff, data=recov))
       plot.title = element_text(size = 27, color='darkred')))
 
 both<-plot_grid(f,g, ncol=2)
-ggsave(filename="recovery.jpeg",
+ggsave(filename="recovery_magnitude.jpeg",
        plot = both,
        width =12,
        height = 6,
        units = "in")
 
-(h<-ggplot(recov, aes(x=ID, shape=ID, color=IF, group=1))+
+(h<-ggplot(recov, aes(x=ID, color=IF, group=1))+
     geom_point(aes(y=GPP_ratio), size=6)+
     geom_hline(yintercept = 1, linetype='dashed')+
     scale_colour_manual(name="", values = cols,
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("GPP Recovery")+
-    xlab(hdiff)+
+    xlab('River Reversal Frequency')+
     scale_x_discrete(limits=c("IU","ID","LF","GB","OS","AM"))+
     ylab(y)+scale_y_continuous(trans='log10')+theme_sam+
     theme(
       axis.title.y =element_text(size = 25, color='darkgreen'),
-      plot.title = element_text(size = 27, color='darkgreen')))
+      plot.title = element_text(size = 27, color='darkgreen'),
+      axis.text.x = element_text(size=17)))
 
-(i<-ggplot(recov, aes(ID, shape=ID, color=IF))+
+(i<-ggplot(recov, aes(ID, color=IF))+
     geom_point(aes(y=ER_ratio), size=6)+
     geom_hline(yintercept = 1, linetype='dashed')+
     scale_colour_manual(name="", values = cols,
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("ER Recovery")+
-    xlab(hdiff)+
+    xlab("River Reversal Frequency")+
     scale_x_discrete(limits=c("IU","ID","LF","GB","OS","AM"))+
     ylab(y)+scale_y_continuous(trans='log10')+theme_sam+
     theme(
       axis.title.y =element_text(size = 25, color='darkred'),
-      plot.title = element_text(size = 27, color='darkred')))
+      plot.title = element_text(size = 27, color='darkred'),
+      axis.text.x = element_text(size=17)))
 both<-plot_grid(h,i, ncol=2)
 
-ggsave(filename="recovery by site.jpeg",
+ggsave(filename="recovery_site.jpeg",
        plot = both,
        width =12,
        height = 6,
        units = "in")
+
