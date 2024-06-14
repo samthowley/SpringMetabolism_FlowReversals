@@ -10,6 +10,7 @@ library(corrplot)
 library(dataRetrieval)
 library(ggpmisc)
 library(tidyverse)
+library(readxl)
 #constants######
 
 #NEPflux<-expression(paste('NEP'~'(g'~O[2]/m^2/'day)'))
@@ -93,7 +94,6 @@ master<-master%>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))%>%
   mutate(depth_diff= depth-depth_min)
 
 sites<-split(master,master$ID)
-names(sites)
 AM<-sites[[1]]
 GB<-sites[[2]]
 ID<-sites[[3]]
@@ -114,7 +114,7 @@ OS<-sites[[6]]
    scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
    theme_poster+theme(axis.title.x = element_text(size = 20),
                       axis.title.y = element_text(size = 20)))
-lm(GPP ~ depth_diff, data = ID)
+summary(lm(GPP ~ depth_diff, data = ID))
 
 (IU_sc<-ggplot(data=IU, aes(x=depth_diff)) +
     geom_point(aes(y=GPP), size=1, color='darkgreen')+
@@ -130,6 +130,7 @@ lm(GPP ~ depth_diff, data = ID)
     xlab(poster_x)+ggtitle("IU")+
     scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_sam)
 
+summary(lm(GPP ~ depth_diff, data = IU))
 
 (AM_sc<-ggplot(data=AM, aes(x=depth_diff)) +
     geom_point(aes(y=GPP), size=1, color='darkgreen')+
@@ -146,6 +147,8 @@ lm(GPP ~ depth_diff, data = ID)
       scale_x_continuous(n.breaks=4) +
       scale_y_continuous(n.breaks=3)+ theme_poster)
 
+summary(lm(GPP ~ depth_diff, data = AM))
+
 (LF_sc<-ggplot(data=LF, aes(x=depth_diff)) +
     geom_point(aes(y=GPP), size=1, color='darkgreen')+
     geom_point(aes(y=ER*-1), size=1, color='darkred')+
@@ -159,6 +162,8 @@ lm(GPP ~ depth_diff, data = ID)
                 data=LF, se = FALSE, method='lm')+
     xlab(h)+ggtitle("LF")+scale_x_continuous(n.breaks=4) +
     scale_y_continuous(n.breaks=3)+theme_poster)
+
+summary(lm(GPP ~ depth_diff, data = LF))
 
 (GB_sc<-ggplot(data=GB, aes(x=depth_diff)) +
     geom_point(aes(y=GPP), size=1, color='darkgreen')+
@@ -176,6 +181,7 @@ lm(GPP ~ depth_diff, data = ID)
     theme(axis.title.x = element_text(size = 20),
           axis.title.y = element_text(size = 20)))
 
+summary(lm(GPP ~ depth_diff, data = GB))
 
 (OS_sc<-ggplot(data=OS, aes(x=depth_diff)) +
     geom_point(aes(y=GPP), size=1, color='darkgreen')+
@@ -276,7 +282,6 @@ BO<-expression(paste("Brownout"~ (h[brown])))
 
 ####LF
 library(mmand)
-library(openxlsx)
 LF_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "LF")
 rel_u <- lm(u ~ depth, data=LF_rC)
 (cf <- coef(rel_u))
@@ -380,6 +385,19 @@ AMFR$u<-gaussianSmooth(AMFR$u, 6)
 (AMg<-plot_grid(ah,au,a, align = "v", ncol = 1, rel_heights = c(0.2,0.2,0.5)))
 
 hypoxia<-plot_grid(LFg, OSg, AMg, ncol = 3, align='h')
+
+#velocity example
+AMFR<-filter(AM,  Date> "2023-11-15" & Date<"2023-12-21")
+AMFR$depth_diff<-gaussianSmooth(AMFR$depth_diff, 6)
+AMFR$u<-gaussianSmooth(AMFR$u, 6)
+
+(au<-ggplot(AMFR, aes(x=depth))+
+    geom_line(aes(y=u), color="black", linewidth=0.8)+
+    scale_y_continuous(n.breaks=3)+
+    ylab(u)+xlab('Depth (m)')+
+    geom_hline(yintercept = 0, linetype='dashed')+theme_bland+
+    theme(axis.title.x = element_text(size=17)))
+
 ####together#####
 library(gridGraphics)
 scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=2)
