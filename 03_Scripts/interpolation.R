@@ -28,7 +28,20 @@ river_elevation <- function(site_id,parameterCd) {
     mutate(elevation=abs(stage_up-stage_down)*proportion)
   river<-river[,c(1,5)]
   return(river)}
+for_wilcox <- function(site_id,parameterCd) {
+  river <- readNWISuv(site_id,parameterCd)
+
+  river<-river[,c(3,4)]
+  river<-rename(river, 'Date'='dateTime', 'stage_up'='X_00065_00000')
+  
+  river<- river %>% mutate(minute = minute(Date))
+  river<-river %>% filter(minute==0)
+  river<-river[,c(1,5)]
+  return(river)}
+
 interpolation <- function(site) {
+  GPP_bound<-min(site$GPP, na.rm=T)
+  ER_bound<-min(site$ER, na.rm=T)
   
   mod_h<-lm(formula =  stage ~ elevation, data = site)
   cf <- coef(mod_h)
@@ -79,12 +92,26 @@ site_id <- c('02322500','02321958')
 parameterCd <- c('00065')
 ftwhite <- river_elevation(site_id,parameterCd)
 
+site_id <- '02323500'
+parameterCd <- c('00065')
+proportion<-1
+wilcox <- for_wilcox(site_id,parameterCd)
+
+site_id <- c('02320000','02319800')
+parameterCd <- c('00065')
+proportion<-0.501
+dowling <- river_elevation(site_id,parameterCd)
+
+site_id <- c('02323000','02323500')
+parameterCd <- c('00065')
+proportion<-0.72
+OS_river <- river_elevation(site_id,parameterCd)
+
+
 ###GB run####
 GB<-left_join(GB, ftwhite)
 GB_edit<-filter(GB, depth_diff<0.6)
 
-GPP_bound<-min(GB_edit$GPP, na.rm=T)
-ER_bound<-min(GB_edit$ER, na.rm=T)
 
 ggplot(data=GB, aes(x=depth_diff)) +
     geom_point(aes(y=GPP), size=1, color='darkgreen')+
