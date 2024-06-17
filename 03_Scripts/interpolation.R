@@ -15,45 +15,46 @@ river_elevation <- function(site_id,parameterCd) {
   
   up_gage <-split(river, river$site_no)[[2]]
   up_gage<-up_gage[,c(3,4)]
-  up_gage<-rename(up_gage, 'Date'='dateTime', 'stage_up'='X_00065_00000')
+  up_gage<-rename(up_gage, 'Date'='dateTime', 'depth_up'='X_00065_00000')
   
   down_gage <-split(river, river$site_no)[[1]]
   down_gage<-down_gage[,c(3,4)]
-  down_gage<-rename(down_gage, 'Date'='dateTime', 'stage_down'='X_00065_00000')
+  down_gage<-rename(down_gage, 'Date'='dateTime', 'depth_down'='X_00065_00000')
   
   river<-left_join(down_gage,up_gage, by='Date')
   
   river<- river %>% mutate(minute = minute(Date))
   river<-river %>% filter(minute==0) %>% 
-    mutate(elevation=abs(stage_up-stage_down)*proportion)
+    mutate(elevation=abs(depth_up-depth_down)*proportion)
   river<-river[,c(1,5)]
   return(river)}
+
 for_wilcox <- function(site_id,parameterCd) {
   river <- readNWISuv(site_id,parameterCd)
 
   river<-river[,c(3,4)]
-  river<-rename(river, 'Date'='dateTime', 'stage_up'='X_00065_00000')
+  river<-rename(river, 'Date'='dateTime', 'elevation'='X_00065_00000')
   
   river<- river %>% mutate(minute = minute(Date))
   river<-river %>% filter(minute==0)
-  river<-river[,c(1,5)]
+  river<-river[,c(1,2)]
   return(river)}
 
-interpolation <- function(site) {
+check <- function(site, river) {
   GPP_bound<-min(site$GPP, na.rm=T)
   ER_bound<-min(site$ER, na.rm=T)
   
-  mod_h<-lm(formula =  stage ~ elevation, data = site)
+  mod_h<-lm(formula =  depth ~ elevation, data = site)
   cf <- coef(mod_h)
   (site$h_inter<-(cf[2]*site$elevation)+cf[1])
   
   
-  modGPP<-lm(GPP ~ stage, data = site)
+  modGPP<-lm(GPP ~ depth, data = site)
   cf <- coef(modGPP)
   (site$GPP_est<- cf[2]*site$h_inter+cf[1])
   
   
-  modER<-lm(ER ~ stage, data = site)
+  modER<-lm(ER ~ depth, data = site)
   cf <- coef(modER)
   (site$ER_est<- cf[2]*site$h_inter+cf[1])
   
@@ -64,7 +65,59 @@ interpolation <- function(site) {
   site<- site %>% mutate(ratio_GPP=GPP/GPP_est, ratio_ER=ER/ER_est,
                                  ratio_h=depth/h_inter)
   
+  return(river)}
+interpolation <- function(site, river) {
+  GPP_bound<-min(site$GPP, na.rm=T)
+  ER_bound<-min(site$ER, na.rm=T)
+  
+  mod_h<-lm(formula =  depth ~ elevation, data = site)
+  cf <- coef(mod_h)
+  (river$h_inter<-(cf[2]*river$elevation)+cf[1])
+  
+  
+  modGPP<-lm(GPP ~ depth, data = site)
+  cf <- coef(modGPP)
+  (river$GPP_est<- cf[2]*river$h_inter+cf[1])
+  
+  
+  modER<-lm(ER ~ depth, data = site)
+  cf <- coef(modER)
+  (river$ER_est<- cf[2]*river$h_inter+cf[1])
+  
+  
+  river$GPP[river$GPP< GPP_bound] <- GPP_bound
+  river$ER[river$ER< ER_bound] <- ER_bound
+  
+  return(river)}
+
+interpolation_wilcox <- function(site) {
+  GPP_bound<-min(site$GPP, na.rm=T)
+  ER_bound<-min(site$ER, na.rm=T)
+  
+  names(site)
+  mod_h<-lm(formula =  depth ~ elevation, data = site)
+  cf <- coef(mod_h)
+  (site$h_inter<-(cf[2]*site$elevation)+cf[1])
+  
+  
+  modGPP<-lm(GPP ~ depth, data = site)
+  cf <- coef(modGPP)
+  (site$GPP_est<- cf[2]*site$h_inter+cf[1])
+  
+  
+  modER<-lm(ER ~ depth, data = site)
+  cf <- coef(modER)
+  (site$ER_est<- cf[2]*site$h_inter+cf[1])
+  
+  
+  site$GPP[site$GPP< GPP_bound] <- GPP_bound
+  site$ER[site$ER< ER_bound] <- ER_bound
+  
+  site<- site %>% mutate(ratio_GPP=GPP/GPP_est, ratio_ER=ER/ER_est,
+                         ratio_h=depth/h_inter)
+  
   return(site)}
+
 
 #get data####
 metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
@@ -91,39 +144,57 @@ proportion<-0.79
 site_id <- c('02322500','02321958')
 parameterCd <- c('00065')
 ftwhite <- river_elevation(site_id,parameterCd)
+write_csv(ftwhite, "04_Outputs/ftwhite.csv")
 
 site_id <- '02323500'
 parameterCd <- c('00065')
 proportion<-1
 wilcox <- for_wilcox(site_id,parameterCd)
+write_csv(wilcox, "04_Outputs/wilcox.csv")
 
 site_id <- c('02320000','02319800')
 parameterCd <- c('00065')
 proportion<-0.501
 dowling <- river_elevation(site_id,parameterCd)
+write_csv(dowling, "04_Outputs/dowling.csv")
 
 site_id <- c('02323000','02323500')
 parameterCd <- c('00065')
 proportion<-0.72
 OS_river <- river_elevation(site_id,parameterCd)
+write_csv(OS_river, "04_Outputs/OS_river.csv")
 
+site_id<-'02322700'
+parameterCd <- c('00065')
+IU <- for_wilcox(site_id,parameterCd)
+write_csv(IU, "04_Outputs/IU_historical.csv")
 
 ###GB run####
-GB<-left_join(GB, ftwhite)
-GB_edit<-filter(GB, depth_diff<0.6)
+#check the SRWMD Gage
+GB_check<-left_join(GB, ftwhite)
+
+GB_inter<-check(GB)
+names(GB_inter)
+
+ggplot(data=GB_inter, aes(x=Date)) +
+  geom_point(aes(y=GPP_est), size=1, color='darkgreen')+
+  geom_point(aes(y=GPP), size=1, color='darkgreen')+
+  geom_hline(yintercept = 0)
+  
 
 
-ggplot(data=GB, aes(x=depth_diff)) +
-    geom_point(aes(y=GPP), size=1, color='darkgreen')+
-    geom_point(aes(y=ER*-1), size=1, color='darkred')+
-    geom_point(aes(y=NEP), size=1, color='blue')+
-    scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
-                data=GB, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-                data=GB, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-                data=GB, se = FALSE, method='lm')+
-    ggtitle("GB")+scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+geom_vline(xintercept = 0.6)
+
+LF<-left_join(LF,
+              wilcox)
+
+ggplot(data=LF, aes(x=depth_diff)) +
+  geom_point(aes(y=GPP), size=1, color='darkgreen')+geom_point(aes(y=ER*-1), size=1, color='darkred')+
+  geom_point(aes(y=NEP), size=1, color='blue')+scale_color_manual(values='black')+
+  geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75, data=LF, se = FALSE, method='lm')+
+  geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,data=LF, se = FALSE, method='lm')+
+  geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,data=LF, se = FALSE, method='lm')+geom_vline(xintercept = 0.6)
+
+LF_edit<-filter(LF, depth_diff<0.6)
+LF_edit<-rename(LF_edit, 'elevation'='stage_up')
+LF_inter<-interpolation(LF_edit)
 

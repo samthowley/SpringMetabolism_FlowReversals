@@ -193,7 +193,7 @@ write_csv(SpC_everything, "02_Clean_data/Chem/SpC.csv")
 ###IU####
 library(dataRetrieval)
 startDate <- "2022-05-12"
-endDate <- "2024-05-20"
+endDate <- "2024-06-17"
 parameterCd <- c('00010','00300','00095','00400')
 ventID<-'02322700'
 
