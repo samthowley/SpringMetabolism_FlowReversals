@@ -72,6 +72,8 @@ metabolism <- function(site) {
 
   return(prediction2)
 }
+site_output<-GB_output
+site2<-GB2
 compile<- function(site_output, site2) {
   site_output<-rename(site_output,'Date'='date','GPPavg'="GPP_daily_mean",
                       'ER'='ER_daily_mean','K600_1d'='K600_daily_mean')
@@ -82,6 +84,8 @@ compile<- function(site_output, site2) {
   x<-c('Date', 'ER','GPPavg', 'K600_1d')
   site2<-site2[,x]
   site<-rbind(site2, site_output)
+  names(site2)
+  names(site_output)
   site$NEP<-site$GPPavg+site$ER
   return(site)}
 notparsed_metabolism<- function(site) {
@@ -132,8 +136,7 @@ bayes_name <- mm_name(type='bayes', pool_K600="binned", err_obs_iid=TRUE, err_pr
 GB_input <- read_csv("04_Outputs/one station inputs/GB.csv")
 bayes_specs<-bins(GB_input)
 GB_output<-metabolism(GB_input)
-GB_output$ID<'GB'
-write_csv(GB, "04_Outputs/one station ouputs/GB.csv")
+write_csv(GB_output, "04_Outputs/one station outputs/GB.csv")
 
 
 GB_output<-read_csv("04_Outputs/one station outputs/GB.csv")
@@ -145,6 +148,7 @@ ggplot(data=GB, aes(x=Date)) +geom_line(aes(y=GPPavg), size=1, color='darkgreen'
 
 write_csv(GB, "04_Outputs/Stream metabolizer results/GB.csv")
 
+#not parsed
 GB_input <- read_csv("04_Outputs/one station inputs/not parsed/GB.csv")
 GB_output<-notparsed_metabolism(GB_input)
 GB_output$ID<-'GB'
@@ -199,21 +203,29 @@ write_csv(LF_output, "04_Outputs/Stream metabolizer results/not parsed/LF.csv")
 write_csv(LF, "04_Outputs/Stream metabolizer results/LF.csv")
 
 ##ID#######
-ID <- read_csv("04_Outputs/one_station_inputs/not parsed/ID.csv")
-ID <- read_csv("04_Outputs/two_station/ID.csv")
+ID_input <- read_csv("04_Outputs/one station inputs/ID.csv")
+bayes_specs<-bins(ID_input)
+ID_output<-metabolism(ID_input)
+ID_output$ID<'ID'
+write_csv(ID, "04_Outputs/one station ouputs/ID.csv")
 
-x<-c('Date', 'ER','GPPavg', 'K600_1d')
-ID<-ID[,x]
-ID$NEP<-ID$GPPavg+ID$ER
 
+ID_output<-read_csv("04_Outputs/one station outputs/ID.csv")
+ID2 <- read_csv("04_Outputs/two station results/ID.csv")
+ID<-compile(ID_output, ID2)
 ID$ID<-'ID'
 
-write_csv(ID, "04_Outputs/Stream metabolizer/not parsed/ID.csv")
+ggplot(data=ID, aes(x=Date)) +geom_line(aes(y=GPPavg), size=1, color='darkgreen')
+
 write_csv(ID, "04_Outputs/Stream metabolizer results/ID.csv")
 
+ID_input <- read_csv("04_Outputs/one station inputs/not parsed/ID.csv")
+ID_output<-notparsed_metabolism(ID_input)
+ID_output$ID<-'ID'
+write_csv(ID_output, "04_Outputs/Stream metabolizer results/not parsed/ID.csv")
 ###IU#######
-startDate <- "2024-05-05"
-endDate <- "2024-05-20"
+startDate <- "2024-05-20"
+endDate <- "2024-06-17"
 parameterCd <- c('00010','00300','00065')
 ventID<-'02322700'
 

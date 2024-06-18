@@ -120,7 +120,7 @@ write_csv(stage, "02_Clean_data/Chem/PSI.csv")
 data_retrieval <- function(site_id) {
   parameterCd <- c('00065')
   startDate <- "2022-05-12"
-  endDate <- "2024-05-20"
+  endDate <- "2024-06-18"
 
   river <- readNWISuv(site_id,parameterCd, startDate, endDate)
   split<-split(river, river$site_no)
@@ -160,11 +160,6 @@ AM<-stage_relationship(AM)
 AM$ID<-'AM'
 AM<-AM[,x]
 
-# ggplot(AM, aes(x=Date)) +
-#   geom_line(aes(y=elevation),size=1)+
-#   geom_line(aes(y=depth),size=1, color='red')
-
-
 GB<-filter(master, ID=='GB')
 site_id <- c('02321958','02322500')
 elevation_diff<-data_retrieval(site_id)
@@ -174,11 +169,6 @@ GB<-stage_relationship(GB)
 GB<-GB %>% mutate(ID=='GB') %>% filter(depth>0.3)
 GB$ID<-'GB'
 GB<-GB[,x]
-
-ggplot(GB, aes(x=Date)) +
-  #geom_line(aes(y=elevation),size=1)+
-  geom_line(aes(y=depth),size=1, color='red')
-
 
 OS<-filter(master, ID=='OS')
 site_id <- c('02323000','02323500')
@@ -193,7 +183,7 @@ LF<-filter(master, ID=='LF')
 site_id <- '02323500'
 parameterCd <- c('00065')
 startDate <- "2022-04-12"
-endDate <- "2024-05-05"
+endDate <- "2024-06-18"
 riverLF <- readNWISuv(site_id,parameterCd, startDate, endDate)
 riverLF<-riverLF[,c(1,3,2,4)]
 riverLF<-rename(riverLF, 'Date'='dateTime', 'elevation'='X_00065_00000')
@@ -207,22 +197,25 @@ LF$ID<-'LF'
 LF<-LF[,x]
 
 ID<-filter(master, ID=='ID')
-SF<- read_csv("01_Raw_data/Hobo/PT/02322703_Level.csv",col_types = cols(Date = col_date(format = "%m/%d/%Y")))
+SF<- read_xlsx("01_Raw_data/Hobo/PT/02322703_Level.xlsx",skip = 25)
 SF<-SF %>%rename('depth_gage'="Level NAVD88") %>%
   filter(Date>'2021-04-02')%>%mutate(depth_gage=conv_unit(depth_gage,'ft','m'),
                                      day=as.Date(Date)) %>%mutate(depth_gage=depth_gage-2)
 ID$day<-as.Date(ID$Date)
+ID<-ID[,-c(1)]
 SF<-SF[,c('depth_gage','day')]
-ID<-left_join(ID, SF, by='day')
-modInter<-lm( depth_gage~ PT, data = ID)
+ID<-left_join(SF, ID, by='day')
+
+modInter<-lm( depth~ depth_gage, data = ID)
 cf <- coef(modInter)
-ID$depth<-ID$PT*cf[2]+cf[1]
-ID$ID<-'ID'
+ID$depth<-ID$depth_gage*cf[2]+cf[1]
+ID<-ID %>% filter(depth>0) %>% rename("Date"='day') %>%mutate(ID= 'ID', depth=depth+0.75)
 ID<-ID[,x]
 
+ggplot(ID, aes(Date, depth)) + geom_line()
 
 startDate <- "2022-05-12"
-endDate <- "2024-05-05"
+endDate <- "2024-06-17"
 parameterCd <- c('00065')
 ventID<-'02322700'
 IU<- readNWISuv(ventID,parameterCd, startDate, endDate)

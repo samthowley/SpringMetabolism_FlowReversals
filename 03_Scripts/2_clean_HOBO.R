@@ -38,6 +38,7 @@ DO_formatted <- function(fil) {
   colnames(DO)[1] <- "Date"
   colnames(DO)[2] <- "DO"
   DO<-filter(DO, DO>0)
+  DO<-filter(DO, DO<11)
   DO$ID<-strsplit(basename(fil), '_')[[1]][1]
   return(DO)}
 DO_unformatted <- function(fil) {
@@ -192,14 +193,12 @@ write_csv(SpC_everything, "02_Clean_data/Chem/SpC.csv")
 
 ###IU####
 library(dataRetrieval)
-startDate <- "2022-05-12"
-endDate <- "2024-06-17"
+startDate <- "2024-05-20"
+endDate <- "2024-06-18"
 parameterCd <- c('00010','00300','00095','00400')
 ventID<-'02322700'
 
-#what<-whatNWISdata(site='02322700')
 IU<- readNWISuv(ventID,parameterCd, startDate, endDate)
-names(IU)
 IU<-IU %>% rename('Date'='dateTime', 'Temp'='X_00010_00000',
                   'DO'='X_00300_00000', 'SpC'='X_00095_00000',
                   'pH'='X_00400_00000')%>%
@@ -208,6 +207,13 @@ IU<-IU %>% rename('Date'='dateTime', 'Temp'='X_00010_00000',
   filter(min==0)
 IU$ID<-'IU'
 IU<-IU[,c("Date", "DO","Temp", "ID","CO2","pH","SpC","min" )]
+write_csv(IU, "01_Raw_data/IU/IU_0618.csv")
+
+IU<-data.frame()
+file.names <- list.files(path="01_Raw_data/IU", pattern=".csv", full.names=TRUE)
+for(fil in file.names){
+  site <- read_csv(fil)
+  IU<-rbind(IU,site)}
 ###compile####
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
 file.names<-file.names[c(3,1,5,8)]

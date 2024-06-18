@@ -12,6 +12,7 @@ library(imputeTS)
 library(dataRetrieval)
 library(streamMetabolizer)
 library(tools)
+library(cowplot)
 
 master <- read_csv("02_Clean_data/master_depth2.csv")
 LF_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "LF")
@@ -73,6 +74,14 @@ two_station<- function(spring) {
     mutate(L_max=(u_md*3)/K600_1d) %>%
     group_by(day,Month,year) %>%
     mutate(L_max=max(L_max, na.rm=T)- length*2)
+  
+  #for ID
+  # spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
+  #   mutate(u_md=u_mh*24) %>%
+  #   mutate(L_max=(u_md*3)/K600_1d) %>%
+  #   group_by(day,Month,year) %>%
+  #   mutate(L_max=max(L_max, na.rm=T)- length*2)
+  
 
   spring1 <- spring %>%
     mutate(method= case_when(
@@ -116,7 +125,7 @@ two_station_forRecovery<- function(spring) {
 data_retrieval <- function(parameterCd, ventID) {
 
   startDate <- "2022-04-12"
-  endDate <- "2024-05-03"
+  endDate <- "2024-06-17"
 
   vent_15sec<-readNWISuv(ventID,parameterCd,startDate,endDate)
   vent_15sec<-vent_15sec[,-c(1,2,5,7,8)]
@@ -222,10 +231,10 @@ met_output<-two_station(AllenMill1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-# ggplot(two, aes(x=Date)) +
-#   geom_line(aes(y=ER),size=1)+
-#  #geom_hline(yintercept=(0.4))
-# geom_line(aes(y=DO*2),size=1, color='darkred')
+ggplot(two, aes(x=Date)) +
+  geom_line(aes(y=ER),size=1)+
+ #geom_hline(yintercept=(0.4))
+geom_line(aes(y=DO*2),size=1, color='darkred')
 # 
 # ggplot(one, aes(x=Date)) +
 #   geom_line(aes(y=ER),size=1)+
@@ -315,12 +324,11 @@ met_output<-two_station(ID1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-# ggplot(two, aes(x=Date)) +
-#   geom_line(aes(y=ER, color="ER"),size=1)+
-#   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)
+ggplot(one, aes(x=Date)) +
+  geom_line(aes(y=L_max),size=0.4)
 
-write_csv(two, "04_Outputs/two station results/LF.csv")
-write_csv(one, "04_Outputs/one station inputs/LF.csv")
+write_csv(two, "04_Outputs/two station results/ID.csv")
+write_csv(one, "04_Outputs/one station inputs/ID.csv")
 ##OS####
 OS <- master %>% filter(ID=='OS')
 

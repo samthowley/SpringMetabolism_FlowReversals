@@ -1,0 +1,5 @@
+﻿"Plot Title: LH6-2"
+"#","Date Time, GMT-05:00","Low Range, μS/cm (LGR S/N: 20342060, SEN S/N: 20342060)","Full Range, μS/cm (LGR S/N: 20342060, SEN S/N: 20342060)","Temp, °F (LGR S/N: 20342060, SEN S/N: 20342060)","Coupler Detached (LGR S/N: 20342060, SEN S/N: 20342060)","Coupler Attached (LGR S/N: 20342060, SEN S/N: 20342060)","Stopped (LGR S/N: 20342060, SEN S/N: 20342060)","End Of File (LGR S/N: 20342060, SEN S/N: 20342060)"
+1,06/16/24 10:00:00 AM,395.8,402.5,75.04,Logged,,,
+2,06/16/24 10:28:30 AM,,,,,Logged,,
+3,06/16/24 10:28:34 AM,,,,,,Logged,Logged
