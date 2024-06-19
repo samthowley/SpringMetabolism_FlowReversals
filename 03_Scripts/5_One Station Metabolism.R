@@ -72,8 +72,6 @@ metabolism <- function(site) {
 
   return(prediction2)
 }
-site_output<-GB_output
-site2<-GB2
 compile<- function(site_output, site2) {
   site_output<-rename(site_output,'Date'='date','GPPavg'="GPP_daily_mean",
                       'ER'='ER_daily_mean','K600_1d'='K600_daily_mean')
@@ -88,6 +86,7 @@ compile<- function(site_output, site2) {
   names(site_output)
   site$NEP<-site$GPPavg+site$ER
   return(site)}
+site<-GB_input
 notparsed_metabolism<- function(site) {
   keep<-c('Date', 'DO', 'depth', 'Temp', 'light', 'K600_1d', 'Q_m.s')
   site<-site[,keep]
@@ -96,8 +95,8 @@ notparsed_metabolism<- function(site) {
 
   bayes_specs<-bins(site)
 
-  samplingperiod <- data.frame(Date = rep(seq(from=as.POSIXct(min(site$Date)),
-                                              to=as.POSIXct(max(site$Date)),by="hour")))
+  samplingperiod <- data.frame(Date = rep(seq(from=as.POSIXct(min(site$Date, na.rm=T)),
+                                              to=as.POSIXct(max(site$Date,na.rm=T)),by="hour")))
   site<-left_join(samplingperiod, site)
   site <- site[!duplicated(site[c('Date')]),]
   site$Temp[site$Temp < 65] <- mean(site$Temp, na.rm=T)
@@ -150,38 +149,68 @@ write_csv(GB, "04_Outputs/Stream metabolizer results/GB.csv")
 
 #not parsed
 GB_input <- read_csv("04_Outputs/one station inputs/not parsed/GB.csv")
+#last time we ran SM
+GB_input<-filter(GB_input, Date>'2024-05-04')
 GB_output<-notparsed_metabolism(GB_input)
 GB_output$ID<-'GB'
-write_csv(GB_output, "04_Outputs/Stream metabolizer results/not parsed/GB.csv")
+write_csv(GB_output, "04_Outputs/Stream metabolizer results/not_parsed/GB/GB_05052024.csv")
+
+
+file.names <- list.files(path="04_Outputs/Stream metabolizer results/not parsed/GB", pattern=".csv", full.names=TRUE)
+GB_all<-data.frame()
+for(fil in file.names){
+  site <- read_csv(fil)
+  GB_all<-rbind(GB_all,site)}
+
+write_csv(GB_all, "04_Outputs/Stream metabolizer results/not parsed/GB.csv")
 
 ###OS######
 OS_input <- read_csv("04_Outputs/one station inputs/OS.csv")
+OS_input<-filter(OS_input, Date>'2024-02-04')
 OS_input$light<-calc_light(OS_input$Date,  29.585, -82.937)
 OS_output<-notparsed_metabolism(OS_input)
 names(OS_output)
 
 OS_output$ID<-'OS'
 ggplot(OS_output, aes(Date, ER))+geom_line()
+write_csv(OS_output, "04_Outputs/Stream metabolizer results/not_parsed/OS/OS_05052024.csv")
 
-write_csv(OS_output, "04_Outputs/Stream metabolizer results/not parsed/OS.csv")
-write_csv(OS_output, "04_Outputs/Stream metabolizer results/OS.csv")
+file.names <- list.files(path="04_Outputs/Stream metabolizer results/not parsed/OS", pattern=".csv", full.names=TRUE)
+OS_all<-data.frame()
+for(fil in file.names){
+  site <- read_csv(fil)
+  OS_all<-rbind(OS_all,site)}
+
+write_csv(OS_all, "04_Outputs/Stream metabolizer results/not parsed/OS/OS.csv")
+
+
+write_csv(OS_all, "04_Outputs/Stream metabolizer results/not parsed/OS.csv")
+write_csv(OS_all, "04_Outputs/Stream metabolizer results/OS.csv")
 
 ###AM######
 AM_input <- read_csv("04_Outputs/one station inputs/AM.csv")
 bayes_specs<-bins(AM_input)
-AM_output<-metabolism(AM_input)
-AM_output$ID<-'AM'
-write_csv(AM_output, "04_Outputs/one station outputs/AM.csv")
+AM_onestat<-metabolism(AM_input)
+write_csv(AM_onestat, "04_Outputs/one station outputs/AM.csv")
 
 AM2 <- read_csv("04_Outputs/two station results/AM.csv")
-AM<-compile(AM_output, AM2)
+AM<-compile(AM_onestat, AM2)
 AM$ID<-'AM'
 write_csv(AM, "04_Outputs/Stream metabolizer results/AM.csv")
 
 AM_input <- read_csv("04_Outputs/one station inputs/not parsed/AM.csv")
+#last time it was ran
+AM_input<-filter(AM_input, Date>'2024-01-31')
 AM_output<-notparsed_metabolism(AM_input)
 AM_output$ID<-'AM'
-write_csv(AM_output, "04_Outputs/Stream metabolizer results/not parsed/AM.csv")
+write_csv(AM_output, "04_Outputs/Stream metabolizer results/not parsed/AM/AM_06172024.csv")
+
+file.names <- list.files(path="04_Outputs/Stream metabolizer results/not parsed/AM", pattern=".csv", full.names=TRUE)
+AM_all<-data.frame()
+for(fil in file.names){
+  site <- read_csv(fil)
+  AM_all<-rbind(AM_all,site)}
+write_csv(AM_all, "04_Outputs/Stream metabolizer results/not parsed/AM.csv")
 
 ###LF######
 LF_input <- read_csv("04_Outputs/one station inputs/LF.csv")
@@ -198,16 +227,21 @@ write_csv(LF, "04_Outputs/Stream metabolizer results/LF.csv")
 LF_input <- read_csv("04_Outputs/one station inputs/not parsed/LF.csv")
 LF_output<-notparsed_metabolism(LF_output)
 LF_output$ID<-'LF'
-write_csv(LF_output, "04_Outputs/Stream metabolizer results/not parsed/LF.csv")
+write_csv(LF_output, "04_Outputs/Stream metabolizer results/not_parsed/LF/LF_02042024.csv")
 
-write_csv(LF, "04_Outputs/Stream metabolizer results/LF.csv")
+file.names <- list.files(path="04_Outputs/Stream metabolizer results/not parsed/LF", pattern=".csv", full.names=TRUE)
+LF_all<-data.frame()
+for(fil in file.names){
+  site <- read_csv(fil)
+  LF_all<-rbind(LF_all,site)}
+write_csv(LF_all, "04_Outputs/Stream metabolizer results/not parsed/LF.csv")
+
 
 ##ID#######
 ID_input <- read_csv("04_Outputs/one station inputs/ID.csv")
 bayes_specs<-bins(ID_input)
-ID_output<-metabolism(ID_input)
-ID_output$ID<'ID'
-write_csv(ID, "04_Outputs/one station ouputs/ID.csv")
+ID_one<-metabolism(ID_input)
+write_csv(ID_one, "04_Outputs/one station outputs/ID.csv")
 
 
 ID_output<-read_csv("04_Outputs/one station outputs/ID.csv")
@@ -216,15 +250,23 @@ ID<-compile(ID_output, ID2)
 ID$ID<-'ID'
 
 ggplot(data=ID, aes(x=Date)) +geom_line(aes(y=GPPavg), size=1, color='darkgreen')
-
 write_csv(ID, "04_Outputs/Stream metabolizer results/ID.csv")
 
 ID_input <- read_csv("04_Outputs/one station inputs/not parsed/ID.csv")
 ID_output<-notparsed_metabolism(ID_input)
 ID_output$ID<-'ID'
-write_csv(ID_output, "04_Outputs/Stream metabolizer results/not parsed/ID.csv")
+write_csv(ID_output, "04_Outputs/Stream metabolizer results/not parsed/ID/ID_06172024.csv")
+
+file.names <- list.files(path="04_Outputs/Stream metabolizer results/not parsed/ID", pattern=".csv", full.names=TRUE)
+ID_all<-data.frame()
+for(fil in file.names){
+  site <- read_csv(fil)
+  ID_all<-rbind(ID_all,site)}
+
+write_csv(ID_all, "04_Outputs/Stream metabolizer results/not parsed/ID.csv")
+
 ###IU#######
-startDate <- "2024-05-20"
+startDate <- "2024-05-05"
 endDate <- "2024-06-17"
 parameterCd <- c('00010','00300','00065')
 ventID<-'02322700'
@@ -244,12 +286,25 @@ bayes_specs <- specs(bayes_name, K600_daily_meanlog_meanlog=0.1, K600_daily_mean
                      burnin_steps=1000, saved_steps=1000)
 mm<- metab(bayes_specs, IU)
 IU <- mm@fit$daily %>% select(date,GPP_daily_mean,ER_daily_mean,K600_daily_mean)
+IU<- read_csv("04_Outputs/Stream metabolizer results/not parsed/IU/IU_06172024.csv")
 
-IU<-compile_notparsed(IU)
 IU$ID<-'IU'
+rename("GPPavg"='GPP_daily_mean', 'ER'='ER_daily_mean', 
+       'K600_1d'='K600_daily_mean', 'Date'='date') %>%  
+  mutate(NEP= GPPavg-ER)
+names(IU)
+IU<-IU[,c(1,2,3,4,6,5)]
 
-write_csv(IU, "04_Outputs/Stream metabolizer/not parsed/IU.csv")
-write_csv(IU, "04_Outputs/Stream metabolizer/IU_05052024.csv")
+write_csv(IU, "04_Outputs/Stream metabolizer results/not parsed/IU/IU_06172024.csv")
+
+file.names <- list.files(path="04_Outputs/Stream metabolizer results/not parsed/IU", pattern=".csv", full.names=TRUE)
+IU_all<-data.frame()
+for(fil in file.names){
+  site <- read_csv(fil)
+  IU_all<-rbind(IU_all,site)}
+range(IU_all$Date)
+
+write_csv(IU_all, "04_Outputs/Stream metabolizer results/IU.csv")
 
 #compile parsed####
 file.names <- list.files(path="04_Outputs/Stream metabolizer results", pattern=".csv", full.names=TRUE)
@@ -267,15 +322,6 @@ for(fil in file.names){
   master_notparsed<-rbind(master_notparsed,site)}
 
 write_csv(master_notparsed, "04_Outputs/master_metabolizer_notparsed.csv")
-
-#compile one station outputs####
-file.names <- list.files(path="04_Outputs/one station outputs", pattern=".csv", full.names=TRUE)
-onestation_results <- data.frame()
-for(fil in file.names){
-  site <- read_csv(fil)
-  onestation_results<-rbind(onestation_results,site)}
-names(onestation_results)
-onestation_results<-onestation_results %>%rename('GPP1', 'ER1', 'NEP1', 'ID', 'Date')
 
 #curate master dataset####
 onestation<- read_csv("04_Outputs/master_metabolizer_notparsed.csv")

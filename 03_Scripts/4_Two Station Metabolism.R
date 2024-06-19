@@ -69,18 +69,18 @@ two_station<- function(spring) {
 
   spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
 
-  spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
-    mutate(u_md=u_mh*24) %>%
-    mutate(L_max=(u_md*3)/K600_1d) %>%
-    group_by(day,Month,year) %>%
-    mutate(L_max=max(L_max, na.rm=T)- length*2)
-  
-  #for ID
   # spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
   #   mutate(u_md=u_mh*24) %>%
   #   mutate(L_max=(u_md*3)/K600_1d) %>%
   #   group_by(day,Month,year) %>%
   #   mutate(L_max=max(L_max, na.rm=T)- length*2)
+  # 
+  #for ID
+  spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
+    mutate(u_md=u_mh*24) %>%
+    mutate(L_max=(u_md*3)/K600_1d) %>%
+    group_by(day,Month,year) %>%
+    mutate(L_max=max(L_max, na.rm=T)- length*2)
   
 
   spring1 <- spring %>%
