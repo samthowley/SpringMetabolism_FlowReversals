@@ -291,7 +291,7 @@ IU<- read_csv("04_Outputs/Stream metabolizer results/not parsed/IU/IU_06172024.c
 IU$ID<-'IU'
 rename("GPPavg"='GPP_daily_mean', 'ER'='ER_daily_mean', 
        'K600_1d'='K600_daily_mean', 'Date'='date') %>%  
-  mutate(NEP= GPPavg-ER)
+  mutate(NEP= GPPavg+ER)
 names(IU)
 IU<-IU[,c(1,2,3,4,6,5)]
 
@@ -302,8 +302,13 @@ IU_all<-data.frame()
 for(fil in file.names){
   site <- read_csv(fil)
   IU_all<-rbind(IU_all,site)}
-range(IU_all$Date)
+IU_all<-IU_all %>% mutate(NEP=GPPavg+ER)
 
+# ggplot(IU_all, aes(Date)) +
+#   geom_line(aes(y=GPPavg))+
+#   geom_line(aes(y=ER))+
+#   geom_line(aes(y=NEP,color='NEP'))
+  
 write_csv(IU_all, "04_Outputs/Stream metabolizer results/IU.csv")
 
 #compile parsed####

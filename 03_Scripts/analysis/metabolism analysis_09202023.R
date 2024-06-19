@@ -94,6 +94,7 @@ master<-master%>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))%>%
   mutate(depth_diff= depth-depth_min)
 
 sites<-split(master,master$ID)
+#names(sites)
 AM<-sites[[1]]
 GB<-sites[[2]]
 ID<-sites[[3]]
@@ -130,7 +131,6 @@ summary(lm(GPP ~ depth_diff, data = ID))
     xlab(poster_x)+ggtitle("IU")+
     scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_sam)
 
-summary(lm(GPP ~ depth_diff, data = IU))
 
 (AM_sc<-ggplot(data=AM, aes(x=depth_diff)) +
     geom_point(aes(y=GPP), size=1, color='darkgreen')+
@@ -405,25 +405,25 @@ boxplots<-plot_grid(box,slope,  ncol=2)
 together<-plot_grid(boxplots,scatter, nrow=2, rel_heights = c(3/5,1.7/5))
 scatter_ex<-plot_grid(box,cherrypick_scatter,  ncol=2)
 
-ggsave(filename="flood types.jpeg",
+ggsave(filename="05_Figures/flood types.jpeg",
        plot = hypoxia,
        width =20,
        height = 12,
        units = "in")
 
-ggsave(filename="master.jpeg",
+ggsave(filename="05_Figures/master.jpeg",
        plot = together,
        width =12,
        height = 14.5,
        units = "in")
 
-ggsave(filename="poster master.jpeg",
+ggsave(filename="05_Figures/poster master.jpeg",
        plot = boxplots,
        width =17,
        height = 12,
        units = "in")
-ggsave(filename="scatter_ex.jpeg",
-       plot = scatter_ex,
+ggsave(filename="05_Figures/scatter.jpeg",
+       plot = scatter,
        width =17,
        height = 12,
        units = "in")

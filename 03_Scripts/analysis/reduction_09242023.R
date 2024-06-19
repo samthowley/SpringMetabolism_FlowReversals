@@ -108,7 +108,7 @@ GBFR<- GB %>% mutate(RI = case_when(
 GB_0622<-extract_reduce(GB, GBFR)
 
 GBFR<- GB %>% mutate(RI = case_when(
-  Date> "2023-11-14" & Date<"2024-02-11"~ 2))
+  Date> "2023-11-14" & Date<"2024-03-11"~ 2))
 GB_1223<-extract_reduce(GB, GBFR)
 
 GB_tbl<-rbind(GB_0622,GB_1223)
@@ -165,11 +165,6 @@ OSmod_tbl$num<-4
 OSmod_tbl$IF <- c("h","h",'h', "h")
 ####AllenMill##########
 
-# AMFRcheck<-filter(AMFR,RI==2 )
-# ggplot(AMFRcheck, aes(Date)) +
-#   geom_line(aes(y=ER))+
-#   geom_line(aes(y=depth*10, color=depthID))
-
 AM<- AM %>% mutate(depthID = case_when(
   depth<0.9 ~ "low",
   depth>0.9 & depth<1.2 ~ "moderate",
@@ -188,17 +183,38 @@ AMFR<- AM %>% mutate(RI = case_when(
 AMFR_0823<-extract_reduce(AM, AMFR)
 
 AMFR<- AM %>% mutate(RI = case_when(
-  Date> "2023-11-17" & Date<"2024-01-11"~ 2))
-AMFR_1224<-extract_reduce(AM, AMFR)
+  Date> "2023-11-17" & Date<"2023-12-17"~ 2))
+AMFR_1123<-extract_reduce(AM, AMFR)
 
-AM_tbl<-rbind(AMFR_0223,AMFR_0623,AMFR_0823,AMFR_1224)
+AMFR<- AM %>% mutate(RI = case_when(
+  Date> "2023-12-17" & Date<"2024-01-01"~ 2))
+AMFR_1223<-extract_reduce(AM, AMFR)
+
+AMFR<- AM %>% mutate(RI = case_when(
+  Date> "2024-03-11" & Date<"2024-03-28"~ 2))
+AMFR_0324<-extract_reduce(AM, AMFR)
+
+
+AMFR<- AM %>% mutate(RI = case_when(
+  Date> "2024-03-28" & Date<"2024-06-16"~ 2))
+AMFR_0524<-extract_reduce(AM, AMFR)
+
+# AMFR<- AM %>% mutate(RI = case_when(
+#   Date> "2023-11-01" & Date<"2024-06-16"~ 2))
+# 
+# AMFRcheck<-filter(AMFR,RI==2 )
+# ggplot(AMFRcheck, aes(Date)) +
+#   geom_line(aes(y=ER, color='ER'))+
+#   geom_line(aes(y=DO, color='DO'))
+# AM$SpC[AM$SpC>550]<-NA
+
+
+AM_tbl<-rbind(AMFR_0223,AMFR_0623,AMFR_0823,AMFR_1123,AMFR_1223, AMFR_0324,
+              AMFR_0524)
 AM_tbl$ID<-'AM'
 AM_tbl$num<-5
-AM_tbl$IF <- c("rev","bo",'bo','rev')
-# AMFRcheck<-filter(AMFR,RI==2 )
-# ggplot(AM, aes(Date, depth, colour=RI)) + geom_line()+
-#   geom_hline(yintercept = 0.8)+
-#   geom_hline(yintercept = 1.37)
+AM_tbl$IF <- c("rev","bo",'bo','bo','rev','bo', 'bo')
+AMFRcheck<-filter(AMFR,RI==2 )
 
 
 AM_mod<-filter(AM, depthID== 'moderate')
@@ -217,10 +233,14 @@ AMmod_0623<-extract_reduce_mod(AM, AMmod)
 AMmod<- AM_mod %>% mutate(RI = case_when(Date>"2023-07-31" & Date<"2023-12-31"~ 2))
 AMmod_1223<-extract_reduce_mod(AM, AMmod)
 
-AMmod_tbl<-rbind(AMmod_0622,AMmod_0823,AMmod_0223,AMmod_0623,AMmod_1223)
+AMmod<- AM_mod %>% mutate(RI = case_when( Date>"2023-11-01" & Date<"2024-06-16"~ 2))
+AMmod_0324<-extract_reduce_mod(AM, AMmod)
+
+
+AMmod_tbl<-rbind(AMmod_0622,AMmod_0823,AMmod_0223,AMmod_0623,AMmod_1223,AMmod_0324)
 AMmod_tbl$ID<-'AM'
 AMmod_tbl$num<-5
-AMmod_tbl$IF <- c("h","h",'h','h','h')
+AMmod_tbl$IF <- c("h","h",'h','h','h','h')
 
 ####LF#####
 
@@ -257,11 +277,6 @@ LF_tbl$ID<-'LF'
 LF_tbl$num<-3
 LF_tbl$IF <- c("h","h",'h')
 ######ID#######
-# IDFRcheck<-filter(IDFR,RI==2 )
-# ggplot(IDFRcheck, aes(Date)) +
-#   geom_line(aes(y=depth*3, color=depthID))+
-#   geom_line(aes(y=ER))+
-#   geom_line(aes(y=GPP))
 
 ID<- ID %>% mutate(depthID = case_when(
   depth<0.85 ~ "low",
@@ -284,17 +299,28 @@ IDFR<- ID %>% mutate(RI = case_when(
   Date> "2023-11-01" & Date<"2024-01-31"~ 2))
 ID_0124<-extract_reduce(ID, IDFR)
 
-ID_tbl<-rbind(ID_0123,ID_0823,ID_0923,ID_0124)
+IDFR<- ID %>% mutate(RI = case_when(
+  Date> "2023-12-18" & Date<"2024-01-01"~ 2))
+ID_0124<-extract_reduce(ID, IDFR)
+
+IDFR<- ID %>% mutate(RI = case_when(
+  Date> "2024-01-01" & Date<"2024-06-12"~ 2))
+ID_0324<-extract_reduce(ID, IDFR)
+
+IDFRcheck<-filter(IDFR,RI==2 )
+ggplot(IDFRcheck, aes(Date)) +
+  geom_line(aes(y=ER, color='ER'))+geom_line(aes(y=SpC/10, color='SpC'))+
+  geom_line(aes(y=DO, color='DO'))+
+  geom_line(aes(y=depth*5, color='h'))
+ID$SpC[ID$SpC>1000]<-NA
+
+ID_tbl<-rbind(ID_0123,ID_0823,ID_0923,ID_0124,ID_0324)
 ID_tbl$ID<-'ID'
 ID_tbl$num<-1
-ID_tbl$IF <- c("h","h",'h','h')
+ID_tbl$IF <- c("h","h",'h','rev','h')
 
 ######IU#######
 IU<-filter(IU, Date>'2022-05-02')
-
-# IUFRcheck<-filter(IUFR,RI==2 )
-# ggplot(IUFRcheck, aes(Date)) +
-#   geom_line(aes(y=ER, color=depthID))
 
 IU<- IU %>% mutate(depthID = case_when(
   depth<1.7 ~ "low",
@@ -306,13 +332,21 @@ IUFR<- IU %>% mutate(RI = case_when(
 IU_0124<-extract_reduce(IU, IUFR)
 
 IUFR<- IU %>% mutate(RI = case_when(
-  Date> "2024-02-28" & Date<"2024-05-28"~ 2))
+  Date> "2024-02-28" & Date<"2024-05-16"~ 2))
 IU_0324<-extract_reduce(IU, IUFR)
 
-IU_tbl<-rbind(IU_0124, IU_0324)
+IUFR<- IU %>% mutate(RI = case_when(
+  Date> "2024-05-16" & Date<"2024-06-16"~ 2))
+IU_0524<-extract_reduce(IU, IUFR)
+
+# IUFRcheck<-filter(IUFR,RI==2 )
+# ggplot(IUFRcheck, aes(Date)) +
+#   geom_line(aes(y=ER))+geom_line(aes(y=depth*2, color='h'))
+
+IU_tbl<-rbind(IU_0124, IU_0324,IU_0524)
 IU_tbl$ID<-'IU'
 IU_tbl$num<-1
-IU_tbl$IF <- c('h', 'h')
+IU_tbl$IF <- c('h', 'h', 'h')
 ###########
 R_R<-rbind(IU_tbl, ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl, OSmod_tbl,
            AMmod_tbl)
@@ -323,8 +357,8 @@ R_R$GPP_reduce[R_R$GPP_reduce<0] <- NA
 R_R$ER_reduce[R_R$ER_reduce<0] <- NA
 
 write_csv(R_R, "04_Outputs/reduction_analysis.csv")
-
 R_R<-read.csv("04_Outputs/reduction_analysis.csv")
+
 R_R$a<-'a'
 cols<-c(
   "h"="deepskyblue3",
@@ -374,7 +408,7 @@ summary(lm(GPP_reduce ~ h, data=R_R))
 
 (flood_mag<-plot_grid(a, b, nrow=1))
 
-ggsave(filename="reduced_mag.jpeg",
+ggsave(filename="05_Figures/reduced_mag.jpeg",
        plot = flood_mag,
        width =12,
        height = 5.5,
@@ -398,7 +432,7 @@ summary(lm(GPP_reduce ~ h, data=RR_noID))
 
 (flood_site<-plot_grid(a, c, nrow=1))
 
-ggsave(filename="reduced_site.jpeg",
+ggsave(filename="05_Figures/reduced_site.jpeg",
        plot = flood_site,
        width =12,
        height = 5.5,

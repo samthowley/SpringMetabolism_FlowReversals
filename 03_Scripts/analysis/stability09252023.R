@@ -31,7 +31,7 @@ prelim <- function(spring,spring_rC) {
 
   spring<-spring %>%mutate(u_md=u_mh*24) %>%mutate(L_max=(u_md*3)/K600_1d) 
   
-  keep<-spring %>%filter(L_max> length+length*0.66)
+  keep<-spring %>%filter(L_max> length+length*0.5)
   
   return(keep)}
 autocorrelation <- function(site) {
@@ -315,13 +315,13 @@ combined_plot <- insert_yaxis_grob(ERAR, ERden, position = "right")
 
 AR<-plot_grid(GPP, ER, ncol=2)
 
-ggsave(filename="AR.jpeg",
+ggsave(filename="05_Figures/AR.jpeg",
        plot = AR,
        width =12,
        height = 5,
        units = "in")
 
-ggsave(filename="AR poster.jpeg",
+ggsave(filename="05_Figures/AR poster.jpeg",
        plot = AR,
        width =12,
        height =6,

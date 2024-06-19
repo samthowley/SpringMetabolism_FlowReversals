@@ -5,7 +5,8 @@ library(tidyverse)
 library(readxl)
 library(measurements)
 library(zoo)
-library(cowplot)
+library(cowplot)d
+library(mmand)
 
 check_ratios <- function(siteBO) {
   x<-c("Date","DO","depth","ER","GPP",'depth_diff')
@@ -30,19 +31,19 @@ check_ratios <- function(siteBO) {
 
   u<-
     siteBO_disturb %>%
-    mutate( ERmean= rollapply(ER_ratio,4,mean, fill=NA, partial=TRUE, align='left'))
+    mutate( ERmean= gaussianSmooth(ER_ratio,3))
   u<-u[,c(11,1)]
   siteBO_disturb<-left_join(siteBO_disturb,u,by=c('Date'))
 
   v<-
     siteBO_disturb %>%
-    mutate( GPPmean= rollapply(GPP_ratio,4,mean, fill=NA, partial=TRUE, align='left'))
+    mutate( GPPmean= gaussianSmooth(GPP_ratio,3))
   v<-v[,c(12,1)]
   siteBO_disturb<-left_join(siteBO_disturb,v,by=c('Date'))
 
   y<-
     siteBO_disturb %>%
-    mutate( hmean= rollapply(depth,4,mean, fill=NA, partial=TRUE, align='left'))
+    mutate( hmean= gaussianSmooth(depth,3))
   y<-y[,c(13,1)]
   siterecov<-left_join(siteBO_disturb,y,by=c('Date'))
   return(siterecov)}
@@ -146,7 +147,7 @@ recovery_calc_FR <- function(siterecov) {
 
   return(df)}
 
-##### data####
+#data####
 master <- read_csv("02_Clean_data/master_metabolism4.csv")
 master<-master[,c("Date","DO" ,"GPP","ER","depth","ID")]
 
@@ -163,53 +164,70 @@ ID<-IDs[[3]]
 IU<-IDs[[4]]
 LF<-IDs[[5]]
 OS<-IDs[[6]]
-####AM ####
-AMFR<- AM %>% mutate(RI = case_when(Date> "2023-01-07" & Date<"2023-05-06"~ 2))
-AMFR<-filter(AMFR, RI==2)
-ggplot(AMFR, aes(Date))+geom_line(aes(y=depth_diff), size=1)
+#AM ####
 
+AMFR<- AM %>% mutate(RI = case_when(Date> "2023-01-10" & Date<"2023-04-27"~ 2))
+AMFR<-filter(AMFR, RI==2)
+#ggplot(AMFR, aes(Date))+geom_line(aes(y=depth_diff), size=1)
 AMFR_0223<-check_ratios(AMFR)
-ggplot(AMFR_0223, aes(x=count,y=hmean))+geom_point(size=1)+geom_smooth(method = "lm")
+AMFR_0223<-AMFR_0223 %>% filter(count<90)
+#ggplot(AMFR_0223, aes(x=count,y=ERmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_0223<-recovery_calc_FR(AMFR_0223))
 
 
-AMFR<- AM %>% mutate(RI = case_when(Date> "2023-06-03" & Date<"2023-08-05"~ 2))
+AMFR<- AM %>% mutate(RI = case_when(Date> "2023-06-03" & Date<"2023-07-20"~ 2))
 AMFR<-filter(AMFR, RI==2)
-# ggplot(AMFR, aes(Date))+geom_line(aes(y=ER), size=1)
-
+#ggplot(AMFR, aes(Date))+geom_line(aes(y=ER), size=1)
 AMFR_0623<-check_ratios(AMFR)
-AMFR_0623<-filter(AMFR_0623, count<50)
-# ggplot(AMFR_0623, aes(x=count,y=hmean))+
-#   geom_point(size=1)+geom_smooth(method = "lm")
+#ggplot(AMFR_0623, aes(x=count,y=GPPmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_0623<-recovery_calc(AMFR_0623))
 
 
 AMFR<- AM %>% mutate(RI = case_when(
   Date> "2023-07-20" & Date<"2023-10-31"~ 2))
 AMFR<-filter(AMFR, RI==2)
-ggplot(AMFR, aes(Date))+geom_line(aes(y=depth), size=1)
-
+#ggplot(AMFR, aes(Date))+geom_line(aes(y=depth), size=1)
 AMFR_0823<-check_ratios(AMFR)
 #ggplot(AMFR_0823, aes(x=count,y=hmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_0823<-recovery_calc(AMFR_0823))
 
 
-AMFR<- AM %>% mutate(RI = case_when(Date> "2023-11-20" & Date<"2024-01-15"~ 2))
+AMFR<- AM %>% mutate(RI = case_when(Date>"2023-11-01" & Date<"2023-12-31"~ 2))
 AMFR<-filter(AMFR, RI==2)
-ggplot(AMFR, aes(Date))+geom_line(aes(y=ER), size=1)
+#ggplot(AMFR, aes(Date))+geom_line(aes(y=depth), size=1)
 AMFR_1223<-check_ratios(AMFR)
-
-ggplot(AMFR_1223, aes(x=count,y=ERmean))+
-  geom_point(size=1)+geom_smooth(method = "lm")
+#ggplot(AMFR_1223, aes(x=count,y=GPPmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_1223<-recovery_calc_FR(AMFR_1223))
 
 
-AM_tbl<-rbind(AMFR_0223,AMFR_0623,AMFR_0823,AMFR_1223)
+AMFR<- AM %>% mutate(RI = case_when(Date>"2023-12-15" & Date<"2024-02-20"~ 2))
+AMFR<-AMFR %>% filter(RI==2) 
+ggplot(AMFR, aes(Date))+geom_line(aes(y=ER), size=1)
+AMFR_0224<-check_ratios(AMFR)
+AMFR_0224<-filter(AMFR_0224, count>13)
+
+for(i in 1:nrow(AMFR_0224)) {if(AMFR_0224$count[i]>=35) {
+  AMFR_0224$ERmean[i]<-NA}
+  else {AMFR_0224$ERmean[i]<- AMFR_0224$ERmean[i]-0 }}
+
+#ggplot(AMFR_0224, aes(x=count,y=ERmean))+geom_point(size=1)+geom_smooth(method = "lm")
+(AMFR_0224<-recovery_calc_FR(AMFR_0224))
+
+
+# AMFR<- AM %>% mutate(RI = case_when(Date>"2024-02-20" & Date<"2024-06-16"~ 2))
+# AMFR<-AMFR %>% filter(RI==2) 
+# ggplot(AMFR, aes(Date))+geom_line(aes(y=GPP), size=1)
+# AMFR_0224<-check_ratios(AMFR)
+# 
+# ggplot(AMFR_0224, aes(x=count,y=mean))+geom_point(size=1)+geom_smooth(method = "lm")
+# (AMFR_0224<-recovery_calc_FR(AMFR_0224))
+
+AM_tbl<-rbind(AMFR_0223,AMFR_0623,AMFR_0823,AMFR_1223, AMFR_0224)
 AM_tbl$ID<-'AM'
 AM_tbl$num<-6
-AM_tbl$IF <- c("rev","bo",'bo','rev')
+AM_tbl$IF <- c("rev","bo",'bo','rev', 'bo')
 
-####OS####
+#OS####
 OSFR<- OS %>% mutate(RI = case_when(Date> "2022-07-15" & Date<"2022-10-20"~ 2))
 OSFR<-filter(OSFR, RI==2)
 # ggplot(OSFR, aes(Date))+
@@ -219,20 +237,19 @@ OSFR_08<-check_ratios(OSFR)
 (OSFR_0822<-recovery_calc(OSFR_08))
 
 
-OSFR<- OS %>% mutate(RI = case_when(Date> "2023-05-07" & Date<"2023-07-23"~ 2))
+OSFR<- OS %>% mutate(RI = case_when(Date> "2023-05-07" & Date<"2023-08-06"~ 2))
+OSFR<-filter(OSFR, RI==2)
+#ggplot(OSFR, aes(Date))+geom_line(aes(y=depth), size=1)
+OSFR_0723<-check_ratios(OSFR)
+OSFR_0723<-filter(OSFR_0723, count>55)
+#ggplot(OSFR_0723, aes(x=count,y=GPPmean))+geom_point(size=1)+geom_smooth(method = "lm")
+(OSFR_0723<-recovery_calc_FR(OSFR_0723))
+
+OSFR<- OS %>% mutate(RI = case_when( Date> "2023-11-18" & Date<"2024-04-04"~ 2))
 OSFR<-filter(OSFR, RI==2)
 ggplot(OSFR, aes(Date))+geom_line(aes(y=depth), size=1)
-OSFR_0723<-check_ratios(OSFR)
-ggplot(OSFR_0723, aes(x=count,y=GPPmean))+geom_point(size=1)+geom_smooth(method = "lm")
-(OSFR_0723<-recovery_calc_FR(OSFR_0723))
-OSFR_0723$GPP_recov<-NA
-
-OSFR_0723$ER_recov<-NA
-
-OSFR<- OS %>% mutate(RI = case_when( Date> "2023-11-18" & Date<"2024-04-11"~ 2))
-OSFR<-filter(OSFR, RI==2)
 OSFR_1223<-check_ratios(OSFR)
-#ggplot(OSFR_1223, aes(count))+geom_point(aes(y=hmean))
+ggplot(OSFR_1223, aes(count))+geom_point(aes(y=ERmean))
 (OSFR_1223<-recovery_calc_FR(OSFR_1223))
 
 
@@ -241,32 +258,29 @@ OS_tbl$ID<-'OS'
 OS_tbl$num<-5
 OS_tbl$IF <- c('bo','bo', 'rev')
 
-####LF######
+##LF######
 LFFR<- LF %>% mutate(RI = case_when(Date> "2022-06-01" & Date<"2022-10-30"~ 2))
 LFFR<-filter(LFFR, RI==2)
-ggplot(LFFR, aes(Date))+geom_point(aes(y=GPP))
+#ggplot(LFFR, aes(Date))+geom_point(aes(y=GPP))
 LFFR_0822<-check_ratios(LFFR)
 #LFFR_0822<-filter(LFFR_0822,count<110)
-ggplot(LFFR_0822, aes(count))+geom_point(aes(y=GPPmean))
+#ggplot(LFFR_0822, aes(count))+geom_point(aes(y=ERmean))
 (LFFR_0822<-recovery_calc(LFFR_0822))
 
 
-LFFR<- LF %>% mutate(RI = case_when(
-  Date> "2023-01-01" & Date<"2023-05-01"~ 2))
+LFFR<- LF %>% mutate(RI = case_when(Date> "2023-01-01" & Date<"2023-05-01"~ 2))
 LFFR<-filter(LFFR, RI==2)
-ggplot(LFFR, aes(Date))+geom_point(aes(y=depth_diff))
+#ggplot(LFFR, aes(Date))+geom_point(aes(y=depth_diff))
 LFFR_0323<-check_ratios(LFFR)
 LFFR_0323<-filter(LFFR_0323,count<110)
-ggplot(LFFR_0323, aes(count))+geom_point(aes(y=GPPmean))
+#ggplot(LFFR_0323, aes(count))+geom_point(aes(y=ERmean))
 (LFFR_0323<-recovery_calc_FR(LFFR_0323))
 
-LFFR<- LF %>% mutate(RI = case_when(
-  Date> "2023-05-25" & Date<"2023-08-26"~ 2))
+LFFR<- LF %>% mutate(RI = case_when(Date> "2023-05-25" & Date<"2023-07-26"~ 2))
 LFFR<-filter(LFFR, RI==2)
 ggplot(LFFR, aes(Date))+geom_line(aes(y=depth_diff))
 LFFR_0723<-check_ratios(LFFR)
-LFFR_0723<-filter(LFFR_0723,count<68)
-ggplot(LFFR_0723, aes(count))+geom_point(aes(y=hmean))
+ggplot(LFFR_0723, aes(count))+geom_point(aes(y=ERmean))
 (LFFR_0723<-recovery_calc_FR(LFFR_0723))
 
 
@@ -285,25 +299,20 @@ LF_tbl$ID<-'LF'
 LF_tbl$num<-4
 LF_tbl$IF <- c("h","h","h")
 
-####GB####
-GBFR<- GB %>% mutate(RI = case_when(
-  Date> "2022-07-01" & Date<"2022-12-20"~ 2))
+#GB####
+GBFR<- GB %>% mutate(RI = case_when(Date> "2022-07-01" & Date<"2022-11-08"~ 2))
 GBFR<-filter(GBFR, RI==2)
-ggplot(GBFR, aes(Date))+ geom_line(aes(y=depth), size=1)
-
+#ggplot(GBFR, aes(Date))+ geom_line(aes(y=depth), size=1)
 GBFR_0822<-check_ratios(GBFR)
-GBFR_0822<-filter(GBFR_0822, count<120)
-ggplot(GBFR_0822, aes(count))+geom_point(aes(y=hmean))
+#ggplot(GBFR_0822, aes(count))+geom_point(aes(y=GPPmean))
 (GBFR_0822<-recovery_calc(GBFR_0822))
 
 
-GBFR<- GB %>% mutate(RI = case_when(
-  Date> "2023-11-10" & Date<"2024-01-27"~ 2))
+GBFR<- GB %>% mutate(RI = case_when(Date> "2023-10-01" & Date<"2024-02-11"~ 2))
 GBFR<-filter(GBFR, RI==2)
-ggplot(GBFR, aes(Date))+ geom_point(aes(y=depth), size=1)
+#ggplot(GBFR, aes(Date))+ geom_point(aes(y=depth), size=1)
 GBFR_1224<-check_ratios(GBFR)
-#GBFR_1224<-filter(GBFR_1224, count<60)
-ggplot(GBFR_1224, aes(count))+ geom_point(aes(y=GPPmean))
+#ggplot(GBFR_1224, aes(count))+ geom_point(aes(y=GPPmean))
 (GBFR_1224<-recovery_calc_FR(GBFR_1224))
 
 
@@ -313,64 +322,70 @@ GB_tbl$num<-3
 GB_tbl$IF <- c("h", 'rev')
 
 
-####ID####
+#ID####
 
-IDFR<- ID %>% mutate(RI = case_when(
-  Date> "2023-01-10" & Date<"2023-04-30"~ 2))
+IDFR<- ID %>% mutate(RI = case_when(Date> "2023-01-10" & Date<"2023-04-30"~ 2))
 IDFR<-filter(IDFR, RI==2)
 #ggplot(IDFR, aes(Date))+geom_line(aes(y=depth), size=1)
 IDFR_0223<-check_ratios(IDFR)
-# ggplot(IDFR_0223, aes(count))+
-#   geom_point(aes(y=hmean))
+#ggplot(IDFR_0223, aes(count))+geom_point(aes(y=hmean))
 (IDFR_0223<-recovery_calc_FR(IDFR_0223))
 
 
-IDFR<- ID %>% mutate(RI = case_when(
-  Date> "2023-06-01" & Date<"2023-08-01"~ 2))
+IDFR<- ID %>% mutate(RI = case_when(Date> "2023-06-01" & Date<"2023-07-19"~ 2))
 IDFR<-filter(IDFR, RI==2)
-# ggplot(IDFR, aes(Date))+
-#   geom_line(aes(y=depth), size=1)
+# ggplot(IDFR, aes(Date))+geom_line(aes(y=depth), size=1)
 IDFR_0723<-check_ratios(IDFR)
-IDFR_0723<-filter(IDFR_0723,count>35)
-# ggplot(IDFR_0723, aes(count))+
-#   geom_point(aes(y=ERmean))
-IDFR_0723<-recovery_calc_FR(IDFR_0723)
+#ggplot(IDFR_0723, aes(count))+geom_point(aes(y=ERmean))
+(IDFR_0723<-recovery_calc_FR(IDFR_0723))
 
 
-IDFR<- ID %>% mutate(RI = case_when(
-  Date> "2023-08-16" & Date<"2023-10-30"~ 2))
+IDFR<- ID %>% mutate(RI = case_when(Date> "2023-05-19" & Date<"2023-10-22"~ 2))
 IDFR<-filter(IDFR, RI==2)
-# ggplot(IDFR, aes(Date))+
-#   geom_line(aes(y=depth), size=1)
+#ggplot(IDFR, aes(Date))+ geom_line(aes(y=depth), size=1)
 IDFR_0923<-check_ratios(IDFR)
-IDFR_0923<-filter(IDFR_0923, count<45)
-# ggplot(IDFR_0923, aes(count))+
-#   geom_point(aes(y=hmean))
+#ggplot(IDFR_0923, aes(count))+ geom_point(aes(y=ERmean))
 (IDFR_0923<-recovery_calc_FR(IDFR_0923))
 
 
-ID_tbl<-rbind(IDFR_0223,IDFR_0723,IDFR_0923)
+IDFR<- ID %>% mutate(RI = case_when(Date> "2023-09-01" & Date<"2024-03-16"~ 2))
+IDFR<-filter(IDFR, RI==2)
+#ggplot(IDFR, aes(Date))+ geom_line(aes(y=depth), size=1)
+IDFR_0124<-check_ratios(IDFR)
+#ggplot(IDFR_0124, aes(count))+ geom_point(aes(y=ERmean))
+(IDFR_0124<-recovery_calc_FR(IDFR_0124))
+
+
+IDFR<- ID %>% mutate(RI = case_when(Date> "2024-03-16" & Date<"2024-06-16"~ 2))
+IDFR<-filter(IDFR, RI==2)
+#ggplot(IDFR, aes(Date))+ geom_line(aes(y=depth), size=1)
+IDFR_0324<-check_ratios(IDFR)
+ggplot(IDFR_0324, aes(count))+ geom_point(aes(y=ERmean))
+(IDFR_0324<-recovery_calc_FR(IDFR_0324))
+
+
+ID_tbl<-rbind(IDFR_0223,IDFR_0723,IDFR_0923,IDFR_0124,IDFR_0324)
 ID_tbl$ID<-'ID'
 ID_tbl$num<-2
-ID_tbl$IF <- c("h","h","h")
+ID_tbl$IF <- c("h","h","h","rev","h")
 
 
-####IU####
+#IU####
 #check
 IUFR<- IU %>% mutate(RI = case_when(Date> "2023-11-20" & Date<"2024-02-10"~ 2))
 IUFR<-filter(IUFR, RI==2)
 #ggplot(IUFR, aes(Date))+geom_line(aes(y=depth), size=1)
 IUFR_0223<-check_ratios(IUFR)
-#ggplot(IUFR_0223, aes(count))+geom_point(aes(y=GPPmean))
+ggplot(IUFR_0223, aes(count))+geom_point(aes(y=ERmean))
 (IUFR_0223<-recovery_calc_FR(IUFR_0223))
 
 
-IUFR<- IU %>% mutate(RI = case_when(Date> "2024-03-04" & Date<"2024-05-28"~ 2))
+IUFR<- IU %>% mutate(RI = case_when(Date> "2024-03-04" & Date<"2024-05-10"~ 2))
 IUFR<-filter(IUFR, RI==2)
 #ggplot(IUFR, aes(x=Date))+geom_line(aes(y=GPP), size=1)
 IUFR_0423<-check_ratios(IDFR)
-IUFR_0423<-filter(IUFR_0423, count<45)
-#ggplot(IUFR_0423, aes(count))+geom_point(aes(y=GPPmean))
+IUFR_0423<-filter(IUFR_0423, count<82)
+ggplot(IUFR_0423, aes(count))+geom_point(aes(y=ERmean))
 (IUFR_0423<-recovery_calc_FR(IUFR_0423))
 
 
@@ -444,7 +459,7 @@ summary(lm(log10(ER_ratio) ~ h_diff, data=recov))
       plot.title = element_text(size = 27, color='darkred')))
 
 both<-plot_grid(f,g, ncol=2)
-ggsave(filename="recovery_magnitude.jpeg",
+ggsave(filename="05_Figures/recovery_magnitude.jpeg",
        plot = both,
        width =12,
        height = 6,
@@ -479,7 +494,7 @@ ggsave(filename="recovery_magnitude.jpeg",
       axis.text.x = element_text(size=17)))
 both<-plot_grid(h,i, ncol=2)
 
-ggsave(filename="recovery_site.jpeg",
+ggsave(filename="05_Figures/recovery_site.jpeg",
        plot = both,
        width =12,
        height = 6,

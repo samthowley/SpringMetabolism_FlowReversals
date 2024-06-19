@@ -69,19 +69,11 @@ two_station<- function(spring) {
 
   spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
 
-  # spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
-  #   mutate(u_md=u_mh*24) %>%
-  #   mutate(L_max=(u_md*3)/K600_1d) %>%
-  #   group_by(day,Month,year) %>%
-  #   mutate(L_max=max(L_max, na.rm=T)- length*2)
-  # 
-  #for ID
   spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
     mutate(u_md=u_mh*24) %>%
     mutate(L_max=(u_md*3)/K600_1d) %>%
     group_by(day,Month,year) %>%
     mutate(L_max=max(L_max, na.rm=T)- length*2)
-  
 
   spring1 <- spring %>%
     mutate(method= case_when(
@@ -94,6 +86,51 @@ two_station<- function(spring) {
     filter(method== "1"  | ER > -2)
 
   return(list(two,one))}
+two_station_ID<- function(spring) {
+  
+  spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
+  spring$not<-spring$deltaDO_rate-spring$K_reaeration
+  spring$not[spring$not< -37]<- -37
+  
+  spring<- spring %>%
+    mutate(hour = hour(Date),day=day(Date),Month=month(Date),year=year(Date))
+  
+  spring <- spring %>%mutate(time= case_when(light<=0~ 'ER',light>0~ 'AM'))
+  
+  springER<-spring%>% group_by(day,Month,year,time) %>%
+    summarize(ER = mean(not, na.rm=T))
+  
+  springER<-filter(springER, time=='ER')
+  spring<-left_join(spring, springER,by=c("day","Month","year"))
+  
+  spring$GPP<-spring$not-spring$ER
+  spring$GPP[spring$GPP<0] <- 0
+  
+  spring_GPPavg<-spring%>% group_by(day,Month,year) %>%
+    summarize(GPPavg = mean(GPP, na.rm=T))
+  
+  spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
+  
+  #for ID
+  spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
+    mutate(u_md=u_mh*24) %>%
+    mutate(L_max=(u_md*3)/K600_1d) %>%
+    group_by(day,Month,year) %>%
+    mutate(L_max=max(L_max, na.rm=T)- length*2)
+  
+  
+  spring1 <- spring %>%
+    mutate(method= case_when(
+      length< L_max ~ '2'))
+  spring1$method[is.na(spring1$method)]<-1
+  
+  two<-spring1 %>%group_by(day,Month,year) %>%
+    filter(method== "2" & ER <= -2)
+  one<-spring1 %>%group_by(day,Month,year) %>%
+    filter(method== "1"  | ER > -2)
+  
+  return(list(two,one))}
+
 two_station_forRecovery<- function(spring) {
   spring$K600_1d[spring$K600_1d<0]<-0.1
   spring$Q_m.s[spring$K600_1d<0]<-0.1
@@ -319,7 +356,7 @@ ID1<-ID %>% mutate(depth=depth-0.5) %>%filter(DO<10)
 ID_recov<-two_station_forRecovery(ID)
 
 write_csv(ID_recov, "04_Outputs/one station inputs/not parsed/ID.csv")
-met_output<-two_station(ID1)
+met_output<-two_station_ID(ID1)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
