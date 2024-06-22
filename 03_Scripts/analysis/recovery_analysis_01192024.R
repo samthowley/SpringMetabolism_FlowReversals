@@ -5,7 +5,7 @@ library(tidyverse)
 library(readxl)
 library(measurements)
 library(zoo)
-library(cowplot)d
+library(cowplot)
 library(mmand)
 
 check_ratios <- function(siteBO) {
@@ -408,7 +408,7 @@ write_csv(recov, "04_Outputs/recovery_analysis.csv")
 
 ###compile####
 recov<-read_csv("04_Outputs/recovery_analysis.csv")
-
+mean(recov$ER_ratio, na.rm = T)
 recov$a<-'a'
 cols<-c(
   "h"="deepskyblue3",
@@ -479,7 +479,7 @@ ggsave(filename="05_Figures/recovery_magnitude.jpeg",
       plot.title = element_text(size = 27, color='darkgreen'),
       axis.text.x = element_text(size=17)))
 
-(i<-ggplot(recov, aes(ID, color=IF))+
+(i<-ggplot(recov_excluding_ID, aes(ID, color=IF))+
     geom_point(aes(y=ER_ratio), size=6)+
     geom_hline(yintercept = 1, linetype='dashed')+
     scale_colour_manual(name="", values = cols,
@@ -492,6 +492,10 @@ ggsave(filename="05_Figures/recovery_magnitude.jpeg",
       axis.title.y =element_text(size = 25, color='darkred'),
       plot.title = element_text(size = 27, color='darkred'),
       axis.text.x = element_text(size=17)))
+recov_excluding_ID<-filter(recov, ER_ratio<1.9)
+summary(lm(log10(GPP_ratio) ~ ID, data=recov_excluding_ID))
+
+
 both<-plot_grid(h,i, ncol=2)
 
 ggsave(filename="05_Figures/recovery_site.jpeg",

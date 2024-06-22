@@ -28,7 +28,6 @@ river_elevation <- function(site_id,parameterCd) {
     mutate(elevation=abs(depth_up-depth_down)*proportion)
   river<-river[,c(1,5)]
   return(river)}
-
 for_wilcox <- function(site_id,parameterCd) {
   river <- readNWISuv(site_id,parameterCd)
 
@@ -39,101 +38,93 @@ for_wilcox <- function(site_id,parameterCd) {
   river<-river %>% filter(minute==0)
   river<-river[,c(1,2)]
   return(river)}
+checkGPP <- function(site_river) {
 
-check <- function(site, river) {
-  GPP_bound<-min(site$GPP, na.rm=T)
-  ER_bound<-min(site$ER, na.rm=T)
+  zoom<-filter(site_river, Date>"2022-05-03")
+  a<-ggplot(data=zoom, aes(x=depth)) +
+    geom_point(aes(y=GPP, color="OG"), size=1)+
+    geom_point(aes(y=GPP_pred, color="est"), size=1)
   
-  mod_h<-lm(formula =  depth ~ elevation, data = site)
-  cf <- coef(mod_h)
-  (site$h_inter<-(cf[2]*site$elevation)+cf[1])
+  b<-ggplot(data=zoom, aes(x=Date)) +
+    geom_point(aes(y=GPP, color="OG"), size=1)+
+    geom_point(aes(y=GPP_pred, color="est"), size=1)
   
+  c<-ggplot(data=zoom, aes(x=GPP)) +
+    geom_point(aes(y=GPP_pred), size=1)
   
-  modGPP<-lm(GPP ~ depth, data = site)
-  cf <- coef(modGPP)
-  (site$GPP_est<- cf[2]*site$h_inter+cf[1])
+  d<-ggplot(data=zoom, aes(x=depth)) +
+    geom_point(aes(y=GPP_ratio), size=1)
   
+  GPPcheck<-plot_grid(a,b,c,d)
   
-  modER<-lm(ER ~ depth, data = site)
-  cf <- coef(modER)
-  (site$ER_est<- cf[2]*site$h_inter+cf[1])
+  return(GPPcheck)}
+checkER <- function(site_river) {
   
+  zoom<-filter(site_river, Date>"2022-05-03")
+  a<-ggplot(data=zoom, aes(x=depth)) +
+    geom_point(aes(y=ER, color="OG"), size=1)+
+    geom_point(aes(y=ER_pred, color="est"), size=1)
   
-  site$GPP[site$GPP< GPP_bound] <- GPP_bound
-  site$ER[site$ER< ER_bound] <- ER_bound
+  b<-ggplot(data=zoom, aes(x=Date)) +
+    geom_point(aes(y=ER, color="OG"), size=1)+
+    geom_point(aes(y=ER_pred, color="est"), size=1)
   
-  site<- site %>% mutate(ratio_GPP=GPP/GPP_est, ratio_ER=ER/ER_est,
-                                 ratio_h=depth/h_inter)
+  c<-ggplot(data=zoom, aes(x=ER)) +
+    geom_point(aes(y=ER_pred), size=1)
   
-  return(river)}
-interpolation <- function(site, river) {
-  GPP_bound<-min(site$GPP, na.rm=T)
-  ER_bound<-min(site$ER, na.rm=T)
+  d<-ggplot(data=zoom, aes(x=depth)) +
+    geom_point(aes(y=ER_ratio), size=1)
   
-  mod_h<-lm(formula =  depth ~ elevation, data = site)
-  cf <- coef(mod_h)
-  (river$h_inter<-(cf[2]*river$elevation)+cf[1])
+  ERcheck<-plot_grid(a,b,c,d)
   
-  
-  modGPP<-lm(GPP ~ depth, data = site)
-  cf <- coef(modGPP)
-  (river$GPP_est<- cf[2]*river$h_inter+cf[1])
-  
-  
-  modER<-lm(ER ~ depth, data = site)
-  cf <- coef(modER)
-  (river$ER_est<- cf[2]*river$h_inter+cf[1])
-  
-  
-  river$GPP[river$GPP< GPP_bound] <- GPP_bound
-  river$ER[river$ER< ER_bound] <- ER_bound
-  
-  return(river)}
+  return(ERcheck)}
 
-interpolation_wilcox <- function(site) {
-  GPP_bound<-min(site$GPP, na.rm=T)
-  ER_bound<-min(site$ER, na.rm=T)
+interpolation <- function(site, river, el_lowbound, el_upbound,
+                          h_lowbound,h_upbound) {
   
-  names(site)
-  mod_h<-lm(formula =  depth ~ elevation, data = site)
-  cf <- coef(mod_h)
-  (site$h_inter<-(cf[2]*site$elevation)+cf[1])
+  site_river<-left_join(river,site)
   
-  
-  modGPP<-lm(GPP ~ depth, data = site)
-  cf <- coef(modGPP)
-  (site$GPP_est<- cf[2]*site$h_inter+cf[1])
+  site_river<- site_river %>% mutate(elevationID = case_when(
+    elevation<el_lowbound  ~ "low",
+    elevation>el_lowbound & elevation<=el_upbound ~ "moderate",
+    elevation>=el_upbound~ "high"))
+  site_river$elevationID[is.na(site_river$elevationID)]<-"high"
   
   
-  modER<-lm(ER ~ depth, data = site)
-  cf <- coef(modER)
-  (site$ER_est<- cf[2]*site$h_inter+cf[1])
+  mod<-lm(depth~elevation*elevationID, data=site_river)
+  site_river$h_pred<-predict(mod, site_river)
   
+  site_river<- site_river %>% mutate(depthID = case_when(
+    h_pred<h_lowbound  ~ "low",
+    h_pred>h_lowbound & h_pred<=h_upbound ~ "moderate",
+    h_pred>=h_upbound~ "high"))
+  site_river$depthID[is.na(site_river$depthID)]<-"high"
   
-  site$GPP[site$GPP< GPP_bound] <- GPP_bound
-  site$ER[site$ER< ER_bound] <- ER_bound
+  mod<-lm(GPP~h_pred*depthID, data=site_river)
+  site_river$GPP_pred<-predict(mod, site_river)
   
-  site<- site %>% mutate(ratio_GPP=GPP/GPP_est, ratio_ER=ER/ER_est,
-                         ratio_h=depth/h_inter)
+  mod<-lm(ER~h_pred*depthID, data=site_river)
+  site_river$ER_pred<-predict(mod, site_river)
   
-  return(site)}
+  site_river<-site_river %>% mutate(ER_ratio=ER_pred/ER,
+                                GPP_ratio=GPP_pred/GPP,
+                                h_ratio=h_pred/depth)
+  
+  site_river<-site_river %>% mutate(day=as.Date(Date))
+  site_river <- site_river[!duplicated(site_river[c('day')]),]
+  site_river$ER_pred[site_river$ER_pred>-3]<- -3
+  site_river$GPP_pred[site_river$GPP_pred<0]<- 0
+  
+  return(site_river)}
 
 
 #get data####
-metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
-metabolism<-metabolism[,c('ER','GPP','NEP', 'Date', 'ID')]
-metabolism<-metabolism %>%rename('day'='Date') %>% mutate(day=as.Date(day))
-depth<-read_csv('02_Clean_data/master_depth2.csv')
-depth$day<-as.Date(depth$Date)
-master<-left_join(depth,metabolism, by=c('ID','day'))
-
-master<- master[!duplicated(master[c('ID','Date')]),]
+master<-read_csv('02_Clean_data/master_metabolism4.csv')
 master<-master%>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))%>%
   mutate(depth_diff= depth-depth_min)
 
 sites<-split(master,master$ID)
 AM<-sites[[1]]
-GB<-sites[[2]]
 ID<-sites[[3]]
 IU<-sites[[4]]
 LF<-sites[[5]]
@@ -144,57 +135,65 @@ proportion<-0.79
 site_id <- c('02322500','02321958')
 parameterCd <- c('00065')
 ftwhite <- river_elevation(site_id,parameterCd)
-write_csv(ftwhite, "04_Outputs/ftwhite.csv")
+#write_csv(ftwhite, "04_Outputs/ftwhite.csv")
 
 site_id <- '02323500'
 parameterCd <- c('00065')
 proportion<-1
 wilcox <- for_wilcox(site_id,parameterCd)
-write_csv(wilcox, "04_Outputs/wilcox.csv")
+#write_csv(wilcox, "04_Outputs/wilcox.csv")
 
 site_id <- c('02320000','02319800')
 parameterCd <- c('00065')
 proportion<-0.501
 dowling <- river_elevation(site_id,parameterCd)
-write_csv(dowling, "04_Outputs/dowling.csv")
+#write_csv(dowling, "04_Outputs/dowling.csv")
 
 site_id <- c('02323000','02323500')
 parameterCd <- c('00065')
 proportion<-0.72
 OS_river <- river_elevation(site_id,parameterCd)
-write_csv(OS_river, "04_Outputs/OS_river.csv")
+#write_csv(OS_river, "04_Outputs/OS_river.csv")
 
 site_id<-'02322700'
 parameterCd <- c('00065')
 IU <- for_wilcox(site_id,parameterCd)
-write_csv(IU, "04_Outputs/IU_historical.csv")
+#write_csv(IU, "04_Outputs/IU_historical.csv")
 
-###GB run####
-#check the SRWMD Gage
-GB_check<-left_join(GB, ftwhite)
+#GB run####
+GB<-sites[[2]]
 
-GB_inter<-check(GB)
-names(GB_inter)
+GB_inter<-interpolation(GB,ftwhite,
+                        el_lowbound=1.7,
+                        el_upbound=2.5,
+                        h_lowbound=0.56,
+                        h_upbound=0.73)
+GB_GPPcheck<-checkGPP(GB_inter)
+GB_ERcheck<-checkER(GB_inter)
 
-ggplot(data=GB_inter, aes(x=Date)) +
-  geom_point(aes(y=GPP_est), size=1, color='darkgreen')+
-  geom_point(aes(y=GPP), size=1, color='darkgreen')+
-  geom_hline(yintercept = 0)
-  
+#AM run####
+AM<-sites[[1]]
 
+AM<- AM %>% mutate(depthID = case_when(
+  depth<0.9 ~ "low",
+  depth>0.9 & depth<1.2 ~ "moderate",
+  depth>=1.2 ~ "high"))
 
+dowling<- dowling %>% mutate(elevationID = case_when(
+  depth<0.55  ~ "low",
+  depth>0.55 & depth<=0.75 ~ "moderate",
+  depth>=0.75~ "high"))
 
-LF<-left_join(LF,
-              wilcox)
+ggplot(AM, aes(x=weight)) + 
+  geom_histogram(binwidth=0.01)+
+  geom_vline(xintercept=)+geom_vline(xintercept=)
 
-ggplot(data=LF, aes(x=depth_diff)) +
-  geom_point(aes(y=GPP), size=1, color='darkgreen')+geom_point(aes(y=ER*-1), size=1, color='darkred')+
-  geom_point(aes(y=NEP), size=1, color='blue')+scale_color_manual(values='black')+
-  geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75, data=LF, se = FALSE, method='lm')+
-  geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,data=LF, se = FALSE, method='lm')+
-  geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,data=LF, se = FALSE, method='lm')+geom_vline(xintercept = 0.6)
+AM_inter<-interpolation(AM,ftwhite,
+                        el_lowbound=1.7,
+                        el_upbound=2.5,
+                        h_lowbound=0.56,
+                        h_upbound=0.73)
+AM_GPPcheck<-checkGPP(AM_inter)
+AM_ERcheck<-checkER(AM_inter)
 
-LF_edit<-filter(LF, depth_diff<0.6)
-LF_edit<-rename(LF_edit, 'elevation'='stage_up')
-LF_inter<-interpolation(LF_edit)
 

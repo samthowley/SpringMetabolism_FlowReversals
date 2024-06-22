@@ -95,8 +95,8 @@ OS<-IDs[[6]]
 ####GB####
 
 # GBFRcheck<-filter(GBFR,RI==2 )
-# ggplot(GBFRcheck, aes(Date)) + geom_line(aes(y=ER))+
-#   geom_line(aes(y=depth*10, color=depthID))+geom_hline(yintercept = 0.75)
+# ggplot(GB, aes(Date)) +
+#   geom_line(aes(y=depth, color=depthID))+geom_hline(yintercept = 0.75)
 
 GB<- GB %>% mutate(depthID = case_when(
   depth<0.55  ~ "low",
@@ -115,6 +115,24 @@ GB_tbl<-rbind(GB_0622,GB_1223)
 GB_tbl$ID<-'GB'
 GB_tbl$num<-2
 GB_tbl$IF <- c("bo",'rev')
+
+#high stage event
+
+GB_mod<-filter(GB, depthID== 'moderate')
+
+GB_mod<- GB_mod %>% mutate(RI = case_when(Date<'2023-01-01'~ 2))
+GBmod_0622<-extract_reduce_mod(GB, GB_mod)
+
+GB_mod<- GB_mod %>% mutate(RI = case_when(Date>'2023-01-01' & Date<'2024-11-20'~ 2))
+GBmod_0723<-extract_reduce_mod(GB, GB_mod)
+
+GB_mod<- GB_mod %>% mutate(RI = case_when(Date>'2024-11-20'~ 2))
+GBmod_0124<-extract_reduce_mod(GB, GB_mod)
+
+GBmod_tbl<-rbind(GBmod_0622,GBmod_0723,GBmod_0124)
+GBmod_tbl$ID<-'GB'
+GBmod_tbl$num<-2
+GBmod_tbl$IF <- c("h","h",'h')
 
 ####Otter#####
 
@@ -193,7 +211,6 @@ AMFR_1223<-extract_reduce(AM, AMFR)
 AMFR<- AM %>% mutate(RI = case_when(
   Date> "2024-03-11" & Date<"2024-03-28"~ 2))
 AMFR_0324<-extract_reduce(AM, AMFR)
-
 
 AMFR<- AM %>% mutate(RI = case_when(
   Date> "2024-03-28" & Date<"2024-06-16"~ 2))
@@ -357,8 +374,9 @@ R_R$GPP_reduce[R_R$GPP_reduce<0] <- NA
 R_R$ER_reduce[R_R$ER_reduce<0] <- NA
 
 write_csv(R_R, "04_Outputs/reduction_analysis.csv")
-R_R<-read.csv("04_Outputs/reduction_analysis.csv")
 
+R_R<-read.csv("04_Outputs/reduction_analysis.csv")
+mean(R_R$ER_reduce, na.rm = T)
 R_R$a<-'a'
 cols<-c(
   "h"="deepskyblue3",
@@ -423,7 +441,7 @@ ggsave(filename="05_Figures/reduced_mag.jpeg",
     xlab(hdiff)+ylab("|ER| Increase (%)")+xlab("River Reversal Frequency")+
     theme_sam+theme(
       axis.title.y =element_text(size = 27, color="darkred"),
-      axis.title.x =element_text(size = 27),
+      axis.title.x =element_text(size = 18),
       axis.text.x=element_text(size=18),
       plot.title = element_text(size = 22, color="darkred"))+
     scale_y_continuous(limits = c(0,100)))
@@ -432,9 +450,17 @@ summary(lm(GPP_reduce ~ h, data=RR_noID))
 
 (flood_site<-plot_grid(a, c, nrow=1))
 
-ggsave(filename="05_Figures/reduced_site.jpeg",
+ggsave(filename="05_Figures/ERreduced_site.jpeg",
        plot = flood_site,
        width =12,
+       height = 5.5,
+       units = "in")
+
+(all_reduced<-plot_grid(a,b,c, ncol=3, align = 'h'))
+
+ggsave(filename="05_Figures/all reduced.jpeg",
+       plot = all_reduced,
+       width =14,
        height = 5.5,
        units = "in")
 
@@ -455,3 +481,4 @@ ggsave(filename="reduced legend.jpeg",
        width =12,
        height = 10,
        units = "in")
+

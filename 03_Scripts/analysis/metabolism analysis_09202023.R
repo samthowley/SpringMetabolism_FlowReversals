@@ -32,6 +32,17 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
                              panel.background = element_rect(fill = 'white'),
                              axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
                              axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
+
+theme_sam_insideplots<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
+                             axis.text.y = element_text(size = 24, angle=0),
+                             axis.title.y =element_blank(),
+                             axis.title.x =element_text(size = 24),
+                             plot.title = element_text(size = 24),
+                             legend.position = "none",
+                             panel.background = element_rect(fill = 'white'),
+                             axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
+                             axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
+
 theme_poster<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
                              axis.text.y = element_text(size = 24, angle=0),
                              axis.title.y =element_blank(),
@@ -111,10 +122,9 @@ OS<-sites[[6]]
    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,data=ID, se = FALSE, method='lm')+
    geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,data=ID, se = FALSE, method='lm')+
    geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,data=ID, se = FALSE, method='lm')+
-   xlab(" ")+ggtitle("ID")+
+   xlab(h)+ggtitle("ID")+
    scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-   theme_poster+theme(axis.title.x = element_text(size = 20),
-                      axis.title.y = element_text(size = 20)))
+   theme_sam_insideplots)
 summary(lm(GPP ~ depth_diff, data = ID))
 
 (IU_sc<-ggplot(data=IU, aes(x=depth_diff)) +
@@ -128,7 +138,7 @@ summary(lm(GPP ~ depth_diff, data = ID))
                 data=IU, se = FALSE, method='lm')+
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
                 data=IU, se = FALSE, method='lm')+
-    xlab(poster_x)+ggtitle("IU")+
+    xlab(h)+ggtitle("IU")+
     scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_sam)
 
 
@@ -145,7 +155,7 @@ summary(lm(GPP ~ depth_diff, data = ID))
                 data=AM, se = FALSE, method='lm')+
     xlab(h)+ggtitle("AM")+
       scale_x_continuous(n.breaks=4) +
-      scale_y_continuous(n.breaks=3)+ theme_poster)
+      scale_y_continuous(n.breaks=3)+ theme_sam_insideplots)
 
 summary(lm(GPP ~ depth_diff, data = AM))
 
@@ -161,7 +171,7 @@ summary(lm(GPP ~ depth_diff, data = AM))
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
                 data=LF, se = FALSE, method='lm')+
     xlab(h)+ggtitle("LF")+scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_poster)
+    scale_y_continuous(n.breaks=3)+theme_sam)
 
 summary(lm(GPP ~ depth_diff, data = LF))
 
@@ -177,9 +187,7 @@ summary(lm(GPP ~ depth_diff, data = LF))
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
                 data=GB, se = FALSE, method='lm')+
     xlab(h)+ggtitle("GB")+scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_poster+
-    theme(axis.title.x = element_text(size = 20),
-          axis.title.y = element_text(size = 20)))
+    scale_y_continuous(n.breaks=3)+theme_sam_insideplots)
 
 summary(lm(GPP ~ depth_diff, data = GB))
 
@@ -195,7 +203,7 @@ summary(lm(GPP ~ depth_diff, data = GB))
     geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
                 data=OS, se = FALSE, method='lm')+
     xlab(h)+ggtitle("OS")+scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_poster)
+    scale_y_continuous(n.breaks=3)+theme_sam_insideplots)
 
 cherrypick_scatter<-plot_grid(ID_sc,GB_sc, ncol=1, align = 'v')
 #slope######
@@ -244,10 +252,9 @@ master$ID <- factor(master$ID , levels=c("IU","ID", "GB", "LF", "OS", "AM"))
   scale_y_continuous(n.breaks=3, limits=c(-10, 5))+
   stat_summary(fun=mean, colour="white", geom="point",
                size=1, show.legend=FALSE) + theme_sam+
-    theme(axis.text.x=element_blank(),
-          axis.title.x=element_blank()))
+    theme(axis.title.x=element_blank()))
 
-(box<-plot_grid(GPP, NEP, ER, ncol=1, align = 'v'))
+(box<-plot_grid(GPP, ER, NEP,ncol=1, align = 'v'))
 ######cherry pick#####
 theme_chem<-theme()+theme(axis.text.x = element_blank(),
       axis.text.y.right = element_text(size = 17, angle=0, color="purple"),
@@ -411,13 +418,13 @@ ggsave(filename="05_Figures/flood types.jpeg",
        height = 12,
        units = "in")
 
-ggsave(filename="05_Figures/master.jpeg",
+ggsave(filename="05_Figures/all metabolism plots.jpeg",
        plot = together,
        width =12,
        height = 14.5,
        units = "in")
 
-ggsave(filename="05_Figures/poster master.jpeg",
+ggsave(filename="05_Figures/metabolism boxplots.jpeg",
        plot = boxplots,
        width =17,
        height = 12,
@@ -428,7 +435,3 @@ ggsave(filename="05_Figures/scatter.jpeg",
        height = 12,
        units = "in")
 
-
-ggplot(ID, aes(x=Date))+
-    geom_line(aes(y=DO), linewidth=0.8)+theme_bland+ylab('DO mg/L')+
-  theme(axis.text.x = element_text(size=12))
