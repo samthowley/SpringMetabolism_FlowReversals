@@ -52,7 +52,7 @@ theme_poster<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
                              panel.background = element_rect(fill = 'white'),
                              axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "black"),
                              axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
-
+#functions####
 extract_slope <- function(site) {
   (siteNEP<-lm(NEP ~ depth_diff, data = site))
   cf <- coef(siteNEP)
@@ -92,6 +92,24 @@ slope_df <- function(site) {
 
   return(df)}
 
+lm_eqn_GPP <- function(df){
+  m <- lm(GPP ~ depth_diff, df);
+  eq <- substitute(italic(GPP) == a + b %.% italic(depth_diff)*","~~italic(r)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 2),
+                        b = format(unname(coef(m)[2]), digits = 2),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+
+lm_eqn_ER <- function(df){
+  m <- lm(ER ~ depth_diff, df);
+  eq <- substitute(italic(ER) == a + b %.% italic(depth_diff)*","~~italic(r)^2~"="~r2, 
+                   list(a = format(unname(coef(m)[1]), digits = 2),
+                        b = format(unname(coef(m)[2]), digits = 2),
+                        r2 = format(summary(m)$r.squared, digits = 3)))
+  as.character(as.expression(eq));
+}
+
 #get data####
 metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
 metabolism<-metabolism[,c('ER','GPP','NEP', 'Date', 'ID')]
@@ -114,96 +132,74 @@ LF<-sites[[5]]
 OS<-sites[[6]]
 #Scatter plots#######
 
-(ID_sc<-ggplot(data=ID, aes(x=depth_diff)) +
-   geom_point(aes(y=GPP), size=1, color='darkgreen')+
-   geom_point(aes(y=ER*-1), size=1, color='darkred')+
-   geom_point(aes(y=NEP), size=1, color='blue')+
-   ylab(flux)+scale_color_manual(values='black')+
-   geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,data=ID, se = FALSE, method='lm')+
-   geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,data=ID, se = FALSE, method='lm')+
-   geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,data=ID, se = FALSE, method='lm')+
-   xlab(h)+ggtitle("ID")+
-   scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-   theme_sam_insideplots)
-summary(lm(GPP ~ depth_diff, data = ID))
+GPP<-master[,c('depth','depth_diff','GPP','ID')]
+GPP<-GPP %>% rename('prod'='GPP') %>% mutate(type='GPP')
 
-(IU_sc<-ggplot(data=IU, aes(x=depth_diff)) +
-    geom_point(aes(y=GPP), size=1, color='darkgreen')+
-    geom_point(aes(y=ER*-1), size=1, color='darkred')+
-    geom_point(aes(y=NEP), size=1, color='blue')+
-    ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
-                data=IU, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-                data=IU, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-                data=IU, se = FALSE, method='lm')+
-    xlab(h)+ggtitle("IU")+
-    scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+theme_sam)
+ER<-master[,c('depth','depth_diff','ER','ID')]
+ER<-ER %>% rename('prod'='ER') %>% mutate(type='ER')
+
+NEP<-master[,c('depth','depth_diff','NEP','ID')]
+NEP<-NEP %>% rename('prod'='NEP') %>% mutate(type='NEP')
+
+master_scatter<-rbind(GPP, ER, NEP)
+
+sites<-split(master_scatter,master_scatter$ID)
+#names(sites)
+AM_scatter<-sites[[1]]
+GB_scatter<-sites[[2]]
+ID_scatter<-sites[[3]]
+IU_scatter<-sites[[4]]
+LF_scatter<-sites[[5]]
+OS_scatter<-sites[[6]]
+
+cols<-c(
+  "GPP"="darkgreen",
+  "ER"="darkred",
+  "NEP"="blue")
+
+(ID_sc<-ggplot(data=ID_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1))+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")))+
+  scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
+  ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
+  theme_sam_insideplots
+  
+(IU_sc<-ggplot(data=IU_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1))+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")), label.x = 1)+
+  scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
+  ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
+  theme_sam
+
+    
+(AM_sc<-ggplot(data=AM_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1))+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")), label.x = 1)+
+  scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
+  ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
+  theme_sam_insideplots
+
+(LF_sc<-ggplot(data=LF_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1))+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")), label.x = 0)+
+  scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
+  ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
+  theme_sam
+
+(GB_sc<-ggplot(data=GB_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1))+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")))+
+  scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
+  ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
+  theme_sam_insideplots
 
 
-(AM_sc<-ggplot(data=AM, aes(x=depth_diff)) +
-    geom_point(aes(y=GPP), size=1, color='darkgreen')+
-    geom_point(aes(y=ER*-1), size=1, color='darkred')+
-    geom_point(aes(y=NEP), size=1, color='blue')+
-    ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
-                data=AM, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-                data=AM, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-                data=AM, se = FALSE, method='lm')+
-    xlab(h)+ggtitle("AM")+
-      scale_x_continuous(n.breaks=4) +
-      scale_y_continuous(n.breaks=3)+ theme_sam_insideplots)
-
-summary(lm(GPP ~ depth_diff, data = AM))
-
-(LF_sc<-ggplot(data=LF, aes(x=depth_diff)) +
-    geom_point(aes(y=GPP), size=1, color='darkgreen')+
-    geom_point(aes(y=ER*-1), size=1, color='darkred')+
-    geom_point(aes(y=NEP), size=1, color='blue')+
-    ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
-                data=LF, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-                data=LF, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-                data=LF, se = FALSE, method='lm')+
-    xlab(h)+ggtitle("LF")+scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_sam)
-
-summary(lm(GPP ~ depth_diff, data = LF))
-
-(GB_sc<-ggplot(data=GB, aes(x=depth_diff)) +
-    geom_point(aes(y=GPP), size=1, color='darkgreen')+
-    geom_point(aes(y=ER*-1), size=1, color='darkred')+
-    geom_point(aes(y=NEP), size=1, color='blue')+
-    ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
-                data=GB, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-                data=GB, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-                data=GB, se = FALSE, method='lm')+
-    xlab(h)+ggtitle("GB")+scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_sam_insideplots)
-
-summary(lm(GPP ~ depth_diff, data = GB))
-
-(OS_sc<-ggplot(data=OS, aes(x=depth_diff)) +
-    geom_point(aes(y=GPP), size=1, color='darkgreen')+
-    geom_point(aes(y=ER*-1), size=1, color='darkred')+
-    geom_point(aes(y=NEP), size=1, color='blue')+
-    ylab(flux)+scale_color_manual(values='black')+
-    geom_smooth(aes(x=depth_diff, y=GPP), color='darkgreen', size=0.75,
-                data=OS, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=ER*-1), color='darkred', size=0.75,
-                data=OS, se = FALSE, method='lm')+
-    geom_smooth(aes(x=depth_diff, y=NEP), color='blue', size=0.75,
-                data=OS, se = FALSE, method='lm')+
-    xlab(h)+ggtitle("OS")+scale_x_continuous(n.breaks=4) +
-    scale_y_continuous(n.breaks=3)+theme_sam_insideplots)
+(OS_sc<-ggplot(data=OS_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1))+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")), label.x = 1)+
+  scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
+  ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
+  theme_sam_insideplots
 
 cherrypick_scatter<-plot_grid(ID_sc,GB_sc, ncol=1, align = 'v')
 #slope######
