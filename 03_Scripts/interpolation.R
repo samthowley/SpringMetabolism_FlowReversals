@@ -222,8 +222,10 @@ checkGPP_lm <- function(site_river) {
     geom_line(aes(y=GPP, color="OG"), size=1)+
     geom_line(aes(y=GPP_lm, color="est"), size=1)
   
-  c<-ggplot(data=zoom, aes(x=GPP)) +
-    geom_point(aes(y=GPP_lm), size=1)
+  c<-ggplot(data=zoom, aes(x=GPP,y=GPP_lm)) +
+    geom_point(size=1)+
+    stat_poly_line()+
+    stat_poly_eq(use_label(c("R2")),size=5, label.x = 1,label.y = 0)
   
   d<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=GPP_ratio_lm), size=1)
@@ -242,8 +244,10 @@ checkER_lm <- function(site_river) {
     geom_line(aes(y=ER, color="OG"), size=1)+
     geom_line(aes(y=ER_lm, color="est"), size=1)
   
-  c<-ggplot(data=zoom, aes(x=ER)) +
-    geom_point(aes(y=ER_lm), size=1)
+  c<-ggplot(data=zoom, aes(x=ER,y=ER_lm)) +
+    geom_point(size=1)+
+    stat_poly_line()+
+    stat_poly_eq(use_label(c("R2")),size=5, label.x = 1,label.y = 0)
   
   d<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=ER_ratio_lm), size=1)
@@ -263,8 +267,11 @@ checkGPP_lm_interaction<- function(site_river) {
     geom_line(aes(y=GPP, color="OG"), size=1)+
     geom_line(aes(y=GPP_lm_interaction, color="est"), size=1)
   
-  c<-ggplot(data=zoom, aes(x=GPP)) +
-    geom_point(aes(y=GPP_lm_interaction), size=1)
+  c<-ggplot(data=zoom, aes(x=GPP,y=GPP_lm_interaction)) +
+    geom_point(size=1)+
+    stat_poly_line()+
+    stat_poly_eq(use_label(c("R2")),size=5, label.x = 1,label.y = 0)
+  
   
   d<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=GPP_ratio_lm_interaction), size=1)
@@ -283,8 +290,10 @@ checkER_lm_interaction <- function(site_river) {
     geom_line(aes(y=ER, color="OG"), size=1)+
     geom_line(aes(y=ER_lm_interaction, color="est"), size=1)
   
-  c<-ggplot(data=zoom, aes(x=ER)) +
-    geom_point(aes(y=ER_lm_interaction), size=1)
+  c<-ggplot(data=zoom, aes(x=ER,y=ER_lm_interaction)) +
+    geom_point(size=1)+
+    stat_poly_line()+
+    stat_poly_eq(use_label(c("R2")),size=5, label.x = 1,label.y = 0)
   
   d<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=ER_ratio_lm_interaction), size=1)
@@ -304,8 +313,10 @@ checkGPP_poly <- function(site_river) {
     geom_line(aes(y=GPP, color="OG"), size=1)+
     geom_line(aes(y=GPP_poly, color="est"), size=1)
   
-  c<-ggplot(data=zoom, aes(x=GPP)) +
-    geom_point(aes(y=GPP_poly), size=1)
+  c<-ggplot(data=zoom, aes(x=GPP,y=GPP_poly)) +
+    geom_point(size=1)+
+    stat_poly_line()+
+    stat_poly_eq(use_label(c("R2")),size=5, label.x = 1,label.y = 0)
   
   d<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=GPP_ratio_poly), size=1)
@@ -324,8 +335,11 @@ checkER_poly <- function(site_river) {
     geom_line(aes(y=ER, color="OG"), size=1)+
     geom_line(aes(y=ER_poly, color="est"), size=1)
   
-  c<-ggplot(data=zoom, aes(x=ER)) +
-    geom_point(aes(y=ER_poly), size=1)
+  c<-ggplot(data=zoom, aes(x=ER,y=ER_poly)) +
+    geom_point(size=1)+
+  stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")),size=5, label.x = 1,label.y = 0)
+
   
   d<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=ER_ratio_poly), size=1)
@@ -345,8 +359,11 @@ checkGPP_poly_interaction <- function(site_river) {
     geom_line(aes(y=GPP, color="OG"), size=1)+
     geom_line(aes(y=GPP_poly_interaction, color="est"), size=1)
   
-  c<-ggplot(data=zoom, aes(x=GPP)) +
-    geom_point(aes(y=GPP_poly_interaction), size=1)
+  c<-ggplot(data=zoom, aes(x=GPP,y=GPP_poly_interaction)) +
+    geom_point(size=1)+
+    stat_poly_line()+
+    stat_poly_eq(use_label(c("R2")),size=5, label.x = 1,label.y = 0)
+  
   
   d<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=GPP_ratio_poly_interaction), size=1)
@@ -365,8 +382,10 @@ checkER_poly_interaction <- function(site_river) {
     geom_line(aes(y=ER, color="OG"), size=1)+
     geom_line(aes(y=ER_poly_interaction, color="est"), size=1)
   
-  c<-ggplot(data=zoom, aes(x=ER)) +
-    geom_point(aes(y=ER_poly_interaction), size=1)
+  c<-ggplot(data=zoom, aes(x=ER,y=ER_poly_interaction)) +
+    geom_point(size=1)+
+    stat_poly_line()+
+    stat_poly_eq(use_label(c("R2")),size=5, label.x = 1,label.y = 0)
   
   d<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=ER_ratio_poly_interaction), size=1)

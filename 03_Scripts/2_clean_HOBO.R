@@ -37,9 +37,9 @@ DO_formatted <- function(fil) {
   DO<-DO[,c(1,2,3)]
   colnames(DO)[1] <- "Date"
   colnames(DO)[2] <- "DO"
-  DO<-filter(DO, DO>0)
-  DO<-filter(DO, DO<11)
-  DO$ID<-strsplit(basename(fil), '_')[[1]][1]
+  DO$DO[DO$DO>10]<-NA
+  DO$DO[DO$DO<0]<-NA
+    DO$ID<-strsplit(basename(fil), '_')[[1]][1]
   return(DO)}
 DO_unformatted <- function(fil) {
   DO <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
@@ -49,7 +49,7 @@ DO_unformatted <- function(fil) {
   keep<-c('Date', "DO", "Temp")
   DO<-DO[,keep]
   DO$Date <- mdy_hms(DO$Date)
-  DO<-filter(DO, DO>0)
+  DO$DO[DO$DO<0]<-NA
   DO$ID<-strsplit(basename(fil), '_')[[1]][1]
   return(DO)}
 SpC_formatted <- function(fil) {

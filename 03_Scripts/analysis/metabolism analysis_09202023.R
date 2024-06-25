@@ -92,24 +92,6 @@ slope_df <- function(site) {
 
   return(df)}
 
-lm_eqn_GPP <- function(df){
-  m <- lm(GPP ~ depth_diff, df);
-  eq <- substitute(italic(GPP) == a + b %.% italic(depth_diff)*","~~italic(r)^2~"="~r2, 
-                   list(a = format(unname(coef(m)[1]), digits = 2),
-                        b = format(unname(coef(m)[2]), digits = 2),
-                        r2 = format(summary(m)$r.squared, digits = 3)))
-  as.character(as.expression(eq));
-}
-
-lm_eqn_ER <- function(df){
-  m <- lm(ER ~ depth_diff, df);
-  eq <- substitute(italic(ER) == a + b %.% italic(depth_diff)*","~~italic(r)^2~"="~r2, 
-                   list(a = format(unname(coef(m)[1]), digits = 2),
-                        b = format(unname(coef(m)[2]), digits = 2),
-                        r2 = format(summary(m)$r.squared, digits = 3)))
-  as.character(as.expression(eq));
-}
-
 #get data####
 metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
 metabolism<-metabolism[,c('ER','GPP','NEP', 'Date', 'ID')]
@@ -130,7 +112,7 @@ ID<-sites[[3]]
 IU<-sites[[4]]
 LF<-sites[[5]]
 OS<-sites[[6]]
-#Scatter plots#######
+#Scatter data#######
 
 GPP<-master[,c('depth','depth_diff','GPP','ID')]
 GPP<-GPP %>% rename('prod'='GPP') %>% mutate(type='GPP')
@@ -157,51 +139,64 @@ cols<-c(
   "ER"="darkred",
   "NEP"="blue")
 
+#scatter plots####
 (ID_sc<-ggplot(data=ID_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1))+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")))+
+    geom_point(size=1)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-  theme_sam_insideplots
+  theme_sam_insideplots+  stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")),size=9, label.x = 1))
   
 (IU_sc<-ggplot(data=IU_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1))+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")), label.x = 1)+
+    geom_point(size=1)+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")),size=9, label.x = 1)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-  theme_sam
+  theme_sam)
 
     
 (AM_sc<-ggplot(data=AM_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1))+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")), label.x = 1)+
+    geom_point(size=1)+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")),size=9, label.x = 1)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-  theme_sam_insideplots
+  theme_sam_insideplots)
 
-(LF_sc<-ggplot(data=LF_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1))+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")), label.x = 0)+
+LF_sc<-ggplot(data=LF_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1)+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")), size=9,label.x = 1)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
   theme_sam
 
-(GB_sc<-ggplot(data=GB_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1))+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")))+
+GB_sc<-ggplot(data=GB_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1)+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")),size=9, label.x=1)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
   theme_sam_insideplots
 
 
-(OS_sc<-ggplot(data=OS_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1))+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")), label.x = 1)+
+OS_sc<-ggplot(data=OS_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1)+stat_poly_line()+
+  stat_poly_eq(use_label(c("R2")), label.x = 1, size=9)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
   theme_sam_insideplots
 
-cherrypick_scatter<-plot_grid(ID_sc,GB_sc, ncol=1, align = 'v')
+#DO scatter plots####
+(ID_DO<-ggplot(data=ID, aes(x=depth_diff, y=DO)) +
+   geom_point(size=1)+theme_sam+xlab(h))
+(IU_DO<-ggplot(data=IU, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h))
+(LF_DO<-ggplot(data=LF, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h))
+(GB_DO<-ggplot(data=GB, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h))
+(AM_DO<-ggplot(data=AM, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h))
+(OS_DO<-ggplot(data=OS, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h))
 #slope######
 
 OS_x<-slope_df(OS)
@@ -403,10 +398,11 @@ AMFR$u<-gaussianSmooth(AMFR$u, 6)
 
 ####together#####
 library(gridGraphics)
-scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=2)
+scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=1)
 boxplots<-plot_grid(box,slope,  ncol=2)
 together<-plot_grid(boxplots,scatter, nrow=2, rel_heights = c(3/5,1.7/5))
 scatter_ex<-plot_grid(box,cherrypick_scatter,  ncol=2)
+scatterDO<-plot_grid(IU_DO, ID_DO,GB_DO, LF_DO, OS_DO, AM_DO,nrow=1)
 
 ggsave(filename="05_Figures/flood types.jpeg",
        plot = hypoxia,
@@ -427,7 +423,12 @@ ggsave(filename="05_Figures/metabolism boxplots.jpeg",
        units = "in")
 ggsave(filename="05_Figures/scatter.jpeg",
        plot = scatter,
-       width =17,
-       height = 12,
+       width =42,
+       height = 8,
        units = "in")
 
+ggsave(filename="05_Figures/scatterDO.jpeg",
+       plot = scatterDO,
+       width =42,
+       height = 8,
+       units = "in")
