@@ -120,7 +120,7 @@ write_csv(stage, "02_Clean_data/Chem/PSI.csv")
 data_retrieval <- function(site_id) {
   parameterCd <- c('00065')
   startDate <- "2022-05-12"
-  endDate <- "2024-06-18"
+  endDate <- "2024-06-25"
 
   river <- readNWISuv(site_id,parameterCd, startDate, endDate)
   split<-split(river, river$site_no)
@@ -215,7 +215,7 @@ ID<-ID[,x]
 ggplot(ID, aes(Date, depth)) + geom_line()
 
 startDate <- "2022-05-12"
-endDate <- "2024-06-17"
+endDate <- "2024-06-25"
 parameterCd <- c('00065')
 ventID<-'02322700'
 IU<- readNWISuv(ventID,parameterCd, startDate, endDate)
@@ -227,7 +227,6 @@ IU<-IU[,x]
 stage<-rbind(AM, GB, LF, ID, OS, IU)
 
 ggplot(stage, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=2)
-
 
 write_csv(stage, "02_Clean_data/Chem/depth.csv")
 

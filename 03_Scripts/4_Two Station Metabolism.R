@@ -162,7 +162,7 @@ two_station_forRecovery<- function(spring) {
 data_retrieval <- function(parameterCd, ventID) {
 
   startDate <- "2022-04-12"
-  endDate <- "2024-06-17"
+  endDate <- "2024-06-25"
 
   vent_15sec<-readNWISuv(ventID,parameterCd,startDate,endDate)
   vent_15sec<-vent_15sec[,-c(1,2,5,7,8)]

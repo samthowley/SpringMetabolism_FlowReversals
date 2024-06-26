@@ -3,12 +3,16 @@ library(tidyverse)
 library(readxl)
 library(measurements)
 library(tools)
-###function####
+#function####
 pH_xl <- function(fil) {
   pH <- read_excel(fil)
 pH<-pH[,c(1,5)]
 colnames(pH)[1] <- "Date"
 colnames(pH)[2] <- "pH"
+
+pH$pH[pH$pH<4]<-NA
+pH$pH[pH$pH>9]<-NA
+
 pH$pH<-as.numeric(pH$pH)
 pH$ID<-strsplit(basename(fil), '_')[[1]][1]
 
@@ -18,6 +22,10 @@ pH_csv <- function(fil) {
   pH<-pH[,c(1,5)]
   colnames(pH)[1] <- "Date"
   colnames(pH)[2] <- "pH"
+  
+  pH$pH[pH$pH<4]<-NA
+  pH$pH[pH$pH>9]<-NA
+  
   pH$pH<-as.numeric(pH$pH)
   pH$ID<-strsplit(basename(fil), '_')[[1]][1]
 
@@ -27,6 +35,10 @@ pH_HOBO <- function(fil) {
   pH<-pH[,c(2,5)]
   colnames(pH)[1] <- "Date"
   colnames(pH)[2] <- "pH"
+  
+  pH$pH[pH$pH<4]<-NA
+  pH$pH[pH$pH>9]<-NA
+  
   pH$pH<-as.numeric(pH$pH)
   pH<-pH[order(as.Date(pH$Date, format="%Y-%m-%d %H:%M:%S")),]
   pH$ID<-strsplit(basename(fil), '_')[[1]][1]
@@ -49,6 +61,7 @@ DO_unformatted <- function(fil) {
   keep<-c('Date', "DO", "Temp")
   DO<-DO[,keep]
   DO$Date <- mdy_hms(DO$Date)
+  DO$DO[DO$DO>10]<-NA
   DO$DO[DO$DO<0]<-NA
   DO$ID<-strsplit(basename(fil), '_')[[1]][1]
   return(DO)}
@@ -58,6 +71,9 @@ SpC_formatted <- function(fil) {
   colnames(SpC)[1] <- "Date"
   colnames(SpC)[2] <- "SpC"
   SpC$ID<-strsplit(basename(fil), '_')[[1]][1]
+  SpC$SpC[SpC$SpC>600]<-NA
+  SpC$SpC[SpC$SpC<50]<-NA
+  
   return(SpC)}
 SpC_unformatted <- function(fil) {
   SpC <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
@@ -67,11 +83,30 @@ SpC_unformatted <- function(fil) {
   SpC$Date <- mdy_hms(SpC$Date)
   SpC<-SpC[order(as.Date(SpC$Date, format="%Y-%m-%d %H:%M:%S")),]
   SpC$ID<-strsplit(basename(fil), '_')[[1]][1]
+  SpC$SpC[SpC$SpC>600]<-NA
+  SpC$SpC[SpC$SpC<50]<-NA
+  
 
   return(SpC)}
+rename_ID<-function(site){
+  site<-site %>%
+    mutate(ID = ifelse(as.character(ID) == "AllenMillPond", "AM", as.character(ID)),
+           ID = ifelse(as.character(ID) == "AllenMill", "AM", as.character(ID)),
+           ID = ifelse(as.character(ID) == "GilchristBlue", "GB", as.character(ID)),
+           ID = ifelse(as.character(ID) == "Gilichrist", "GB", as.character(ID)),
+           ID = ifelse(as.character(ID) == "GilichristBlue", "GB", as.character(ID)),
+           
+           ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
+           ID = ifelse(as.character(ID) == "Ichetuckneel", "ID", as.character(ID)),
+           
+           ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
+           ID = ifelse(as.character(ID) == "LittleFanningSpC", "LF", as.character(ID)),
+           
+           ID = ifelse(as.character(ID) == "Otter", "OS", as.character(ID)),
+           ID = ifelse(as.character(ID) == "OtterSpC", "OS", as.character(ID)))
+return(site)}
 
-
-####pH#####
+#pH#####
 pH_everything <- data.frame()
 
 file.names <- list.files(path="01_Raw_data/CampbellSci/pH/Everything", pattern=".xlsx", full.names=TRUE)
@@ -110,19 +145,9 @@ GB_pH_04012024$ID<-'GB'
 GB_pH_04012024<-filter(GB_pH_04012024, Date>"2022-05-12")
 pH_everything<-rbind(pH_everything,GB_pH_04012024)
 
-pH_everything<-pH_everything %>%
-  mutate(ID = ifelse(as.character(ID) == "AllenMill", "AM", as.character(ID)),
-         ID = ifelse(as.character(ID) == "GilchristBlue", "GB", as.character(ID)),
-         ID = ifelse(as.character(ID) == "GilBlue04272022.xlsx", "GB", as.character(ID)),
-         ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
-         ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
-         ID = ifelse(as.character(ID) == "RovingBox", "AM", as.character(ID)),
-         ID = ifelse(as.character(ID) == "OtterCO2", "OS", as.character(ID)),
-         ID = ifelse(as.character(ID) == "Otter", "OS", as.character(ID)))
-pH_everything<-filter(pH_everything, pH>4 & pH<9)
-ggplot(pH_everything, aes(Date, pH)) + geom_line() + facet_wrap(~ ID, ncol=2)
+pH_everything<-rename_ID(pH_everything)
 
-unique(pH_everything$ID)
+ggplot(pH_everything, aes(Date, pH)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
 write_csv(pH_everything, "02_Clean_data/Chem/pH.csv")
 ###DO#####
@@ -141,15 +166,8 @@ for(fil in file.names){
   DO_everything <- DO_everything[!duplicated(DO_everything[c('Date','ID')]),]
 }
 
-DO_everything<-DO_everything %>%
-  mutate(ID = ifelse(as.character(ID) == "AllenMillPond", "AM", as.character(ID)),
-         ID = ifelse(as.character(ID) == "AllenMillDO", "AM", as.character(ID)),
-         ID = ifelse(as.character(ID) == "AllenMill", "AM", as.character(ID)),
-         ID = ifelse(as.character(ID) == "GilchristBlue", "GB", as.character(ID)),
-         ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
-         ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
-         ID = ifelse(as.character(ID) == "Otter", "OS", as.character(ID)))
-unique(DO_everything$ID)
+DO_everything<-rename_ID(DO_everything)
+
 ggplot(DO_everything, aes(Date, DO)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
 write_csv(DO_everything, "02_Clean_data/Chem/DO.csv")
@@ -170,31 +188,16 @@ for(fil in file.names){
   SpC_everything <- SpC_everything[!duplicated(SpC_everything[c('Date','ID')]),]
 }
 
-SpC_everything<-SpC_everything %>%
-  mutate(ID = ifelse(as.character(ID) == "AllenMillPond", "AM", as.character(ID)),
-         ID = ifelse(as.character(ID) == "AllenMill", "AM", as.character(ID)),
-         ID = ifelse(as.character(ID) == "GilchristBlue", "GB", as.character(ID)),
-         ID = ifelse(as.character(ID) == "Gilichrist", "GB", as.character(ID)),
-         ID = ifelse(as.character(ID) == "GilichristBlue", "GB", as.character(ID)),
-
-         ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
-         ID = ifelse(as.character(ID) == "Ichetuckneel", "ID", as.character(ID)),
-
-         ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
-         ID = ifelse(as.character(ID) == "LittleFanningSpC", "LF", as.character(ID)),
-
-         ID = ifelse(as.character(ID) == "Otter", "OS", as.character(ID)),
-         ID = ifelse(as.character(ID) == "OtterSpC", "OS", as.character(ID)))
+SpC_everything<-rename_ID(SpC_everything)
 
 SpC_everything$Date<-ymd_hms(SpC_everything$Date)
 ggplot(SpC_everything, aes(Date, SpC)) + geom_line() + facet_wrap(~ ID, ncol=2)
-
 write_csv(SpC_everything, "02_Clean_data/Chem/SpC.csv")
 
 ###IU####
 library(dataRetrieval)
-startDate <- "2024-05-20"
-endDate <- "2024-06-18"
+startDate <- "2024-06-18"
+endDate <- "2024-06-25"
 parameterCd <- c('00010','00300','00095','00400')
 ventID<-'02322700'
 
@@ -207,7 +210,7 @@ IU<-IU %>% rename('Date'='dateTime', 'Temp'='X_00010_00000',
   filter(min==0)
 IU$ID<-'IU'
 IU<-IU[,c("Date", "DO","Temp", "ID","CO2","pH","SpC","min" )]
-write_csv(IU, "01_Raw_data/IU/IU_0618.csv")
+write_csv(IU, "01_Raw_data/IU/IU_0625.csv")
 
 IU<-data.frame()
 file.names <- list.files(path="01_Raw_data/IU", pattern=".csv", full.names=TRUE)
