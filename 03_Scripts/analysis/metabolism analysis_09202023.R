@@ -11,6 +11,8 @@ library(dataRetrieval)
 library(ggpmisc)
 library(tidyverse)
 library(readxl)
+library(gridGraphics)
+
 #constants######
 
 #NEPflux<-expression(paste('NEP'~'(g'~O[2]/m^2/'day)'))
@@ -94,7 +96,7 @@ slope_df <- function(site) {
 
 #get data####
 metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
-metabolism<-metabolism[,c('ER','GPP','NEP', 'Date', 'ID')]
+metabolism<-metabolism[,c('ER', 'ER_1','ER_2','GPP','GPP_1','GPP_2','NEP', 'Date', 'ID')]
 metabolism<-metabolism %>%rename('day'='Date') %>% mutate(day=as.Date(day))
 depth<-read_csv('02_Clean_data/master_depth2.csv')
 depth$day<-as.Date(depth$Date)
@@ -162,12 +164,12 @@ cols<-c(
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
   theme_sam_insideplots)
 
-LF_sc<-ggplot(data=LF_scatter, aes(x=depth_diff, y=prod, color=type)) +
+(LF_sc<-ggplot(data=LF_scatter, aes(x=depth_diff, y=prod, color=type)) +
     geom_point(size=1)+stat_poly_line()+
   stat_poly_eq(use_label(c("R2")), size=9,label.x = 1)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-  theme_sam
+  theme_sam)
 
 GB_sc<-ggplot(data=GB_scatter, aes(x=depth_diff, y=prod, color=type)) +
     geom_point(size=1)+stat_poly_line()+
@@ -197,6 +199,76 @@ OS_sc<-ggplot(data=OS_scatter, aes(x=depth_diff, y=prod, color=type)) +
     geom_point(size=1)+theme_sam+xlab(h))
 (OS_DO<-ggplot(data=OS, aes(x=depth_diff, y=DO)) +
     geom_point(size=1)+theme_sam+xlab(h))
+#Time Series####
+DO.cols<-c(
+  "Avg ER"="darkred",
+  "Avg GPP"="darkgreen",
+  "Two Station"="darkgray",
+  "One Station"="black")
+
+(ID_time<-ggplot(data=ID, aes(x=Date)) +
+   geom_line(aes(y=GPP_2, color="Two Station"),size=1)+
+   geom_line(aes(y=GPP, color="Avg GPP"),size=1)+
+   geom_line(aes(y=GPP_1, color="One Station"),size=1)+
+   geom_line(aes(y=ER_2, color="Two Station"),size=1)+
+   geom_line(aes(y=ER, color="Avg ER"),size=1)+
+   geom_line(aes(y=ER_1, color="One Station"),size=1)+
+   theme_sam+ylab(flux)+ggtitle("ID")+
+   scale_colour_manual(name="", values = DO.cols,labels=c("Avg GPP", "Avg ER","Two Station","One Station")))
+
+
+(IU_time<-ggplot(data=IU, aes(x=Date)) +
+    geom_line(aes(y=GPP_2, color="Two Station"),size=1)+
+    geom_line(aes(y=GPP, color="Avg GPP"),size=1)+
+    geom_line(aes(y=GPP_1, color="One Station"),size=1)+
+    geom_line(aes(y=ER_2, color="Two Station"),size=1)+
+    geom_line(aes(y=ER, color="Avg ER"),size=1)+
+    geom_line(aes(y=ER_1, color="One Station"),size=1)+
+    theme_sam+ylab(flux)+ggtitle("IU")+
+    scale_colour_manual(name="", values = DO.cols,labels=c("Avg GPP", "Avg ER","Two Station","One Station")))
+
+(LF_time<-ggplot(data=LF, aes(x=Date)) +
+    geom_line(aes(y=GPP_2, color="Two Station"),size=1)+
+    geom_line(aes(y=GPP, color="Avg GPP"),size=1)+
+    geom_line(aes(y=GPP_1, color="One Station"),size=1)+
+    geom_line(aes(y=ER_2, color="Two Station"),size=1)+
+    geom_line(aes(y=ER, color="Avg ER"),size=1)+
+    geom_line(aes(y=ER_1, color="One Station"),size=1)+
+    theme_sam+ylab(flux)+ggtitle("LF")+  
+    scale_colour_manual(name="", values = DO.cols,labels=c("Avg GPP", "Avg ER","Two Station","One Station")))
+
+(AM_time<-ggplot(data=AM, aes(x=Date)) +
+    geom_line(aes(y=GPP_2, color="Two Station"),size=1)+
+    geom_line(aes(y=GPP, color="Avg GPP"),size=1)+
+    geom_line(aes(y=GPP_1, color="One Station"),size=1)+
+    geom_line(aes(y=ER_2, color="Two Station"),size=1)+
+    geom_line(aes(y=ER, color="Avg ER"),size=1)+
+    geom_line(aes(y=ER_1, color="One Station"),size=1)+
+    theme_sam+ylab(flux)+ggtitle("AM")+ 
+    scale_colour_manual(name="", values = DO.cols,labels=c("Avg GPP", "Avg ER","Two Station","One Station")))
+
+(GB_time<-ggplot(data=GB, aes(x=Date)) +
+    geom_line(aes(y=GPP_2, color="Two Station"),size=1)+
+    geom_line(aes(y=GPP, color="Avg GPP"),size=1)+
+    geom_line(aes(y=GPP_1, color="One Station"),size=1)+
+    geom_line(aes(y=ER_2, color="Two Station"),size=1)+
+    geom_line(aes(y=ER, color="Avg ER"),size=1)+
+    geom_line(aes(y=ER_1, color="One Station"),size=1)+
+    theme_sam+ylab(flux)+ggtitle("GB")+  
+    scale_colour_manual(name="", values = DO.cols,labels=c("Avg GPP", "Avg ER","Two Station","One Station")))
+
+(OS_time<-ggplot(data=OS, aes(x=Date)) +
+    geom_line(aes(y=GPP_2, color="Two Station"),size=1)+
+    geom_line(aes(y=GPP, color="Avg GPP"),size=1)+
+    geom_line(aes(y=GPP_1, color="One Station"),size=1)+
+    geom_line(aes(y=ER_2, color="Two Station"),size=1)+
+    geom_line(aes(y=ER, color="Avg ER"),size=1)+
+    geom_line(aes(y=ER_1, color="One Station"),size=1)+
+    theme_sam+ylab(flux)+ggtitle("OS")+  
+    scale_colour_manual(name="", values = DO.cols,labels=c("Avg GPP", "Avg ER","Two Station","One Station")))
+
+timeseries<-plot_grid(ID_time,GB_time, LF_time, AM_time,nrow=1)
+
 #slope######
 
 OS_x<-slope_df(OS)
@@ -233,8 +305,8 @@ master$ID <- factor(master$ID , levels=c("IU","ID", "GB", "LF", "OS", "AM"))
   ggtitle('GPP')+ylab(flux)+
   stat_summary(fun=mean, colour="white", geom="point",
                size=1, show.legend=FALSE) +
-  scale_y_continuous(n.breaks=3,  limits=c(0,15))+theme_sam+
-    theme(axis.text.x=element_blank(),
+  scale_y_continuous(n.breaks=3,  limits=c(0,21))+
+    theme_sam+theme(axis.text.x=element_blank(),
           axis.title.x=element_blank()))
 
 (NEP<-ggplot(master, aes(x=ID, y=NEP)) +
@@ -246,7 +318,7 @@ master$ID <- factor(master$ID , levels=c("IU","ID", "GB", "LF", "OS", "AM"))
     theme(axis.title.x=element_blank()))
 
 (box<-plot_grid(GPP, ER, NEP,ncol=1, align = 'v'))
-######cherry pick#####
+#cherry pick#####
 theme_chem<-theme()+theme(axis.text.x = element_blank(),
       axis.text.y.right = element_text(size = 17, angle=0, color="purple"),
       axis.text.y.left = element_text(size = 17, angle=0, color="black"),
@@ -396,8 +468,8 @@ AMFR$u<-gaussianSmooth(AMFR$u, 6)
     geom_hline(yintercept = 0, linetype='dashed')+theme_bland+
     theme(axis.title.x = element_text(size=17)))
 
-####together#####
-library(gridGraphics)
+#plot grids and save figures#####
+
 scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=1)
 boxplots<-plot_grid(box,slope,  ncol=2)
 together<-plot_grid(boxplots,scatter, nrow=2, rel_heights = c(3/5,1.7/5))
@@ -431,4 +503,77 @@ ggsave(filename="05_Figures/scatterDO.jpeg",
        plot = scatterDO,
        width =42,
        height = 8,
+       units = "in")
+
+ggsave(filename="05_Figures/metabolism_timeseries.jpeg",
+       plot = timeseries,
+       width =42,
+       height = 16,
+       units = "in")
+
+#present interest####
+OS_in<-filter(OS, Date>'2023-11-01')
+LF_in<-filter(LF, Date>'2023-11-01')
+AM_in<-filter(AM, Date>'2023-11-01')
+GB_in<-filter(GB, Date>'2023-11-01')
+IU_in<-filter(IU, Date>'2023-11-01')
+ID_in<-filter(ID, Date>'2023-11-01')
+
+a<-ggplot(data=OS_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("OS")
+b<-ggplot(data=OS_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
+c<-ggplot(data=OS_in, aes(x=Date)) +geom_line(aes(y=DO),size=1)+theme_sam
+d<-ggplot(data=OS_in, aes(x=Date)) +
+  geom_line(aes(y=GPP),size=1)+geom_line(aes(y=ER),size=1)+theme_sam+ylab(flux)
+OS_zoom<-plot_grid(a,b,c,d, ncol=1, align = 'v')
+
+e<-ggplot(data=LF_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("LF")
+f<-ggplot(data=LF_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
+g<-ggplot(data=LF_in, aes(x=Date)) +geom_line(aes(y=DO),size=1)+theme_sam
+h<-ggplot(data=LF_in, aes(x=Date)) +
+  geom_line(aes(y=GPP),size=1)+geom_line(aes(y=ER),size=1)+theme_sam+ylab(flux)
+LF_zoom<-plot_grid(e,f,g,h, ncol=1, align = 'v')
+
+i_<-ggplot(data=AM_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("AM")
+j<-ggplot(data=AM_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
+k<-ggplot(data=AM_in, aes(x=Date)) +geom_line(aes(y=DO),size=1)+theme_sam
+l<-ggplot(data=AM_in, aes(x=Date)) +
+  geom_line(aes(y=GPP),size=1)+geom_line(aes(y=ER),size=1)+theme_sam+ylab(flux)
+AM_zoom<-plot_grid(i_,j,k,l, ncol=1, align = 'v')
+
+m<-ggplot(data=GB_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("GB")
+GB_in$SpC[GB_in$SpC>450]<-NA
+n<-ggplot(data=GB_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
+o<-ggplot(data=GB_in, aes(x=Date)) +geom_line(aes(y=DO),size=1)+theme_sam
+p<-ggplot(data=GB_in, aes(x=Date)) +
+  geom_line(aes(y=GPP),size=1)+geom_line(aes(y=ER),size=1)+theme_sam+ylab(flux)
+GB_zoom<-plot_grid(m,n,o,p, ncol=1, align = 'v')
+
+u<-ggplot(data=IU_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("IU")
+v<-ggplot(data=IU_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
+w<-ggplot(data=IU_in, aes(x=Date)) +geom_line(aes(y=DO),size=1)+theme_sam
+x<-ggplot(data=IU_in, aes(x=Date)) +
+  geom_line(aes(y=GPP),size=1)+geom_line(aes(y=ER),size=1)+theme_sam+ylab(flux)
+IU_zoom<-plot_grid(u,v,w,x, ncol=1, align = 'v')
+
+q<-ggplot(data=ID_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("ID")
+r<-ggplot(data=ID_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
+s<-ggplot(data=ID_in, aes(x=Date)) +geom_line(aes(y=DO),size=1)+theme_sam
+t<-ggplot(data=ID_in, aes(x=Date)) +
+  geom_line(aes(y=GPP),size=1)+geom_line(aes(y=ER),size=1)+theme_sam+ylab(flux)
+ID_zoom<-plot_grid(q,r,s,t, ncol=1)
+
+interested1<-plot_grid(IU_zoom, ID_zoom, LF_zoom, ncol=3)
+interested2<-plot_grid(GB_zoom, OS_zoom, AM_zoom, ncol=3)
+
+ggsave(filename="05_Figures/interested1.jpeg",
+       plot = interested1,
+       width =35,
+       height = 18,
+       units = "in")
+
+
+ggsave(filename="05_Figures/interested2.jpeg",
+       plot = interested2,
+       width =35,
+       height = 18,
        units = "in")

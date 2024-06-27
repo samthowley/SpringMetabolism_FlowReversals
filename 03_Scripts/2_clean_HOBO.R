@@ -50,8 +50,9 @@ DO_formatted <- function(fil) {
   colnames(DO)[1] <- "Date"
   colnames(DO)[2] <- "DO"
   DO$DO[DO$DO>10]<-NA
-  DO$DO[DO$DO<0]<-NA
-    DO$ID<-strsplit(basename(fil), '_')[[1]][1]
+  DO$DO[DO$DO< -3]<-NA
+  #DO$DO[DO$DO<0]<-abs(DO$DO)
+  DO$ID<-strsplit(basename(fil), '_')[[1]][1]
   return(DO)}
 DO_unformatted <- function(fil) {
   DO <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
@@ -62,7 +63,8 @@ DO_unformatted <- function(fil) {
   DO<-DO[,keep]
   DO$Date <- mdy_hms(DO$Date)
   DO$DO[DO$DO>10]<-NA
-  DO$DO[DO$DO<0]<-NA
+  DO$DO[DO$DO< -3]<-NA
+  #DO$DO[DO$DO<0]<-abs(DO$DO)
   DO$ID<-strsplit(basename(fil), '_')[[1]][1]
   return(DO)}
 SpC_formatted <- function(fil) {
@@ -92,13 +94,14 @@ rename_ID<-function(site){
   site<-site %>%
     mutate(ID = ifelse(as.character(ID) == "AllenMillPond", "AM", as.character(ID)),
            ID = ifelse(as.character(ID) == "AllenMill", "AM", as.character(ID)),
+           ID = ifelse(as.character(ID) == "AllenMillDO", "AM", as.character(ID)),
+           
            ID = ifelse(as.character(ID) == "GilchristBlue", "GB", as.character(ID)),
            ID = ifelse(as.character(ID) == "Gilichrist", "GB", as.character(ID)),
            ID = ifelse(as.character(ID) == "GilichristBlue", "GB", as.character(ID)),
            
            ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
-           ID = ifelse(as.character(ID) == "Ichetuckneel", "ID", as.character(ID)),
-           
+
            ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
            ID = ifelse(as.character(ID) == "LittleFanningSpC", "LF", as.character(ID)),
            
@@ -167,7 +170,11 @@ for(fil in file.names){
 }
 
 DO_everything<-rename_ID(DO_everything)
+DO_everything<-filter(DO_everything, Date>"2022-01-01")
 
+test<-filter(DO_everything, Date>"2024-01-01")
+
+DO_everything$DO<-abs(DO_everything$DO)
 ggplot(DO_everything, aes(Date, DO)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
 write_csv(DO_everything, "02_Clean_data/Chem/DO.csv")

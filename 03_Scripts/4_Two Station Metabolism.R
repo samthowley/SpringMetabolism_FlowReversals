@@ -201,7 +201,9 @@ rel_k <- lm(k600_1d ~ uh, data=GB_rC)
 (cf <- coef(rel_k))
 GB$K600_1d<- cf[2]*GB$'U/H' + cf[1]
 
-GB1<- GB%>%filter(DO >3.5, Date>'2022-05-20')
+GB1<- GB%>%filter(DO >3.5, Date>'2022-05-20', DO<8.5)
+#ggplot(GB1, aes(Date, DO)) + geom_line()
+
 GB_recov<-two_station_forRecovery(GB1)
 
 a<-ggplot(GB_recov, aes(x=Date)) +
@@ -217,17 +219,6 @@ met_output<-two_station(GB)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
-
-ggplot(two, aes(x=Date)) +
-  geom_line(aes(y=ER),size=1)
-
-ggplot(one, aes(x=Date)) +
-  geom_line(aes(y=ER),size=1)
-
-all<-rbind(two, one)
-ggplot(all, aes(x=Date)) +
-  geom_line(aes(y=ER),size=1)
-
 
 write_csv(two, "04_Outputs/two station results/GB.csv")
 write_csv(one, "04_Outputs/one station inputs/GB.csv")
@@ -256,11 +247,9 @@ rel_k <- lm(k600_1d ~ uh, data=AM_rC)
 AllenMill$K600_1d<- cf[2]*AllenMill$'U/H' + cf[1]
 
 AllenMill1<- AllenMill %>% filter(DO<10) %>% mutate(depth=depth-0.25)
+#ggplot(AllenMill1, aes(Date, DO)) + geom_line() 
 
 AM_recov<-two_station_forRecovery(AllenMill1)
-
-ggplot(AM_recov, aes(x=Date)) +
-  geom_line(aes(y=ER),size=1)
 
 write_csv(AM_recov, "04_Outputs/one station inputs/not parsed/AM.csv")
 met_output<-two_station(AllenMill1)
@@ -302,7 +291,9 @@ rel_k <- lm(k600_1d ~ uh, data=LF_rC)
 (cf <- coef(rel_k))
 LF$K600_1d<- cf[2]*LF$'U/H' + cf[1]
 
-LF<-LF%>% filter(DO<10)
+LF<-LF%>% filter(DO>1.2)
+#ggplot(LF, aes(Date, DO)) + geom_line() 
+
 LF_recov<-two_station_forRecovery(LF)
 
 ggplot(LF_recov, aes(x=Date)) +
@@ -352,10 +343,13 @@ rel_k <- lm(k600_1d ~ uh, data=ID_rC)
 (cf <- coef(rel_k))
 ID$K600_1d<- cf[2]*ID$'U/H' + cf[1]
 
-ID1<-ID %>% mutate(depth=depth-0.5) %>%filter(DO<10)
+ID1<-ID %>% mutate(depth=depth-0.5) %>%filter(DO<10, DO>3.4)
+#ggplot(ID1, aes(Date, DO)) + geom_line() 
+
 ID_recov<-two_station_forRecovery(ID)
 
 write_csv(ID_recov, "04_Outputs/one station inputs/not parsed/ID.csv")
+
 met_output<-two_station_ID(ID1)
 
 two<-data.frame(met_output[1]) #date column
@@ -389,41 +383,43 @@ rel_k <- lm(k600_1d ~ uh, data=OS_rC)
 (cf <- coef(rel_k))
 OS$K600_1d<- cf[2]*OS$'U/H' + cf[1]
 
+#ggplot(OS, aes(Date, DO)) + geom_line() 
+
 write_csv(OS, "04_Outputs/one station inputs/not parsed/OS.csv")
 write_csv(OS, "04_Outputs/one station inputs/OS.csv")
 
 ####For recovery analysis####
-x<-c('Date', 'DO','GPPavg', 'ER', 'depth', 'ID')
-AM_recov$ID<-'AM'
-AM_recov<-AM_recov[,x]
-GB_recov$ID<-'GB'
-GB_recov<-GB_recov[,x]
-LF_recov$ID<-'LF'
-LF_recov<-LF_recov[,x]
-ID_recov$ID<-'ID'
-ID_recov<-ID_recov[,x]
-
-recovery<-rbind(AM_recov, GB_recov, LF_recov,  ID_recov) #ID_recov
-
-met<-read_csv("02_Clean_data/master_metabolism3.csv")
-OSmet<-filter(met, ID=='OS')
-OS_recov<-left_join(OS, OSmet, by='Date')
-OS_recov<-OS_recov[,x]
-
-IUmet<-filter(met, ID=='IU')
-IU <- master %>% filter(ID=='IU')
-IU_recov<-left_join(IU, IUmet, by=c('Date','ID'))
-IU_recov<-IU_recov[,x]
-
-recovery<-rbind(recovery,OS_recov,IU_recov) #ID_recov
-
-OSmet<-read_csv("02_Clean_data/master_metabolism3.csv")
-OSmet<-filter(OSmet, ID=='OS')
-OS_recov<-left_join(OS, OSmet, by='Date')
-OS_recov<-OS_recov[,x]
-
-recovery<-rbind(recovery,OS_recov) #ID_recov
-write_csv(recovery, "04_Outputs/ForRecovery.csv")
+# x<-c('Date', 'DO','GPPavg', 'ER', 'depth', 'ID')
+# AM_recov$ID<-'AM'
+# AM_recov<-AM_recov[,x]
+# GB_recov$ID<-'GB'
+# GB_recov<-GB_recov[,x]
+# LF_recov$ID<-'LF'
+# LF_recov<-LF_recov[,x]
+# ID_recov$ID<-'ID'
+# ID_recov<-ID_recov[,x]
+# 
+# recovery<-rbind(AM_recov, GB_recov, LF_recov,  ID_recov) #ID_recov
+# 
+# met<-read_csv("02_Clean_data/master_metabolism3.csv")
+# OSmet<-filter(met, ID=='OS')
+# OS_recov<-left_join(OS, OSmet, by='Date')
+# OS_recov<-OS_recov[,x]
+# 
+# IUmet<-filter(met, ID=='IU')
+# IU <- master %>% filter(ID=='IU')
+# IU_recov<-left_join(IU, IUmet, by=c('Date','ID'))
+# IU_recov<-IU_recov[,x]
+# 
+# recovery<-rbind(recovery,OS_recov,IU_recov) #ID_recov
+# 
+# OSmet<-read_csv("02_Clean_data/master_metabolism3.csv")
+# OSmet<-filter(OSmet, ID=='OS')
+# OS_recov<-left_join(OS, OSmet, by='Date')
+# OS_recov<-OS_recov[,x]
+# 
+# recovery<-rbind(recovery,OS_recov) #ID_recov
+# write_csv(recovery, "04_Outputs/ForRecovery.csv")
 
 
 

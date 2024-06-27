@@ -170,7 +170,7 @@ OS_input$light<-calc_light(OS_input$Date,  29.585, -82.937)
 OS_output<-notparsed_metabolism(OS_input)
 
 OS_output$ID<-'OS'
-ggplot(OS_output, aes(Date, ER))+geom_line()
+#ggplot(OS_output, aes(Date, ER))+geom_line()
 write_csv(OS_output, "04_Outputs/Stream metabolizer results/not parsed/OS/OS_06252024.csv")
 
 file.names <- list.files(path="04_Outputs/Stream metabolizer results/not parsed/OS", pattern=".csv", full.names=TRUE)
@@ -180,7 +180,6 @@ for(fil in file.names){
   OS_all<-rbind(OS_all,site)}
 
 #write_csv(OS_all, "04_Outputs/Stream metabolizer results/not parsed/OS/OS.csv")
-
 
 write_csv(OS_all, "04_Outputs/Stream metabolizer results/not parsed/OS.csv")
 write_csv(OS_all, "04_Outputs/Stream metabolizer results/OS.csv")
@@ -195,10 +194,11 @@ AM2 <- read_csv("04_Outputs/two station results/AM.csv")
 AM<-compile(AM_onestat, AM2)
 AM$ID<-'AM'
 write_csv(AM, "04_Outputs/Stream metabolizer results/AM.csv")
+ggplot(data=AM, aes(x=Date)) +geom_line(aes(y=ER), size=1, color='darkgreen')
 
 AM_input <- read_csv("04_Outputs/one station inputs/not parsed/AM.csv")
 #last time it was ran
-AM_input<-filter(AM_input, Date>'2024-01-31')
+AM_input<-filter(AM_input, Date>'2024-06-25') #last time it was ran
 AM_output<-notparsed_metabolism(AM_input)
 AM_output$ID<-'AM'
 write_csv(AM_output, "04_Outputs/Stream metabolizer results/not parsed/AM/AM_06172024.csv")
@@ -213,6 +213,7 @@ write_csv(AM_all, "04_Outputs/Stream metabolizer results/not parsed/AM.csv")
 ###LF######
 LF_input <- read_csv("04_Outputs/one station inputs/LF.csv")
 bayes_specs<-bins(LF_input)
+LF_input<-filter(LF_input, Date>'2024-02-04')
 LF_output<-metabolism(LF_input)
 write_csv(LF_output, "04_Outputs/one station outputs/LF.csv")
 
@@ -222,14 +223,12 @@ LF2 <- read_csv("04_Outputs/two station results/LF.csv")
 LF<-compile(LF_output, LF2)
 LF$ID<-'LF'
 
-ggplot(data=LF_output, aes(x=Date)) +geom_line(aes(y=GPPavg), size=1, color='darkgreen')
-
+ggplot(data=LF, aes(x=Date)) +geom_line(aes(y=GPPavg), size=1, color='darkgreen')
 write_csv(LF, "04_Outputs/Stream metabolizer results/LF.csv")
 
 #not parsed
 LF_input <- read_csv("04_Outputs/one station inputs/not parsed/LF.csv")
-#last time we ran SM
-LF_input<-filter(LF_input, Date>'2024-02-04')
+LF_input<-filter(LF_input, Date>'2024-02-04') #last time we ran SM
 LF_output<-notparsed_metabolism(LF_input)
 LF_output$ID<-'LF'
 write_csv(LF_output, "04_Outputs/Stream metabolizer results/not parsed/LF/LF_06252024.csv")
