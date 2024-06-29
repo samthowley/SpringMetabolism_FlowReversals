@@ -9,10 +9,22 @@ library(tidyverse)
 azimuth_adj <- function(driver_file, Lat, Lon){
   driver_file$Hour <- driver_file[, "Hour"] + (1 / 60 / 24)
   return(solar_geo_calc(driver_file, Lat, Lon)$solar_azimuth2)}
+
+meandaily_PARv2 <- function(y){
+  df <- y %>%
+    group_by(jday) %>%
+    summarize_at(.vars = c("DOY","Year","PAR_surface"), .funs = mean, na.rm = TRUE)
+  
+  df$origin <- as.Date(paste0(df$Year, "-01-01"),tz = "UTC") - days(1)
+  df$Date <- as.Date(df$DOY, origin = df$origin, tz = "UTC") 
+  
+  return(df)
+}
+
 #####
 
-#Set the download location (add your own directory)
 working_dir <- "C:/SpringMetabolism_FlowReversals/Stream Biomass files"
+#NLDAS#########
 #Download NLDAS data at NC_NHC
 NLDAS_DL(
   save_dir = working_dir,
@@ -28,6 +40,7 @@ ID_NLDAS_processed <- NLDAS_proc(
   Site_IDs = "ICHE"
 )
 
+#MODIS######
 #Make a table for the MODIS request 
 sites <- read_csv("Modis practice.csv")
 request_sites <- sites[, c("Site_ID", "Lat", "Lon")] 
@@ -55,6 +68,7 @@ ID_mod_processed <- AppEEARS_proc(
   plot = TRUE
 )
 
+#driver file#####
 site_locs <- request_sites
 site_locs$epsg_crs <- 4326
 
@@ -77,7 +91,9 @@ extract_height(
   site_crs = 4326,
   simard_loc="C:/SpringMetabolism_FlowReversals/Stream Biomass files/simard2011_SWR.asc")
 
-test_modeled <- stream_light(
+
+#Run Stream Light########
+ID_modeled <- stream_light(
   NC_NHC_driver, 
   Lat = 29.935, 
   Lon = -82.800, 
@@ -91,3 +107,10 @@ test_modeled <- stream_light(
   overhang_height = NA, 
   x_LAD = 1
 )
+
+ID_modeled$PAR_surface[which(ID_modeled$PAR_surface == 0)] <- NA
+
+ID_modeled <- meandaily_PARv2(ID_modeled)
+
+## View
+ggplot(ID_modeled, aes(Date, PAR_surface))+geom_line()
