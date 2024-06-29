@@ -12,8 +12,7 @@ azimuth_adj <- function(driver_file, Lat, Lon){
 #####
 
 #Set the download location (add your own directory)
-working_dir <- "C:/SpringMetabolism_FlowReversals"
-#29.935078600027087, -82.80015641597691
+working_dir <- "C:/SpringMetabolism_FlowReversals/Stream Biomass files"
 #Download NLDAS data at NC_NHC
 NLDAS_DL(
   save_dir = working_dir,
@@ -26,7 +25,7 @@ NLDAS_DL(
 #Process the downloaded data
 ID_NLDAS_processed <- NLDAS_proc(
   read_dir = working_dir, 
-  Site_IDs = "ID"
+  Site_IDs = "ICHE"
 )
 
 #Make a table for the MODIS request 
@@ -64,43 +63,31 @@ driver_file.ID<-make_driver(
   site_locs,
   ID_NLDAS_processed,
   ID_mod_processed,write_output = FALSE, save_dir = NULL)
-split(driver_file.ID, driver_file.ID$ID)
 
-ID<-driver_file.ID$ID
+driver_file.df<-driver_file.ID$ID
 Lat=29.935
 Lon=-82.8
 
-mean(azimuth_adj(test, Lat, Lon))
-
+(azimuth_adj(driver_file.df, Lat, Lon))
 source("C:/SpringMetabolism_FlowReversals/Stream Biomass files/extract_height_mod.R")
 extract_height(
-  Site_ID = site_locs$Site_ID[1], 
-  Lat = site_locs$Lat[1],
-  Lon = site_locs$Lon[1],
+  Site_ID = 'ICHE', 
+  Lat = Lat,
+  Lon = Lon,
   site_crs = 4326,
-  simard_loc = "NC_NHC_NLDAS.asc"
-)
+  simard_loc="C:/SpringMetabolism_FlowReversals/Stream Biomass files/simard2011_SWR.asc")
 
-
-
-
-
-
-
-
-
-
-NC_NHC_modeled <- stream_light(
+test_modeled <- stream_light(
   NC_NHC_driver, 
   Lat = 29.935, 
   Lon = -82.800, 
   channel_azimuth = 1.57096, 
-  bottom_width = 18.9, 
+  bottom_width = 28, 
   BH = 0.1, 
   BS = 100, 
   WL = 0.1, 
-  TH = 23, 
-  overhang = 2.3, 
+  TH = 18, 
+  overhang = 1.8, 
   overhang_height = NA, 
   x_LAD = 1
 )
