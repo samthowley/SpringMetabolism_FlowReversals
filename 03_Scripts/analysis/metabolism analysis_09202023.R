@@ -104,7 +104,8 @@ master<-left_join(depth,metabolism, by=c('ID','day'))
 
 master<- master[!duplicated(master[c('ID','Date')]),]
 master<-master%>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))%>%
-  mutate(depth_diff= depth-depth_min)
+  mutate(depth_diff= depth-depth_min, day=as.Date(day))
+master <- master[!duplicated(master[c('day','ID')]),]
 
 sites<-split(master,master$ID)
 #names(sites)
@@ -116,16 +117,21 @@ LF<-sites[[5]]
 OS<-sites[[6]]
 #Scatter data#######
 
-GPP<-master[,c('depth','depth_diff','GPP','ID')]
-GPP<-GPP %>% rename('prod'='GPP') %>% mutate(type='GPP')
+GPP<-master[,c('Date','depth','depth_diff','GPP','ID')]
+GPP<-GPP %>% rename('prod'='GPP') %>% mutate(type='GPP', day=as.Date(Date))
+GPP <- GPP[!duplicated(GPP[c('day','ID')]),]
 
-ER<-master[,c('depth','depth_diff','ER','ID')]
-ER<-ER %>% rename('prod'='ER') %>% mutate(type='ER')
 
-NEP<-master[,c('depth','depth_diff','NEP','ID')]
-NEP<-NEP %>% rename('prod'='NEP') %>% mutate(type='NEP')
+ER<-master[,c("Date",'depth','depth_diff','ER','ID')]
+ER<-ER %>% rename('prod'='ER') %>% mutate(type='ER', day=as.Date(Date))
+ER <- ER[!duplicated(ER[c('day','ID')]),]
+
+NEP<-master[,c("Date",'depth','depth_diff','NEP','ID')]
+NEP<-NEP %>% rename('prod'='NEP') %>% mutate(type='NEP', day=as.Date(Date))
+NEP <- NEP[!duplicated(NEP[c('day','ID')]),]
 
 master_scatter<-rbind(GPP, ER, NEP)
+master_scatter<-master_scatter %>% filter(type != 'NEP')
 
 sites<-split(master_scatter,master_scatter$ID)
 #names(sites)
@@ -143,62 +149,86 @@ cols<-c(
 
 #scatter plots####
 (ID_sc<-ggplot(data=ID_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+
+    geom_point(size=1)+ggtitle("ID")+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-  theme_sam_insideplots+  stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")),size=9, label.x = 1))
+  theme_sam_insideplots 
+   #stat_poly_line()+ stat_poly_eq(use_label(c("R2","P")),size=9, vjust = 12, hjust= -.5)
+ )
   
 (IU_sc<-ggplot(data=IU_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")),size=9, label.x = 1)+
+    geom_point(size=1)+
+  #   stat_poly_line()+ggtitle("IU")+
+  # stat_poly_eq(use_label(c("R2","P")),size=9, vjust = 12, hjust= 0)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
   theme_sam)
 
-    
 (AM_sc<-ggplot(data=AM_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")),size=9, label.x = 1)+
+    geom_point(size=1)+
+  #   stat_poly_line()+
+  # stat_poly_eq(use_label(c("R2","P")),size=9, vjust = 1, hjust= -0.5)+
+    ggtitle("AM")+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
   theme_sam_insideplots)
 
-(LF_sc<-ggplot(data=LF_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")), size=9,label.x = 1)+
+(LF_sc<-ggplot(data=LF_scatter, aes(x=depth_diff, y=prod, color=type)) +ggtitle("LF")+
+    geom_point(size=1)+
+  #   stat_poly_line()+
+  # stat_poly_eq(use_label(c("R2","P")), size=9,vjust = 12, hjust= -0.3)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
   theme_sam)
 
-GB_sc<-ggplot(data=GB_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")),size=9, label.x=1)+
+(GB_sc<-ggplot(data=GB_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1)+
+  #   stat_poly_line()+
+  # stat_poly_eq(use_label(c("R2","P")),size=9, vjust = 1, hjust= -0.4)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-  theme_sam_insideplots
+  theme_sam_insideplots+ggtitle("GB"))
 
 
-OS_sc<-ggplot(data=OS_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+stat_poly_line()+
-  stat_poly_eq(use_label(c("R2")), label.x = 1, size=9)+
+(OS_sc<-ggplot(data=OS_scatter, aes(x=depth_diff, y=prod, color=type)) +
+    geom_point(size=1)+ggtitle("OS")+
+  #   stat_poly_line()+
+  # stat_poly_eq(use_label(c("R2","P")), label.x = 1, size=9)+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
   ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-  theme_sam_insideplots
+  theme_sam_insideplots)
 
 #DO scatter plots####
-(ID_DO<-ggplot(data=ID, aes(x=depth_diff, y=DO)) +
-   geom_point(size=1)+theme_sam+xlab(h))
-(IU_DO<-ggplot(data=IU, aes(x=depth_diff, y=DO)) +
+master_chem<-read_csv('02_Clean_data/master_chem1.csv')
+depth<-read_csv('02_Clean_data/master_depth2.csv')
+depth<-depth[,c("Date", "depth", "ID")]
+master_chem<-left_join(master_chem,depth, by=c('ID','Date'))
+
+master_chem<-master_chem%>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))
+master_chem<-master_chem%>% mutate(depth_diff= depth-depth_min)
+
+sites<-split(master_chem,master_chem$ID)
+AM_chem<-sites[[1]]
+GB_chem<-sites[[2]]
+ID_chem<-sites[[3]]
+IU_chem<-sites[[4]]
+LF_chem<-sites[[5]]
+OS_chem<-sites[[6]]
+
+
+(ID_DO<-ggplot(data=ID_chem, aes(x=depth_diff, y=DO)) +
+   geom_point(size=1)+theme_sam+xlab(h)+ggtitle("ID"))
+(IU_DO<-ggplot(data=IU_chem, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h)+ggtitle("IU"))
+(LF_DO<-ggplot(data=LF_chem, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h)+ggtitle("LF"))
+(GB_DO<-ggplot(data=GB_chem, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h)+ggtitle("GB"))
+(AM_DO<-ggplot(data=AM_chem, aes(x=depth_diff, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h)+ggtitle("AM"))
+(OS_DO<-ggplot(data=OS_chem, aes(x=depth_diff, y=DO))+ggtitle("OS")+
     geom_point(size=1)+theme_sam+xlab(h))
-(LF_DO<-ggplot(data=LF, aes(x=depth_diff, y=DO)) +
-    geom_point(size=1)+theme_sam+xlab(h))
-(GB_DO<-ggplot(data=GB, aes(x=depth_diff, y=DO)) +
-    geom_point(size=1)+theme_sam+xlab(h))
-(AM_DO<-ggplot(data=AM, aes(x=depth_diff, y=DO)) +
-    geom_point(size=1)+theme_sam+xlab(h))
-(OS_DO<-ggplot(data=OS, aes(x=depth_diff, y=DO)) +
-    geom_point(size=1)+theme_sam+xlab(h))
+
 #Time Series####
 DO.cols<-c(
   "Avg ER"="darkred",
@@ -470,11 +500,11 @@ AMFR$u<-gaussianSmooth(AMFR$u, 6)
 
 #plot grids and save figures#####
 
-scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=1)
+scatter<-plot_grid(IU_sc, ID_sc,GB_sc, LF_sc, OS_sc, AM_sc,nrow=2)
 boxplots<-plot_grid(box,slope,  ncol=2)
 together<-plot_grid(boxplots,scatter, nrow=2, rel_heights = c(3/5,1.7/5))
 scatter_ex<-plot_grid(box,cherrypick_scatter,  ncol=2)
-scatterDO<-plot_grid(IU_DO, ID_DO,GB_DO, LF_DO, OS_DO, AM_DO,nrow=1)
+scatterDO<-plot_grid(IU_DO, ID_DO,GB_DO, LF_DO, OS_DO, AM_DO,nrow=2)
 
 ggsave(filename="05_Figures/flood types.jpeg",
        plot = hypoxia,
@@ -495,14 +525,17 @@ ggsave(filename="05_Figures/metabolism boxplots.jpeg",
        units = "in")
 ggsave(filename="05_Figures/scatter.jpeg",
        plot = scatter,
-       width =42,
-       height = 8,
+       width =18,
+       height = 14.5,
        units = "in")
+
+# width =42,
+# height = 8,
 
 ggsave(filename="05_Figures/scatterDO.jpeg",
        plot = scatterDO,
-       width =42,
-       height = 8,
+       width =18,
+       height = 14.5,
        units = "in")
 
 ggsave(filename="05_Figures/metabolism_timeseries.jpeg",
@@ -513,12 +546,12 @@ ggsave(filename="05_Figures/metabolism_timeseries.jpeg",
 
 #present interest####
 OS_in<-filter(OS, Date>'2023-11-01')
-LF_in<-filter(LF, Date>'2023-11-01')
+LF_in<-filter(LF, Date>'2024-04-01')
 AM_in<-filter(AM, Date>'2023-11-01')
 GB_in<-filter(GB, Date>'2023-11-01')
 IU_in<-filter(IU, Date>'2023-11-01')
 ID_in<-filter(ID, Date>'2023-11-01')
-
+names(LF)
 a<-ggplot(data=OS_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("OS")
 b<-ggplot(data=OS_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
 c<-ggplot(data=OS_in, aes(x=Date)) +geom_line(aes(y=DO),size=1)+theme_sam
@@ -527,11 +560,11 @@ d<-ggplot(data=OS_in, aes(x=Date)) +
 OS_zoom<-plot_grid(a,b,c,d, ncol=1, align = 'v')
 
 e<-ggplot(data=LF_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("LF")
-f<-ggplot(data=LF_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
+f<-ggplot(data=LF, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam
 g<-ggplot(data=LF_in, aes(x=Date)) +geom_line(aes(y=DO),size=1)+theme_sam
-h<-ggplot(data=LF_in, aes(x=Date)) +
+ggplot(data=LF_in, aes(x=Date)) +
   geom_line(aes(y=GPP),size=1)+geom_line(aes(y=ER),size=1)+theme_sam+ylab(flux)
-LF_zoom<-plot_grid(e,f,g,h, ncol=1, align = 'v')
+(LF_zoom<-plot_grid(e,f,g,h, ncol=1, align = 'v'))
 
 i_<-ggplot(data=AM_in, aes(x=Date)) +geom_line(aes(y=depth),size=1)+theme_sam+ggtitle("AM")
 j<-ggplot(data=AM_in, aes(x=Date)) +geom_line(aes(y=SpC),size=1)+theme_sam

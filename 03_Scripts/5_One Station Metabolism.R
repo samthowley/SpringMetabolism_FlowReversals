@@ -188,6 +188,7 @@ write_csv(OS_all, "04_Outputs/Stream metabolizer results/OS.csv")
 AM_input <- read_csv("04_Outputs/one station inputs/AM.csv")
 bayes_specs<-bins(AM_input)
 AM_onestat<-metabolism(AM_input)
+AM_onestat<-AM_onestat%>% select(date,GPP_daily_mean,ER_daily_mean,K600_daily_mean)
 write_csv(AM_onestat, "04_Outputs/one station outputs/AM.csv")
 
 AM2 <- read_csv("04_Outputs/two station results/AM.csv")
@@ -345,10 +346,13 @@ metabolism<-left_join( onestation, twostation, by=c('ID', 'Date'))
 metabolism$GPP_2 <- ifelse(is.na(metabolism$GPP_2), metabolism$GPP_1, metabolism$GPP_2)
 metabolism$ER_2 <- ifelse(is.na(metabolism$ER_2), metabolism$ER_1, metabolism$ER_2)
 
-metabolism<-metabolism %>% mutate(GPP=(GPP_1+GPP_2)/2, ER=(ER_1+ER_2)/2, NEP=(NEP_2+NEP_2)/2)
+metabolism<-metabolism %>% mutate(GPP=(GPP_1+GPP_2)/2, ER=(ER_1+ER_2)/2, NEP=(NEP_2+NEP_2)/2,
+                                  day=day(Date), month=month(Date), year=year(Date))
 
 depth<-read_csv("02_Clean_data/master_depth2.csv")
-master<-left_join(metabolism,depth,by=c('ID','Date'))
+depth<-depth %>% mutate(day=day(Date), month=month(Date), year=year(Date))
+depth<-depth[,-c(6)]
+master<-left_join(metabolism,depth,by=c('ID','day', 'month', 'year'))
 
 master$ER[master$ER>0]<- -2
 ggplot(master, aes(Date)) +
@@ -364,5 +368,9 @@ ggplot(master, aes(Date)) +
   geom_line(aes(y=GPP_2-1,color='GPP2'))+
   facet_wrap(~ ID, ncol=2)
 
-write_csv(master, "02_Clean_data/master_metabolism4.csv")
+ggplot(master, aes(Date)) +
+  geom_line(aes(y=SpC))+
+  facet_wrap(~ ID, ncol=2)
 
+write_csv(master, "02_Clean_data/master_metabolism4.csv")
+names(master)

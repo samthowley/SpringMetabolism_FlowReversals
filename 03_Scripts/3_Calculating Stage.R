@@ -242,7 +242,7 @@ stage<-stage[,-1]
 master<-left_join(stage, master, by=c('ID', 'day', 'mnth', 'yr'))
 master <- master[!duplicated(master[c('Date','ID')]),]
 
-ggplot(master, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=2)
+ggplot(master, aes(Date, SpC)) + geom_line() + facet_wrap(~ ID, ncol=2)
 ggplot(master, aes(Date, DO)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
 

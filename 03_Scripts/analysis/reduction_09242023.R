@@ -94,9 +94,6 @@ LF<-IDs[[5]]
 OS<-IDs[[6]]
 ####GB####
 
-# GBFRcheck<-filter(GBFR,RI==2 )
-# ggplot(GB, aes(Date)) +
-#   geom_line(aes(y=depth, color=depthID))+geom_hline(yintercept = 0.75)
 
 GB<- GB %>% mutate(depthID = case_when(
   depth<0.55  ~ "low",
@@ -111,10 +108,15 @@ GBFR<- GB %>% mutate(RI = case_when(
   Date> "2023-11-14" & Date<"2024-03-11"~ 2))
 GB_1223<-extract_reduce(GB, GBFR)
 
+GBFRcheck<-filter(GBFR,RI==2 )
+ggplot(GBFRcheck, aes(Date)) +
+  geom_line(aes(y=SpC, color=depthID))+geom_hline(yintercept = 0.75)
+
+
 GB_tbl<-rbind(GB_0622,GB_1223)
 GB_tbl$ID<-'GB'
 GB_tbl$num<-2
-GB_tbl$IF <- c("bo",'rev')
+GB_tbl$IF <- c("h",'rev')
 
 #high stage event
 
@@ -136,11 +138,6 @@ GBmod_tbl$IF <- c("h","h",'h')
 
 ####Otter#####
 
-# OSFRcheck<-filter(OtFR,RI==2 )
-# ggplot(OSFRcheck, aes(Date)) +
-#   geom_line(aes(y=depth, color=depthID))+
-#   geom_line(aes(y=DO))
-
 OS<- OS %>% mutate(depthID = case_when(
   depth<0.8 ~ "low",
   depth>0.8 & depth<1 ~ "moderate",
@@ -155,13 +152,33 @@ OtFR<- OS %>% mutate(RI = case_when(
 OS_0623<-extract_reduce(OS, OtFR)
 
 OtFR<- OS %>% mutate(RI = case_when(
-  Date> "2023-11-18" & Date<"2024-04-11"~ 2))
+  Date> "2023-10-01" & Date<"2024-03-11"~ 2))
+OS_0124<-extract_reduce(OS, OtFR)
+
+OtFR<- OS %>% mutate(RI = case_when(
+  Date> "2024-03-01" & Date<"2024-05-19"~ 2))
+OS_0424<-extract_reduce(OS, OtFR)
+
+OtFR<- OS %>% mutate(RI = case_when(
+  Date> "2024-05-19" & Date<"2024-06-25"~ 2))
+OS_0624<-extract_reduce(OS, OtFR)
+
+OtFR<- OS %>% mutate(RI = case_when(
+  Date> "2023-12-01" & Date<"2024-02-28"~ 2))
 OS_1223<-extract_reduce(OS, OtFR)
 
-OS_tbl<-rbind(OS_0722,OS_0623,OS_1223)
+OSFRcheck<-filter(OtFR,RI==2 )
+ggplot(OSFRcheck, aes(Date)) +
+  geom_line(aes(y=depth, color=depthID))+
+  geom_line(aes(y=DO))
+
+OS_1223<-extract_reduce(OS, OtFR)
+
+OS_tbl<-rbind(OS_0722,OS_0623,OS_1223,OS_0124,
+              OS_0424,OS_0624)
 OS_tbl$ID<-'OS'
 OS_tbl$num<-3
-OS_tbl$IF <- c("bo",'bo','rev')
+OS_tbl$IF <- c("bo",'bo','rev','bo','bo','bo')
 
 Otter_mod<-filter(OS, depthID=='moderate')
 
@@ -261,11 +278,6 @@ AMmod_tbl$IF <- c("h","h",'h','h','h','h')
 
 ####LF#####
 
-# LFFRcheck<-filter(LFFR,RI==2 )
-# ggplot(LFFRcheck, aes(Date)) +
-#     geom_line(aes(y=depth, color=depthID))+
-#   geom_line(aes(y=ER))
-
 LF<- LF %>% mutate(depthID = case_when(
   depth<0.4 ~ "low",
   depth> 0.4 & depth<0.6~ "moderate",
@@ -288,11 +300,26 @@ LFFR<- LF %>% mutate(RI = case_when(
 LFFR<-filter(LFFR, ER>-30)
 LF_0124<-extract_reduce(LF, LFFR)
 
+LFFR<- LF %>% mutate(RI = case_when(
+  Date> "2024-03-30" & Date<"2024-05-15"~ 2))
+LF_0424<-extract_reduce(LF, LFFR)
 
-LF_tbl<-rbind(LF_0922,LF_0223,LF_0723)
+LFFR<- LF %>% mutate(RI = case_when(
+  Date> "2024-05-15" & Date<"2024-06-20"~ 2))
+LF_0624<-extract_reduce(LF, LFFR)
+
+
+# LFFRcheck<-filter(LFFR,RI==2 )
+# ggplot(LFFRcheck, aes(Date)) +
+#   geom_line(aes(y=depth, color=depthID))+
+#   geom_line(aes(y=DO))
+
+
+LF_tbl<-rbind(LF_0922,LF_0223,LF_0723, LF_0424,
+              LF_0624)
 LF_tbl$ID<-'LF'
 LF_tbl$num<-3
-LF_tbl$IF <- c("h","h",'h')
+LF_tbl$IF <- c("h","h",'h','h','rev')
 ######ID#######
 
 ID<- ID %>% mutate(depthID = case_when(
@@ -334,7 +361,7 @@ ID$SpC[ID$SpC>1000]<-NA
 ID_tbl<-rbind(ID_0123,ID_0823,ID_0923,ID_0124,ID_0324)
 ID_tbl$ID<-'ID'
 ID_tbl$num<-1
-ID_tbl$IF <- c("h","h",'h','rev','h')
+ID_tbl$IF <- c("h","h",'h','h','h')
 
 ######IU#######
 IU<-filter(IU, Date>'2022-05-02')
@@ -421,8 +448,8 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
       axis.title.x =element_text(size = 27),
       plot.title = element_text(size = 22, color="darkred"))+
     scale_y_continuous(limits = c(0,100)))
-summary(lm(ER_reduce ~ h, data=R_R))
-summary(lm(GPP_reduce ~ h, data=R_R))
+# summary(lm(ER_reduce ~ h, data=R_R))
+# summary(lm(GPP_reduce ~ h, data=R_R))
 
 (flood_mag<-plot_grid(a, b, nrow=1))
 
@@ -445,8 +472,8 @@ ggsave(filename="05_Figures/reduced_mag.jpeg",
       axis.text.x=element_text(size=18),
       plot.title = element_text(size = 22, color="darkred"))+
     scale_y_continuous(limits = c(0,100)))
-summary(lm(ER_reduce ~ h, data=R_R))
-summary(lm(GPP_reduce ~ h, data=RR_noID))
+# summary(lm(ER_reduce ~ h, data=R_R))
+# summary(lm(GPP_reduce ~ h, data=RR_noID))
 
 (flood_site<-plot_grid(a, c, nrow=1))
 
@@ -476,7 +503,7 @@ ggsave(filename="05_Figures/all reduced.jpeg",
       plot.title = element_text(size = 22, color="darkred"),
       legend.position = 'bottom'))
 
-ggsave(filename="reduced legend.jpeg",
+ggsave(filename="05_Figures/reduced legend.jpeg",
        plot = b,
        width =12,
        height = 10,

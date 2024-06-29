@@ -74,7 +74,7 @@ SpC_formatted <- function(fil) {
   colnames(SpC)[2] <- "SpC"
   SpC$ID<-strsplit(basename(fil), '_')[[1]][1]
   SpC$SpC[SpC$SpC>600]<-NA
-  SpC$SpC[SpC$SpC<50]<-NA
+  SpC$SpC[SpC$SpC<]<-NA
   
   return(SpC)}
 SpC_unformatted <- function(fil) {
@@ -86,8 +86,7 @@ SpC_unformatted <- function(fil) {
   SpC<-SpC[order(as.Date(SpC$Date, format="%Y-%m-%d %H:%M:%S")),]
   SpC$ID<-strsplit(basename(fil), '_')[[1]][1]
   SpC$SpC[SpC$SpC>600]<-NA
-  SpC$SpC[SpC$SpC<50]<-NA
-  
+  SpC$SpC[SpC$SpC<30]<-NA
 
   return(SpC)}
 rename_ID<-function(site){
@@ -101,6 +100,8 @@ rename_ID<-function(site){
            ID = ifelse(as.character(ID) == "GilichristBlue", "GB", as.character(ID)),
            
            ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
+           ID = ifelse(as.character(ID) == "Ichetuckneel", "ID", as.character(ID)),
+        
 
            ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
            ID = ifelse(as.character(ID) == "LittleFanningSpC", "LF", as.character(ID)),

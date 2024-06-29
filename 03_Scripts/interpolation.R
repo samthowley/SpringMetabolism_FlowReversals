@@ -216,11 +216,11 @@ checkGPP_lm <- function(site_river) {
   zoom<-filter(site_river, Date>"2022-05-03")
   a<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=GPP, color="OG"), size=1)+
-    geom_point(aes(y=GPP_lm, color="est"), size=1)
+    geom_point(aes(y=GPP_lm, color="est"), size=1)+ggtitle("Linear Model")
   
   b<-ggplot(data=zoom, aes(x=Date)) +
     geom_line(aes(y=GPP, color="OG"), size=1)+
-    geom_line(aes(y=GPP_lm, color="est"), size=1)
+    geom_line(aes(y=GPP_lm, color="est"), size=1)+theme(legend.position = "none")
   
   c<-ggplot(data=zoom, aes(x=GPP,y=GPP_lm)) +
     geom_point(size=1)+
@@ -238,11 +238,11 @@ checkER_lm <- function(site_river) {
   zoom<-filter(site_river, Date>"2022-05-03")
   a<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=ER, color="OG"), size=1)+
-    geom_point(aes(y=ER_lm, color="est"), size=1)
+    geom_point(aes(y=ER_lm, color="est"), size=1)+ggtitle("Linear Model")
   
   b<-ggplot(data=zoom, aes(x=Date)) +
     geom_line(aes(y=ER, color="OG"), size=1)+
-    geom_line(aes(y=ER_lm, color="est"), size=1)
+    geom_line(aes(y=ER_lm, color="est"), size=1)+theme(legend.position = "none")
   
   c<-ggplot(data=zoom, aes(x=ER,y=ER_lm)) +
     geom_point(size=1)+
@@ -261,11 +261,11 @@ checkGPP_lm_interaction<- function(site_river) {
   zoom<-filter(site_river, Date>"2022-05-03")
   a<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=GPP, color="OG"), size=1)+
-    geom_point(aes(y=GPP_lm_interaction, color="est"), size=1)
+    geom_point(aes(y=GPP_lm_interaction, color="est"), size=1)+ggtitle("Lineaer Model with interaction")
   
   b<-ggplot(data=zoom, aes(x=Date)) +
     geom_line(aes(y=GPP, color="OG"), size=1)+
-    geom_line(aes(y=GPP_lm_interaction, color="est"), size=1)
+    geom_line(aes(y=GPP_lm_interaction, color="est"), size=1)+theme(legend.position = "none")
   
   c<-ggplot(data=zoom, aes(x=GPP,y=GPP_lm_interaction)) +
     geom_point(size=1)+
@@ -284,11 +284,11 @@ checkER_lm_interaction <- function(site_river) {
   zoom<-filter(site_river, Date>"2022-05-03")
   a<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=ER, color="OG"), size=1)+
-    geom_point(aes(y=ER_lm_interaction, color="est"), size=1)
+    geom_point(aes(y=ER_lm_interaction, color="est"), size=1)+ggtitle("Lineaer Model with interaction")
   
   b<-ggplot(data=zoom, aes(x=Date)) +
     geom_line(aes(y=ER, color="OG"), size=1)+
-    geom_line(aes(y=ER_lm_interaction, color="est"), size=1)
+    geom_line(aes(y=ER_lm_interaction, color="est"), size=1)+theme(legend.position = "none")
   
   c<-ggplot(data=zoom, aes(x=ER,y=ER_lm_interaction)) +
     geom_point(size=1)+
@@ -307,11 +307,11 @@ checkGPP_poly <- function(site_river) {
   zoom<-filter(site_river, Date>"2022-05-03")
   a<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=GPP, color="OG"), size=1)+
-    geom_point(aes(y=GPP_poly, color="est"), size=1)
+    geom_point(aes(y=GPP_poly, color="est"), size=1)+ggtitle("Polynomial Model")
   
   b<-ggplot(data=zoom, aes(x=Date)) +
     geom_line(aes(y=GPP, color="OG"), size=1)+
-    geom_line(aes(y=GPP_poly, color="est"), size=1)
+    geom_line(aes(y=GPP_poly, color="est"), size=1)+theme(legend.position = "none")
   
   c<-ggplot(data=zoom, aes(x=GPP,y=GPP_poly)) +
     geom_point(size=1)+
@@ -329,11 +329,11 @@ checkER_poly <- function(site_river) {
   zoom<-filter(site_river, Date>"2022-05-03")
   a<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=ER, color="OG"), size=1)+
-    geom_point(aes(y=ER_poly, color="est"), size=1)
+    geom_point(aes(y=ER_poly, color="est"), size=1)+ggtitle("Polynomial Model")
   
   b<-ggplot(data=zoom, aes(x=Date)) +
     geom_line(aes(y=ER, color="OG"), size=1)+
-    geom_line(aes(y=ER_poly, color="est"), size=1)
+    geom_line(aes(y=ER_poly, color="est"), size=1)+theme(legend.position = "none")
   
   c<-ggplot(data=zoom, aes(x=ER,y=ER_poly)) +
     geom_point(size=1)+
@@ -353,11 +353,11 @@ checkGPP_poly_interaction <- function(site_river) {
   zoom<-filter(site_river, Date>"2022-05-03")
   a<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=GPP, color="OG"), size=1)+
-    geom_point(aes(y=GPP_poly_interaction, color="est"), size=1)
+    geom_point(aes(y=GPP_poly_interaction, color="est"), size=1)+ggtitle("Polynomial Model with Interaction")
   
   b<-ggplot(data=zoom, aes(x=Date)) +
     geom_line(aes(y=GPP, color="OG"), size=1)+
-    geom_line(aes(y=GPP_poly_interaction, color="est"), size=1)
+    geom_line(aes(y=GPP_poly_interaction, color="est"), size=1)+theme(legend.position = "none")
   
   c<-ggplot(data=zoom, aes(x=GPP,y=GPP_poly_interaction)) +
     geom_point(size=1)+
@@ -376,11 +376,11 @@ checkER_poly_interaction <- function(site_river) {
   zoom<-filter(site_river, Date>"2022-05-03")
   a<-ggplot(data=zoom, aes(x=depth)) +
     geom_point(aes(y=ER, color="OG"), size=1)+
-    geom_point(aes(y=ER_poly_interaction, color="est"), size=1)
+    geom_point(aes(y=ER_poly_interaction, color="est"), size=1)+ggtitle("Polynomial Model with Interaction")
   
   b<-ggplot(data=zoom, aes(x=Date)) +
     geom_line(aes(y=ER, color="OG"), size=1)+
-    geom_line(aes(y=ER_poly_interaction, color="est"), size=1)
+    geom_line(aes(y=ER_poly_interaction, color="est"), size=1)+theme(legend.position = "none")
   
   c<-ggplot(data=zoom, aes(x=ER,y=ER_poly_interaction)) +
     geom_point(size=1)+
@@ -455,17 +455,54 @@ IU_hist <- for_wilcox(site_id,parameterCd)
 #write_csv(IU, "04_Outputs/IU_historical.csv")
 
 #GB run####
+ggplot(GB, aes(depth)) +
+  geom_point(aes(y=ER,color='ER'))+geom_vline(xintercept = 0.73)
+
 
 GB_inter<-all_at_once(GB,ftwhite,
                              el_lowbound=1.7,
                              el_upbound=2.5,
-                             h_lowbound=0.56,
+                             h_lowbound=0.62,
                              h_upbound=0.73)
+
+zoom<-filter(GB_inter, Date>"2022-05-01")
+a<-ggplot(zoom, aes(depth)) +
+  geom_point(aes(y=GPP,color='GPP'), color="darkgreen")+
+  geom_smooth(data=GB_inter, aes(x=depth, y=GPP, group=depthID, color=depthID),
+              method='lm', se=FALSE)+
+  geom_point(aes(y=ER,color='ER'), color="darkred")+
+  geom_smooth(data=GB_inter, aes(x=depth, y=ER, group=depthID, color=depthID), method='lm', se=FALSE)+
+  ggtitle("GB, linear model")+ theme(legend.position = "none")
+
+b<-ggplot(zoom, aes(depth)) +
+  geom_point(aes(y=GPP,color='GPP'), color="darkgreen")+
+  geom_smooth(data=GB_inter, aes(x=depth, y=GPP), method='lm', se=FALSE)+
+  geom_point(aes(y=ER,color='ER'), color="darkred")+
+  geom_smooth(data=GB_inter, aes(x=depth, y=ER), method='lm', se=FALSE)+
+  ggtitle("GB, linear model, interaction")+ theme(legend.position = "none")
+
+c<-ggplot(zoom, aes(depth)) +
+  geom_point(aes(y=GPP,color='GPP'), color="darkgreen")+
+  geom_smooth(data=GB_inter, aes(x=depth, y=GPP), method='lm', 
+              formula = y ~ poly(x, 2), se=FALSE)+
+  geom_point(aes(y=ER,color='ER'), color="darkred")+
+  geom_smooth(data=GB_inter, aes(x=depth, y=ER), method='lm', 
+              formula = y ~ poly(x, 2), se=FALSE)+ggtitle("Polynomial")+ theme(legend.position = "none")
+
+d<-ggplot(zoom, aes(depth)) +
+  geom_point(aes(y=GPP,color='GPP'), color="darkgreen")+
+  geom_smooth(data=GB_inter, aes(x=depth, y=GPP, group=depthID, color=depthID), method='lm', 
+              formula = y ~ poly(x, 2), se=FALSE)+
+  geom_point(aes(y=ER,color='ER'), color="darkred")+
+  geom_smooth(data=GB_inter, aes(x=depth, y=ER, group=depthID, color=depthID), method='lm', 
+              formula = y ~ poly(x, 2), se=FALSE)+ggtitle("Polynomial, interaction")+ theme(legend.position = "none")
+
+plot_grid(a,b,c,d, ncol=2)
 
 (GB_gpp<-all_graphs_GPP(GB_inter))
 (GB_er<-all_graphs_ER(GB_inter))
 
-#AM run####                           )
+#AM run####                           
 AM_inter<-all_at_once(AM,dowling,
                       el_lowbound=2.45,
                       el_upbound=2.8,
@@ -522,6 +559,18 @@ ID_inter<-all_at_once(ID,IU_hist,
 
 (ID_gpp<-all_graphs_GPP(ID_inter))
 (ID_er<-all_graphs_ER(ID_inter))
+
+
+all_Interpolations<-rbind(ID_inter, IU_inter, GB_inter, LF_inter, AM_inter, OS_inter)
+all_Interpolations<-filter(all_Interpolations, Date>"2022-05-01")
+all_Interpolations<-all_Interpolations %>% filter(Date>"2022-05-01") %>% filter(ID !=NA |ID !='IU')
+
+
+ggplot(all_Interpolations, aes(Date)) +
+  geom_line(aes(y=h_pred,color='predicted depth'), size=1)+
+  geom_line(aes(y=depth,color='depth'), size=1)+
+  facet_wrap(~ ID, ncol=2)
+
 
 #work flow####
 
