@@ -132,8 +132,8 @@ two_station_ID<- function(spring) {
   return(list(two,one))}
 
 two_station_forRecovery<- function(spring) {
-  spring$K600_1d[spring$K600_1d<0]<-0.1
-  spring$Q_m.s[spring$K600_1d<0]<-0.1
+  #spring$K600_1d[spring$K600_1d<0]<-0.1
+  #spring$Q_m.s[spring$K600_1d<0]<-0.1
 
   spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
   spring$not<-spring$deltaDO_rate-spring$K_reaeration
@@ -389,37 +389,54 @@ write_csv(OS, "04_Outputs/one station inputs/not parsed/OS.csv")
 write_csv(OS, "04_Outputs/one station inputs/OS.csv")
 
 ####For recovery analysis####
-# x<-c('Date', 'DO','GPPavg', 'ER', 'depth', 'ID')
-# AM_recov$ID<-'AM'
-# AM_recov<-AM_recov[,x]
-# GB_recov$ID<-'GB'
-# GB_recov<-GB_recov[,x]
-# LF_recov$ID<-'LF'
-# LF_recov<-LF_recov[,x]
-# ID_recov$ID<-'ID'
-# ID_recov<-ID_recov[,x]
-# 
-# recovery<-rbind(AM_recov, GB_recov, LF_recov,  ID_recov) #ID_recov
-# 
-# met<-read_csv("02_Clean_data/master_metabolism3.csv")
-# OSmet<-filter(met, ID=='OS')
-# OS_recov<-left_join(OS, OSmet, by='Date')
-# OS_recov<-OS_recov[,x]
-# 
-# IUmet<-filter(met, ID=='IU')
-# IU <- master %>% filter(ID=='IU')
-# IU_recov<-left_join(IU, IUmet, by=c('Date','ID'))
-# IU_recov<-IU_recov[,x]
-# 
-# recovery<-rbind(recovery,OS_recov,IU_recov) #ID_recov
-# 
-# OSmet<-read_csv("02_Clean_data/master_metabolism3.csv")
-# OSmet<-filter(OSmet, ID=='OS')
-# OS_recov<-left_join(OS, OSmet, by='Date')
-# OS_recov<-OS_recov[,x]
-# 
-# recovery<-rbind(recovery,OS_recov) #ID_recov
-# write_csv(recovery, "04_Outputs/ForRecovery.csv")
+x<-c('Date', 'GPPavg', 'ER','Q_m.s','ID')
+AM_recov$ID<-'AM'
+AM_recov<-AM_recov[,x]
+GB_recov$ID<-'GB'
+GB_recov<-GB_recov[,x]
+LF_recov$ID<-'LF'
+LF_recov<-LF_recov[,x]
+ID_recov$ID<-'ID'
+ID_recov<-ID_recov[,x]
+
+recovery<-rbind(AM_recov, GB_recov, LF_recov,  ID_recov) #ID_recov
+
+OSmet<-read_csv("04_outputs/Stream metabolizer results/OS.csv")
+OSmet<-OSmet %>% mutate(day=day(Date), month=month(Date), year=year(Date))
+OSdepth<-read_csv("02_Clean_data/master_depth2.csv")
+OSdepth<-OSdepth %>% filter(ID=="OS") %>%mutate(day=day(Date), month=month(Date), year=year(Date))
+OSdepth<-OSdepth[,-6]
+
+rel_u <- lm(u ~ depth, data=OS_rC)
+(cf <- coef(rel_u))
+OSdepth$"velocity_m.s"<-(OSdepth$depth*cf[2]+cf[1])
+OS_recov<-left_join(OSdepth, OSmet, by=c('day', 'month', 'year'))
+OS_recov<-OS_recov %>% mutate(width=17, ID="OS") %>% mutate(Q_m.s=width*depth*velocity_m.s)
+OS_recov<-OS_recov[,x]
+
+
+
+
+IUmet<-read_csv("04_outputs/Stream metabolizer results/IU.csv")
+IUmet<-IUmet %>% mutate(day=day(Date), month=month(Date), year=year(Date))
+
+startDate <- "2022-05-02"
+endDate <- "2024-06-17"
+parameterCd <- c('00060','00065')
+ventID<-'02322700'
+
+library(measurements)
+IUdepth<- readNWISuv(ventID,parameterCd, startDate, endDate)
+IUdepth<-IUdepth %>% rename('Q_m.s'='X_00060_00000')%>%
+  mutate(depth=X_00065_00000-13.72, Q_m.s=Q_m.s/35.3147)%>%
+  mutate(min=minute(dateTime), day=day(dateTime), month=month(dateTime), year=year(dateTime)) %>% filter(min==0)
+IU_recov<-left_join(IUdepth, IUmet, by=c('day', 'month', 'year'))
+IU_recov<-IU_recov %>% mutate(width=28, ID="IU")
+IU_recov<-IU_recov[,x]
+
+recovery<-rbind(recovery,OS_recov,IU_recov) #ID_recov
+
+write_csv(recovery, "02_Clean_data/discharge.csv")
 
 
 

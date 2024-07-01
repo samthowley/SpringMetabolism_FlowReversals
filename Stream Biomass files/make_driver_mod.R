@@ -1,6 +1,6 @@
 make_driver <- function(site_locs, NLDAS_processed, MOD_processed, write_output = FALSE, save_dir = NULL){
   #Find sites that have both NLDAS and MODIS data
-  site_intersect <- Reduce(intersect, list(names(ID_NLDAS_processed), names(ID_mod_processed),
+  site_intersect <- Reduce(intersect, list(names(NLDAS_processed), names(MOD_processed),
                                            site_locs$Site_ID))
   
   #Function for merging and making a driver file
