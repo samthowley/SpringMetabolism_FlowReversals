@@ -14,6 +14,7 @@
 library(StreamLight)
 library(StreamLightUtils)
 library(tidyverse)
+library(streamMetabolizer)
 
 #Question for Matt: Do I need to change the defaults? ex) blank slope, bank height
 #water level
@@ -56,7 +57,7 @@ estimate_par<-function(Site_ID,width, Lat, Lon,select.driver_file){
     BS = 100, 
     WL = 0.1, 
     TH = siteID_TH, 
-    overhang = ID_TH*0.1, 
+    overhang = siteID_TH*0.1, 
     overhang_height = NA, 
     x_LAD = 1)
   
@@ -65,14 +66,14 @@ estimate_par<-function(Site_ID,width, Lat, Lon,select.driver_file){
   
   return(siteID_modeled)}
 
-#####
+#working directory and site locations####
 
 working_dir <- "C:/SpringMetabolism_FlowReversals/Stream Biomass files"
-sites<- read_csv("site_locs.csv")
+sites<- read_csv("Stream Biomass files/site_locs.csv")
 #NLDAS#########
 #Download NLDAS data at NC_NHC
 
-NLDAS_DL_bulk(save_dir = "C:/SpringMetabolism_FlowReversals/Stream Biomass files/NLDAS",
+NLDAS_DL_bulk(save_dir = "Stream Biomass files/NLDAS",
               site_locs = sites, startDate = "2022-05-01")
 
 NLDAS_list <- stringr::str_sub(list.files("C:/SpringMetabolism_FlowReversals/Stream Biomass files/NLDAS"), 1, -11)
@@ -123,14 +124,14 @@ driver_file<-make_driver(
 
 source("C:/SpringMetabolism_FlowReversals/Stream Biomass files/extract_height_mod.R")
 
-
 ID.driver_file<-driver_file$ID
 ID_modeled<-estimate_par(Site_ID= "ID",
                          width=28,
                          Lat=site_locs$Lat[1],
                          Lon=site_locs$Lon[1],
                          ID.driver_file)
-ggplot(IU_modeled, aes(Date, PAR_surface))+geom_line()
+#ggplot(IU_modeled, aes(Date, PAR_surface))+geom_line()
+
 
 
 IU.driver_file<-driver_file$IU
@@ -139,7 +140,7 @@ IU_modeled<-estimate_par(Site_ID= "IU",
                          Lat=site_locs$Lat[2],
                          Lon=site_locs$Lon[2],
                          IU.driver_file)
-ggplot(IU_modeled, aes(Date, PAR_surface))+geom_line()
+#ggplot(IU_modeled, aes(Date, PAR_surface))+geom_line()
 
 
 
@@ -149,7 +150,7 @@ GB_modeled<-estimate_par(Site_ID= "GB",
                          Lat=site_locs$Lat[3],
                          Lon=site_locs$Lon[3],
                          GB.driver_file)
-ggplot(GB_modeled, aes(Date, PAR_surface))+geom_line()
+#ggplot(GB_modeled, aes(Date, PAR_surface))+geom_line()
 
 
 AM.driver_file<-driver_file$AM
@@ -158,7 +159,7 @@ AM_modeled<-estimate_par(Site_ID= "AM",
                          Lat=site_locs$Lat[4],
                          Lon=site_locs$Lon[4],
                          AM.driver_file)
-ggplot(AM_modeled, aes(Date, PAR_surface))+geom_line()
+#ggplot(AM_modeled, aes(Date, PAR_surface))+geom_line()
 
 
 
@@ -168,7 +169,7 @@ OS_modeled<-estimate_par(Site_ID= "OS",
                          Lat=site_locs$Lat[5],
                          Lon=site_locs$Lon[5],
                          OS.driver_file)
-ggplot(OS_modeled, aes(Date, PAR_surface))+geom_line()
+#ggplot(OS_modeled, aes(Date, PAR_surface))+geom_line()
 
 
 
@@ -178,7 +179,16 @@ LF_modeled<-estimate_par(Site_ID= "LF",
                          Lat=site_locs$Lat[6],
                          Lon=site_locs$Lon[6],
                          LF.driver_file)
-ggplot(LF_modeled, aes(Date, PAR_surface))+geom_line()
+#ggplot(LF_modeled, aes(Date, PAR_surface))+geom_line()
+
+LF_modeled$ID<-'LF'
+AM_modeled$ID<-'AM'
+GB_modeled$ID<-'GB'
+IU_modeled$ID<-'IU'
+ID_modeled$ID<-'ID'
+OS_modeled$ID<-'OS'
+
+GB_modeled$light<-calc_light(GB_modeled$Date,  29.83, -82.68)
 
 
 all_site_light <- rbind(ID_modeled, IU_modeled, GB_modeled,LF_modeled,AM_modeled,OS_modeled)
