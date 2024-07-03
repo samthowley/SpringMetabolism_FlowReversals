@@ -74,7 +74,7 @@ metabolism <- function(site) {
 }
 compile<- function(site_output, site2) {
   site_output<-rename(site_output,'Date'='date','GPPavg'="GPP_daily_mean",
-                      'ER'='ER_daily_mean','K600_1d'='K600_daily_mean')
+                      'ER'='ER_daily_mean','K600_1d'='K600_daily_mean', 'light'='light')
   site_output$GPPavg[site_output$GPPavg<0] <- 0
   site_output$ER[site_output$ER>0] <- -3
 

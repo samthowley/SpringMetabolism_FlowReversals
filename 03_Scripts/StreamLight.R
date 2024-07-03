@@ -14,7 +14,6 @@
 library(StreamLight)
 library(StreamLightUtils)
 library(tidyverse)
-library(streamMetabolizer)
 
 #Question for Matt: Do I need to change the defaults? ex) blank slope, bank height
 #water level
@@ -181,6 +180,10 @@ LF_modeled<-estimate_par(Site_ID= "LF",
                          LF.driver_file)
 #ggplot(LF_modeled, aes(Date, PAR_surface))+geom_line()
 
+
+
+
+
 LF_modeled$ID<-'LF'
 AM_modeled$ID<-'AM'
 GB_modeled$ID<-'GB'
@@ -188,10 +191,7 @@ IU_modeled$ID<-'IU'
 ID_modeled$ID<-'ID'
 OS_modeled$ID<-'OS'
 
-GB_modeled$light<-calc_light(GB_modeled$Date,  29.83, -82.68)
-
-
-all_site_light <- rbind(ID_modeled, IU_modeled, GB_modeled,LF_modeled,AM_modeled,OS_modeled)
+all_site_light <- rbind(ID_modeled, IU_modeled, GB_modeled,LF_modeled,AM_modeled,AM_modeled)
 
 saveRDS(all_site_light, "C:/SpringMetabolism_FlowReversals/Stream Biomass files/StreamLight_daily.rds")
 #q TWO YR FLOOD#####
