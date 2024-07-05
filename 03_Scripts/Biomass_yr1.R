@@ -3,46 +3,18 @@ lapply(c("plyr","dplyr","ggplot2","cowplot","lubridate",
          "MCMCglmm"), require, character.only=T)
 library(streamMetabolizer)
 
-#rm(data, l, SL, data_siteyears, dat)
+#############################
+#1. Create required dataset####
+############################
+chem <- read_csv("02_Clean_data/master_chem1.csv") #for temp
+Q <- read_csv("02_Clean_data/discharge.csv") # for discharge
 
-#create required dataset####
-chem <- read_csv("02_Clean_data/master_chem1.csv")
-Q <- read_csv("02_Clean_data/discharge.csv")
+####eventually the light section wont be needed
 
-site_locs<- read_csv("Stream Biomass files/site_locs.csv")
-sites<-split(chem,chem$ID)
-#names(sites)
-AM<-sites[[1]]
-GB<-sites[[2]]
-ID<-sites[[3]]
-IU<-sites[[4]]
-LF<-sites[[5]]
-OS<-sites[[6]]
-
-light_calc <- function(site, Lat, Lon){
-  site$solar.time <-as.POSIXct(site$Date, format="%Y-%m-%d %H:%M:%S", tz="UTC")
-  site$light<-calc_light(site$solar.time,  Lat, Lon)
-  return(site)}
-IU<-light_calc(IU, site_locs$Lat[1], site_locs$Lat[1])
-ID<-light_calc(ID, site_locs$Lat[2], site_locs$Lat[2])
-GB<-light_calc(GB, site_locs$Lat[3], site_locs$Lat[3])
-LF<-light_calc(IU, site_locs$Lat[4], site_locs$Lat[4])
-AM<-light_calc(AM, site_locs$Lat[5], site_locs$Lat[5])
-OS<-light_calc(OS, site_locs$Lat[6], site_locs$Lat[6])
-
-light<-rbind(IU, ID, GB, LF, AM, OS)
-light<-light[,c('Date','ID','light')]
-light$light[light$light<=0]<-NA
-light<-light %>%mutate(Date=as.Date(Date)) %>% group_by(Date, ID) %>% mutate(light=mean(light, na.rm=T))
-light<-left_join(light, Q, by=c('Date', 'ID'))
-light<-light[,c('Date','ID','light','Q_m.s')]
-light <- light[!duplicated(light[c('Date','ID')]),]
-
-
-met <- read_csv("02_Clean_data/master_metabolism4.csv")
+met <- read_csv("02_Clean_data/master_metabolism4.csv") #GPP data
 met<-left_join(met, light, by=c('Date','ID'))
 
-SL <- readRDS("Stream Biomass files/Outputs/StreamLight_daily.rds")
+SL <- readRDS("Stream Biomass files/Outputs/StreamLight_daily.rds") #Stream Light
 
 met.SL <- left_join(met, SL, by=c("ID", "Date"))
 met.SL <- met.SL[!duplicated(met.SL[c('Date','ID')]),]
@@ -54,8 +26,7 @@ met.SL[which(met.SL$GPP < 0),]$GPP <- sample(exp(-3):exp(-2), 1)
 met.SL<-met.SL %>% group_by(ID)%>% mutate(GPP_sd=sd(GPP, na.rm = T))
 #met.SL$GPP_sd <- (((met.SL$GPP.upper - met.SL$GPP)/1.96) + ((met.SL$GPP.lower - met.SL$GPP)/-1.96))/2
 
-#select for the first year
-met.SL<-filter(met.SL, Date< '2023-05-12')
+met.SL<-filter(met.SL, Date< '2023-05-12') #select for the first year
 
 l <- split(met.SL, met.SL$ID)
 rel_LQT <- function(x){
@@ -66,12 +37,10 @@ rel_LQT <- function(x){
   
   x<-x[order(x$Date),]
   return(x)
-}
+} #relative, normalize
 
-dat <- lapply(l, function(x) rel_LQT(x))
-df <- dat
-
-#Biomass Recovery Models####
+dat <- lapply(l, function(x) rel_LQT(x)) #apply relaove function to all
+complete_list_OG <- dat
 
 stan_data_compile_PAR <- function(x){
   data <- list(Ndays=length(x$GPP), light = x$light_rel_PAR, GPP = x$GPP,
@@ -79,8 +48,11 @@ stan_data_compile_PAR <- function(x){
   return(data)
 }
 
-stan_data_PAR <- lapply(df, function(x) stan_data_compile_PAR(x))
+stan_data_PAR <- lapply(complete_list_OG, function(x) stan_data_compile_PAR(x))
 
+###############################
+#fit first year of data####
+###############################
 rstan_options(auto_write=TRUE)
 options(mc.cores= 6) 
 # parallel::detectCores()
@@ -104,21 +76,17 @@ LBTS_output_PAR <- lapply(stan_data_PAR,
 ## Save initial model fit
 init_model_output <- list(STS_output_PAR, LBTS_output_PAR)
 saveRDS(init_model_output, "Stream Biomass files/Param_Rec_Test_init_output_20240702.rds")
-rm(init_model_output); rm(STS_output_PAR); rm(LBTS_output_PAR)
 
-
-#Extract Model Parameters########
-
+source("Stream Biomass files/functions and stans/Predicted_ProductivityModel_LBTS.R")
 ## Extract parameter estimates from simulation
 init_model_output <- readRDS("Stream Biomass files/Param_Rec_Test_init_output_20240702.rds")
 STS_output_PAR <- init_model_output[[1]]
 LBTS_output_PAR <- init_model_output[[2]]
 
-#extract
+
 p_STS <- lapply(STS_output_PAR, function(x) extract(x, c("phi","alpha","beta","sig_p","sig_o")))
 p_LBTS<- lapply(LBTS_output_PAR, function(x) extract(x, c("r","lambda","s","c","sig_p","sig_o")))
 
-#mean and sd
 mean_STS <- lapply(p_STS, function(x) lapply(x, function(y) mean(y)))
 sd_STS <- lapply(p_STS, function(x) lapply(x, function(y) sd(y)))
 mean_LBTS <- lapply(p_LBTS, function(x) lapply(x, function(y) mean(y)))
@@ -129,77 +97,88 @@ sd_LBTS <- lapply(p_LBTS, function(x) lapply(x, function(y) sd(y)))
 ##############################################################
 
 ## Bring in simulation code
-source("Stream Biomass files/Predicted_ProductivityModel_STS.R") 
-source("Stream Biomass files/Predicted_ProductivityModel_LBTS.R")
+source("Stream Biomass files/functions and stans/Predicted_ProductivityModel_STS.R") 
+source("Stream Biomass files/functions and stans/Predicted_ProductivityModel_LBTS.R")
 
-## STS - simulate GPP again for recovery test data set
-Pot_STS_GPP <- PM_AR(phi=mean_STS$Potomac$phi,
-                     alpha=mean_STS$Potomac$alpha,
-                     beta=mean_STS$Potomac$beta,
-                     sig_p=mean_STS$Potomac$sig_p,
-                     sig_o=mean_STS$Potomac$sig_o, df=ex)
-Paint_STS_GPP <- PM_AR(phi=mean_STS$`Paint Branch`$phi,
-                       alpha=mean_STS$`Paint Branch`$alpha,
-                       beta=mean_STS$`Paint Branch`$beta,
-                       sig_p=mean_STS$`Paint Branch`$sig_p,
-                       sig_o=mean_STS$`Paint Branch`$sig_o, df=ex2)
-plot(1:length(Pot_STS_GPP), Pot_STS_GPP, type="l")
-points(ex$GPP) #good
-plot(1:length(Paint_STS_GPP), Paint_STS_GPP, type="l")
-points(ex2$GPP) #divergent fall peak in predicted (line) GPP
+## check models
+AM_STS_GPP <- PM_AR(phi=mean_STS$AM$phi,
+                     alpha=mean_STS$AM$alpha,
+                     beta=mean_STS$AM$beta,
+                     sig_p=mean_STS$AM$sig_p,
+                     sig_o=mean_STS$AM$sig_o, 
+                    df=complete_list_OG$AM)
+IU_STS_GPP <- PM_AR(phi=mean_STS$IU$phi,
+                       alpha=mean_STS$IU$alpha,
+                       beta=mean_STS$IU$beta,
+                       sig_p=mean_STS$IU$sig_p,
+                       sig_o=mean_STS$IU$sig_o, df=complete_list_OG$IU)
+# plot(1:length(AM_STS_GPP), AM_STS_GPP, type="l") #better
+# points(complete_list_OG$AM$GPP) 
+# plot(1:length(IU_STS_GPP), IU_STS_GPP, type="l")
+# points(complete_list_OG$IU$GPP) 
 
 ## LBTS - simulate GPP again for recovery test data set
-Pot_LBTS_GPP <- PM_Ricker(r = mean_LBTS$Potomac$r,
-                          lambda = mean_LBTS$Potomac$lambda,
-                          s = mean_LBTS$Potomac$s,
-                          c = mean_LBTS$Potomac$c, 
-                          sig_p = mean_LBTS$Potomac$sig_p,
-                          sig_o = mean_LBTS$Potomac$sig_o, df = ex)
-Paint_LBTS_GPP <- PM_Ricker(r = mean_LBTS$`Paint Branch`$r,
-                            lambda = mean_LBTS$`Paint Branch`$lambda,
-                            s = mean_LBTS$`Paint Branch`$s,
-                            c = mean_LBTS$`Paint Branch`$c, 
-                            sig_p = mean_LBTS$`Paint Branch`$sig_p,
-                            sig_o = mean_LBTS$`Paint Branch`$sig_o, df = ex2)
-plot(1:length(Pot_LBTS_GPP), Pot_LBTS_GPP, type="l")
-points(ex$GPP) #good
-plot(1:length(Paint_LBTS_GPP), Paint_LBTS_GPP, type="l")
-points(ex2$GPP) #much better than S-TS prediction, just delayed spring peak
-
+AM_LBTS_GPP <- PM_Ricker(r = mean_LBTS$AM$r,
+                          lambda = mean_LBTS$AM$lambda,
+                          s = mean_LBTS$AM$s,
+                          c = mean_LBTS$AM$c, 
+                          sig_p = mean_LBTS$AM$sig_p,
+                          sig_o = mean_LBTS$AM$sig_o, df = complete_list_OG$AM)
+IU_LBTS_GPP <- PM_Ricker(r = mean_LBTS$IU$r,
+                            lambda = mean_LBTS$IU$lambda,
+                            s = mean_LBTS$IU$s,
+                            c = mean_LBTS$IU$c, 
+                            sig_p = mean_LBTS$IU$sig_p,
+                            sig_o = mean_LBTS$IU$sig_o, df = complete_list_OG$IU)
+# plot(1:length(AM_LBTS_GPP), AM_LBTS_GPP, type="l")
+# points(complete_list_OG$AM$GPP) #bad
+# plot(1:length(IU_LBTS_GPP), IU_LBTS_GPP, type="l")
+# points(complete_list_OG$IU$GPP) #why is it so hight??
 
 #############################################################################
 ## (6) Replace original GPP with predicted GPP in stan data list
 #############################################################################
 
-## Compile for Stan again
-# STS
-stan_simPot_STS <- list(Ndays=length(Pot_STS_GPP), light=ex$light_rel_PAR, GPP = Pot_STS_GPP,
-                        prior_sig_o_mean = mean_STS$Potomac$sig_o,
-                        prior_sig_o_sd = sd_STS$Potomac$sig_o, tQ = ex$tQ)
-stan_simPaint_STS <- list(Ndays=length(Paint_STS_GPP), light=ex2$light_rel_PAR, GPP = Paint_STS_GPP,
-                          prior_sig_o_mean = mean_STS$`Paint Branch`$sig_o,
-                          prior_sig_o_sd = sd_STS$`Paint Branch`$sig_o, tQ = ex2$tQ)
-stan_STS_sim_list <- list("Potomac_STS"=stan_simPot_STS,
-                          "PaintBranch_STS"=stan_simPaint_STS)
-#LBTS
-stan_simPot_LBTS <- list(Ndays=length(Pot_LBTS_GPP), light=ex$light_rel_PAR, GPP = Pot_LBTS_GPP,
-                         prior_sig_o_mean = mean_LBTS$Potomac$sig_o,
-                         prior_sig_o_sd = sd_LBTS$Potomac$sig_o, tQ = ex$tQ)
-stan_simPaint_LBTS <- list(Ndays=length(Paint_LBTS_GPP), light=ex2$light_rel_PAR, GPP = Paint_LBTS_GPP,
-                           prior_sig_o_mean = mean_LBTS$`Paint Branch`$sig_o,
-                           prior_sig_o_sd = sd_LBTS$`Paint Branch`$sig_o, tQ = ex2$tQ)
-stan_LBTS_sim_list <- list("Potomac_LBTS"=stan_simPot_LBTS,
-                           "PaintBranch_LBTS"=stan_simPaint_LBTS)
+
+stan_simAM_STS <- list(Ndays=length(AM_STS_GPP), 
+                       light=complete_list_OG$AM$light_rel_PAR, 
+                       GPP = AM_STS_GPP,
+                        prior_sig_o_mean = mean_STS$AM$sig_o,
+                        prior_sig_o_sd = sd_STS$AM$sig_o, 
+                       tQ = complete_list_OG$AM$tQ)
+stan_simIU_STS <- list(Ndays=length(IU_STS_GPP), 
+                       light=complete_list_OG$IU$light_rel_PAR, 
+                       GPP = IU_STS_GPP,
+                          prior_sig_o_mean = mean_STS$IU$sig_o,
+                          prior_sig_o_sd = sd_STS$IU$sig_o, 
+                       tQ = complete_list_OG$IU$tQ)
+stan_STS_sim_list <- list("AM_STS"=stan_simAM_STS,
+                          "IU_STS"=stan_simIU_STS)
+
+stan_simAM_LBTS <- list(Ndays=length(AM_LBTS_GPP), 
+                        light=complete_list_OG$AM$light_rel_PAR, 
+                        GPP = AM_LBTS_GPP,
+                         prior_sig_o_mean = mean_LBTS$AM$sig_o,
+                         prior_sig_o_sd = sd_LBTS$AM$sig_o, 
+                        tQ = complete_list_OG$AM$tQ)
+stan_simIU_LBTS <- list(Ndays=length(IU_LBTS_GPP), 
+                        light=complete_list_OG$IU$light_rel_PAR, GPP = IU_LBTS_GPP,
+                           prior_sig_o_mean = mean_LBTS$IU$sig_o,
+                           prior_sig_o_sd = sd_LBTS$IU$sig_o, 
+                        tQ = complete_list_OG$IU$tQ)
+stan_LBTS_sim_list <- list("AM_LBTS"=stan_simAM_LBTS,
+                           "IU_LBTS"=stan_simIU_LBTS)
 
 ###########################################################################
 ## (7) Fit models to simulated data from initial parameter estimates
 ###########################################################################
 rstan_options(auto_write=TRUE)
-options(mc.cores=8)#parallel::detectCores())
+options(mc.cores=5)
+parallel::detectCores()
 #STS
 recov_STS_output <- lapply(stan_STS_sim_list,
-                           function(x) stan("code/Stan_ProductivityModel1_STS_recovery_simulation.stan",
-                                            data=x,chains=4,iter=5000,
+                           function(x) stan("Stream Biomass files/functions and stans/Stan_ProductivityModel1_STS_recovery_simulation.stan",
+                                            data=x,chains=4,iter=1000,
                                             control=list(max_treedepth=12, adapt_delta = 0.95)))
 
 #LBTS
@@ -207,83 +186,139 @@ init_Ricker <- function(...) {
   list(c = 0.5, s = 1.5)
 }
 recov_LBTS_output <- lapply(stan_LBTS_sim_list,
-                            function(x) stan("Stan_ProductivityModel2_LBTS_recovery_simulation.stan",
-                                             data=x,chains=4,iter=5000,init = init_Ricker,
+                            function(x) stan("Stream Biomass files/functions and stans/Stan_ProductivityModel2_LBTS_recovery_simulation.stan",
+                                             data=x,chains=4,iter=2000,init = init_Ricker,
                                              control=list(max_treedepth=12)))
 
 ## Save parameter recovery model fit
 recovery_model_output <- list(recov_STS_output, recov_LBTS_output)
-saveRDS(recovery_model_output, "./rds files/Param_Rec_Test_recovery_output_2022_07_10.rds")
-rm(recovery_model_output); rm(recov_STS_output); rm(recov_LBTS_output)
+saveRDS(recovery_model_output, "Stream Biomass files/Param_Rec_Test_recovery_output_20240703.rds")
 
 
 #################################################################################
-## (8) Compare parameters from simulation to posterior distributions
+## DNU: (8) Compare parameters from simulation to posterior distributions
 ################################################################################
 
-recovery_model_output <- readRDS("./rds files/Param_Rec_Test_recovery_output_2022_07_10.rds")
-recov_STS_output <- recovery_model_output[[1]]
-recov_LBTS_output <- recovery_model_output[[2]]
+###################################################
+## Run Stan to get parameter estimates - all sites
+###################################################
 
-## STS - vis_recovery
-STS_sim_recp <- lapply(recov_STS_output, function(x) ldply(extract(x, c("phi","alpha","beta","sig_p","sig_o")),data.frame))
-# need STS_sim_recp, and mean_STS from part 4
-STS_vis_recovery <- function(final_distributions, used_parameters, plot.title){
-  
-  ## distributions of most recent fit
-  recpars <- final_distributions
-  colnames(recpars) <- c("parameter","value")
-  
-  ## params used to simulate
-  orig_meanpars <- ldply(used_parameters, data.frame)
-  colnames(orig_meanpars) <- c("parameter","value")
-  
-  
-  ggplot(recpars, aes(value))+
-    geom_density(fill="red", alpha=0.2)+
-    facet_wrap(~parameter, scales = "free")+
-    geom_vline(data=orig_meanpars,aes(xintercept = value))+
-    labs(x="Value",y="Density",title=plot.title)+
-    theme(legend.position = "none",
-          strip.background = element_rect(fill="white", color="black"),
-          strip.text = element_text(size=14),
-          axis.text.x = element_text(size=12, angle = 45, hjust = 0.5),
-          axis.text.y = element_text(size=12),
-          axis.title = element_text(size=14), title = element_text(size=14))
+rstan_options(auto_write=TRUE)
+options(mc.cores=4)
+
+stan_data_compile <- function(x){
+  data <- list(Ndays=length(x$GPP), light = x$light_rel_PAR, GPP = x$GPP,
+               GPP_sd = x$GPP_sd, tQ = x$tQ)
+  return(data)
 }
 
-STS_vis_recovery(STS_sim_recp$Potomac_STS, mean_STS$Potomac, "S-TS Potomac Parameter Recovery")
-STS_vis_recovery(STS_sim_recp$PaintBranch_STS, mean_STS$`Paint Branch`, "S-TS Paint Branch Parameter Recovery")
+stan_data_l <- lapply(complete_list_OG, function(x) stan_data_compile(x))
 
 
-## LBTS - vis_recovery
-LBTS_sim_recp <- lapply(recov_LBTS_output, function(x) ldply(extract(x, c("r","lambda","s","c","sig_p","sig_o")),data.frame))
-# need LBTS_sim_recp, and mean_LBTS from part 4
-LBTS_vis_recovery <- function(final_distributions, used_parameters, plot.title){
+## PM 1 - Standard time series (STS)
+PM_outputlist_AR <- lapply(stan_data_l,
+                           function(x) rstan::stan("Stream Biomass files/functions and stans/Stan_ProductivityModel1_STS.stan",
+                                                   data=x, chains=4, iter=2000,
+                                                   control=list(max_treedepth=12, adapt_delta=0.95)))
+saveRDS(PM_outputlist_AR, "Stream Biomass files/stan_6riv_output_AR_20240703.rds")
+
+
+## PM 2 - Latent Biomass (LBTS)
+init_Ricker <- function(...) {
+  list(c = 0.5, s = 1.5)
+}
+PM_outputlist_Ricker <- lapply(stan_data_l,
+                               function(x) stan("Stream Biomass files/functions and stans/Stan_ProductivityModel2_LBTS.stan",
+                                                data=x, init = init_Ricker, chains=4, iter=2000,
+                                                control=list(max_treedepth=12, adapt_delta=0.95)))
+saveRDS(PM_outputlist_Ricker, "Stream Biomass files/stan_6riv_output_Ricker_20240703.rds")
+
+## Summary of divergent transitions
+PM_outputlist_AR <- readRDS("./rds files/stan_6riv_output_AR_2022_02_22.rds")
+PM_outputlist_Ricker <- readRDS("./rds files/stan_6riv_output_Ricker_2022_02_27.rds")
+
+
+launch_shinystan(PM_outputlist_AR$AM)
+
+launch_shinystan(PM_outputlist_Ricker$AM)
+
+########################################
+#####Biomass WS Predictions#####
+source("Stream Biomass files/functions and stans/Predicted_ProductivityModel_STS.R") # parameters: phi, alpha, beta, sig_p
+source("Stream Biomass files/functions and stans/Predicted_ProductivityModel_LBTS.R") # parameters: r, lambda, s, c, sig_p
+
+# colors
+PM_AR.col <- "#d95f02"
+PM_Ricker.col <- "#7570b3"
+
+## Import stan fits - simulate one at a time
+stan_model_output_AR <- readRDS("Stream Biomass files/stan_6riv_output_AR_2022_02_22.rds")
+stan_model_output_Ricker <- readRDS("Stream Biomass files/stan_6riv_output_Ricker_2022_02_27.rds")
+
+##########################
+## Model 1 Output - S-TS (referred to as "AR" for autoregressive)
+#########################
+names(complete_list_OG); names(stan_model_output_AR)
+AR_list <- Map(c, stan_model_output_AR, complete_list_OG)
+
+AR_sim_fxn <- function(x){
+  #separate data
+  output <- x[[1]]
+  df <- x
   
-  ## distributions of most recent fit
-  recpars <- final_distributions
-  colnames(recpars) <- c("parameter","value")
+  # extract
+  pars1 <- extract(output, c("phi","alpha","beta","sig_p","sig_o"))
+  simmat1<-matrix(NA,length(df$GPP),length(unlist(pars1$phi)))
+  rmsemat1<-matrix(NA,length(df$GPP),1)
   
-  ## params used to simulate
-  orig_meanpars <- ldply(used_parameters, data.frame)
-  colnames(orig_meanpars) <- c("parameter","value")
+  # Simulate
+  for (i in 1:length(pars1$phi)){
+    simmat1[,i]<-PM_AR(pars1$phi[i],pars1$alpha[i],pars1$beta[i],pars1$sig_p[i],pars1$sig_o[i],df)
+    rmsemat1[i]<-sqrt(sum((simmat1[,i]-df$GPP)^2)/length(df$GPP))
+  }
   
+  l <- list(simmat1, rmsemat1)
+  return(l)
   
-  ggplot(recpars, aes(value))+
-    geom_density(fill="red", alpha=0.2)+
-    facet_wrap(~parameter, scales = "free")+
-    geom_vline(data=orig_meanpars,aes(xintercept = value))+
-    labs(x="Value",y="Density",title=plot.title)+
-    theme(legend.position = "none",
-          strip.background = element_rect(fill="white", color="black"),
-          strip.text = element_text(size=14),
-          axis.text.x = element_text(size=12, angle = 45, hjust = 0.5),
-          axis.text.y = element_text(size=12),
-          axis.title = element_text(size=14), title = element_text(size=14))
 }
 
-LBTS_vis_recovery(LBTS_sim_recp$Potomac_LBTS, mean_LBTS$Potomac, "LB-TS Potomac Parameter Recovery")
-LBTS_vis_recovery(LBTS_sim_recp$PaintBranch_LBTS, mean_LBTS$`Paint Branch`, "LB-TS Paint Branch Parameter Recovery")
+#test <- AR_sim_fxn(AR_list$nwis_01608500)
+AR_sim <- lapply(AR_list, function(x) AR_sim_fxn(x))
 
+## Save simulation
+saveRDS(AR_sim, "Stream Biomass files/Sim_6riv_AR_ws_2022_02_27.rds")
+
+
+###############################
+## Model 2 Output - LB-TS (also referred to as Ricker)
+###############################
+names(complete_list_OG); names(stan_model_output_Ricker)
+Ricker_list <- Map(c, stan_model_output_Ricker, complete_list_OG[(names(stan_model_output_Ricker))])
+
+Ricker_sim_fxn <- function(x){
+  #separate data
+  output <- x[[1]]
+  complete_list_OG <- x
+  
+  # extract
+  pars3<-extract(output, c("r","lambda","s","c","B","P","pred_GPP","sig_p","sig_o"))
+  simmat3<-matrix(NA,length(complete_list_OG$GPP),length(unlist(pars3$sig_p)))
+  biomat3<-matrix(NA,length(complete_list_OG$GPP),length(unlist(pars3$sig_p)))
+  rmsemat3<-matrix(NA,length(complete_list_OG$GPP),1)
+  #Simulated
+  for (i in 1:length(pars3$r)){
+    simmat3[,i]<-PM_Ricker(pars3$r[i],pars3$lambda[i],pars3$s[i],pars3$c[i],pars3$sig_p[i],pars3$sig_o[i],df)
+    biomat3[,i]<-PM_Ricker_B(pars3$r[i],pars3$lambda[i],pars3$s[i],pars3$c[i],pars3$sig_p[i],pars3$sig_o[i],df)
+    rmsemat3[i]<-sqrt(sum((simmat3[,i]-df$GPP)^2)/length(df$GPP))
+  }
+  
+  l <- list(simmat3, rmsemat3, biomat3)
+  return(l)
+  
+}
+
+Ricker_sim <- lapply(Ricker_list, function(x) Ricker_sim_fxn(x))
+
+## Save simulation
+saveRDS(Ricker_sim, "Stream Biomass files/Sim_6riv_Ricker_ws_2022_02_27.rds")
 
