@@ -1,31 +1,21 @@
 lapply(c("plyr","dplyr","ggplot2","cowplot","lubridate",
          "parallel","tidyverse","rstan","devtools","shinystan",
          "MCMCglmm"), require, character.only=T)
-library(streamMetabolizer)
 
 #############################
 #1. Create required dataset####
 ############################
-chem <- read_csv("02_Clean_data/master_chem1.csv") #for temp
-Q <- read_csv("02_Clean_data/discharge.csv") # for discharge
-
-####eventually the light section wont be needed
-
-met <- read_csv("02_Clean_data/master_metabolism4.csv") #GPP data
-met<-left_join(met, light, by=c('Date','ID'))
-
+met <- read_csv("02_Clean_data/master_onestation.csv") #GPP data
+unique(met.SL$ID)
 SL <- readRDS("Stream Biomass files/Outputs/StreamLight_daily.rds") #Stream Light
-
 met.SL <- left_join(met, SL, by=c("ID", "Date"))
-met.SL <- met.SL[!duplicated(met.SL[c('Date','ID')]),]
-met.SL <- met.SL[complete.cases(met.SL[ , c('GPP','Temp','Q_m.s','PAR_surface','light')]), ]
+met.SL<-met.SL%>%rename('GPP'='GPPavg')
+met.SL <- met.SL[complete.cases(met.SL[ , c('GPP', 'Temp', 'light','PAR_surface','Q_m.s')]), ]
 
-site_order_list <- c("IU","ID","GB",
+site_order_list <- c("LF","ID","GB",
                      "LF","AM","OS")
 met.SL[which(met.SL$GPP < 0),]$GPP <- sample(exp(-3):exp(-2), 1)
-met.SL<-met.SL %>% group_by(ID)%>% mutate(GPP_sd=sd(GPP, na.rm = T))
-#met.SL$GPP_sd <- (((met.SL$GPP.upper - met.SL$GPP)/1.96) + ((met.SL$GPP.lower - met.SL$GPP)/-1.96))/2
-
+met.SL$GPP_sd <- (((met.SL$GPP_97.5pct - met.SL$GPP)/1.96) + ((met.SL$GPP_2.5pct - met.SL$GPP)/-1.96))/2
 met.SL<-filter(met.SL, Date< '2023-05-12') #select for the first year
 
 l <- split(met.SL, met.SL$ID)
@@ -47,7 +37,6 @@ stan_data_compile_PAR <- function(x){
                GPP_sd = x$GPP_sd, tQ = x$tQ)
   return(data)
 }
-
 stan_data_PAR <- lapply(complete_list_OG, function(x) stan_data_compile_PAR(x))
 
 ###############################
@@ -58,20 +47,32 @@ options(mc.cores= 6)
 # parallel::detectCores()
 
 ## S-TS model
-STS_output_PAR <- lapply(stan_data_PAR,
-                         function(x) stan("Stream Biomass files/functions and stans/Stan_ProductivityModel1_STS.stan",
-                                          data=x,chains=4,iter=1000,
-                                          control=list(max_treedepth=12, adapt_delta = 0.95)))
+# STS_output_PAR_1000 <- lapply(stan_data_PAR,
+#                          function(x) stan("Stream Biomass files/functions and stans/Stan_ProductivityModel1_STS.stan",
+#                                           data=x,chains=4,iter=1000,
+#                                           control=list(max_treedepth=12, adapt_delta = 0.95)))
+
+STS_output_PAR<- lapply(stan_data_PAR,
+                              function(x) stan("Stream Biomass files/functions and stans/Stan_ProductivityModel1_STS.stan",
+                                               data=x,chains=4,iter=7000,
+                                               control=list(max_treedepth=12, adapt_delta = 0.95)))
+
 
 ## LB-TS model
 init_Ricker <- function(...) {
   list(c = 0.5, s = 1.5)
 }
 
-LBTS_output_PAR <- lapply(stan_data_PAR,
+# LBTS_output_PAR_1000 <- lapply(stan_data_PAR,
+#                           function(x) stan("Stream Biomass files/functions and stans/Stan_ProductivityModel2_LBTS.stan",
+#                                            data=x,chains=4,iter=1000,init = init_Ricker,
+#                                            control=list(max_treedepth=12, adapt_delta = 0.95)))
+
+LBTS_output_PAR<- lapply(stan_data_PAR,
                           function(x) stan("Stream Biomass files/functions and stans/Stan_ProductivityModel2_LBTS.stan",
-                                           data=x,chains=4,iter=1000,init = init_Ricker,
+                                           data=x,chains=4,iter=7000,init = init_Ricker,
                                            control=list(max_treedepth=12, adapt_delta = 0.95)))
+
 
 ## Save initial model fit
 init_model_output <- list(STS_output_PAR, LBTS_output_PAR)
@@ -84,8 +85,8 @@ STS_output_PAR <- init_model_output[[1]]
 LBTS_output_PAR <- init_model_output[[2]]
 
 
-p_STS <- lapply(STS_output_PAR, function(x) extract(x, c("phi","alpha","beta","sig_p","sig_o")))
-p_LBTS<- lapply(LBTS_output_PAR, function(x) extract(x, c("r","lambda","s","c","sig_p","sig_o")))
+p_STS <- lapply(STS_output_PAR_5000, function(x) extract(x, c("phi","alpha","beta","sig_p","sig_o")))
+p_LBTS<- lapply(LBTS_output_PAR_5000, function(x) extract(x, c("r","lambda","s","c","sig_p","sig_o")))
 
 mean_STS <- lapply(p_STS, function(x) lapply(x, function(y) mean(y)))
 sd_STS <- lapply(p_STS, function(x) lapply(x, function(y) sd(y)))
@@ -107,15 +108,15 @@ AM_STS_GPP <- PM_AR(phi=mean_STS$AM$phi,
                      sig_p=mean_STS$AM$sig_p,
                      sig_o=mean_STS$AM$sig_o, 
                     df=complete_list_OG$AM)
-IU_STS_GPP <- PM_AR(phi=mean_STS$IU$phi,
-                       alpha=mean_STS$IU$alpha,
-                       beta=mean_STS$IU$beta,
-                       sig_p=mean_STS$IU$sig_p,
-                       sig_o=mean_STS$IU$sig_o, df=complete_list_OG$IU)
+LF_STS_GPP <- PM_AR(phi=mean_STS$LF$phi,
+                       alpha=mean_STS$LF$alpha,
+                       beta=mean_STS$LF$beta,
+                       sig_p=mean_STS$LF$sig_p,
+                       sig_o=mean_STS$LF$sig_o, df=complete_list_OG$LF)
 # plot(1:length(AM_STS_GPP), AM_STS_GPP, type="l") #better
 # points(complete_list_OG$AM$GPP) 
-# plot(1:length(IU_STS_GPP), IU_STS_GPP, type="l")
-# points(complete_list_OG$IU$GPP) 
+# plot(1:length(LF_STS_GPP), LF_STS_GPP, type="l")
+# points(complete_list_OG$LF$GPP) 
 
 ## LBTS - simulate GPP again for recovery test data set
 AM_LBTS_GPP <- PM_Ricker(r = mean_LBTS$AM$r,
@@ -124,16 +125,16 @@ AM_LBTS_GPP <- PM_Ricker(r = mean_LBTS$AM$r,
                           c = mean_LBTS$AM$c, 
                           sig_p = mean_LBTS$AM$sig_p,
                           sig_o = mean_LBTS$AM$sig_o, df = complete_list_OG$AM)
-IU_LBTS_GPP <- PM_Ricker(r = mean_LBTS$IU$r,
-                            lambda = mean_LBTS$IU$lambda,
-                            s = mean_LBTS$IU$s,
-                            c = mean_LBTS$IU$c, 
-                            sig_p = mean_LBTS$IU$sig_p,
-                            sig_o = mean_LBTS$IU$sig_o, df = complete_list_OG$IU)
-# plot(1:length(AM_LBTS_GPP), AM_LBTS_GPP, type="l")
-# points(complete_list_OG$AM$GPP) #bad
-# plot(1:length(IU_LBTS_GPP), IU_LBTS_GPP, type="l")
-# points(complete_list_OG$IU$GPP) #why is it so hight??
+LF_LBTS_GPP <- PM_Ricker(r = mean_LBTS$LF$r,
+                            lambda = mean_LBTS$LF$lambda,
+                            s = mean_LBTS$LF$s,
+                            c = mean_LBTS$LF$c, 
+                            sig_p = mean_LBTS$LF$sig_p,
+                            sig_o = mean_LBTS$LF$sig_o, df = complete_list_OG$LF)
+plot(1:length(AM_LBTS_GPP), AM_LBTS_GPP, type="l")
+points(complete_list_OG$AM$GPP) #bad
+plot(1:length(LF_LBTS_GPP), LF_LBTS_GPP, type="l")
+points(complete_list_OG$LF$GPP) #why is it so hight??
 
 #############################################################################
 ## (6) Replace original GPP with predicted GPP in stan data list
@@ -146,14 +147,14 @@ stan_simAM_STS <- list(Ndays=length(AM_STS_GPP),
                         prior_sig_o_mean = mean_STS$AM$sig_o,
                         prior_sig_o_sd = sd_STS$AM$sig_o, 
                        tQ = complete_list_OG$AM$tQ)
-stan_simIU_STS <- list(Ndays=length(IU_STS_GPP), 
-                       light=complete_list_OG$IU$light_rel_PAR, 
-                       GPP = IU_STS_GPP,
-                          prior_sig_o_mean = mean_STS$IU$sig_o,
-                          prior_sig_o_sd = sd_STS$IU$sig_o, 
-                       tQ = complete_list_OG$IU$tQ)
+stan_simLF_STS <- list(Ndays=length(LF_STS_GPP), 
+                       light=complete_list_OG$LF$light_rel_PAR, 
+                       GPP = LF_STS_GPP,
+                          prior_sig_o_mean = mean_STS$LF$sig_o,
+                          prior_sig_o_sd = sd_STS$LF$sig_o, 
+                       tQ = complete_list_OG$LF$tQ)
 stan_STS_sim_list <- list("AM_STS"=stan_simAM_STS,
-                          "IU_STS"=stan_simIU_STS)
+                          "LF_STS"=stan_simLF_STS)
 
 stan_simAM_LBTS <- list(Ndays=length(AM_LBTS_GPP), 
                         light=complete_list_OG$AM$light_rel_PAR, 
@@ -161,13 +162,19 @@ stan_simAM_LBTS <- list(Ndays=length(AM_LBTS_GPP),
                          prior_sig_o_mean = mean_LBTS$AM$sig_o,
                          prior_sig_o_sd = sd_LBTS$AM$sig_o, 
                         tQ = complete_list_OG$AM$tQ)
-stan_simIU_LBTS <- list(Ndays=length(IU_LBTS_GPP), 
-                        light=complete_list_OG$IU$light_rel_PAR, GPP = IU_LBTS_GPP,
-                           prior_sig_o_mean = mean_LBTS$IU$sig_o,
-                           prior_sig_o_sd = sd_LBTS$IU$sig_o, 
-                        tQ = complete_list_OG$IU$tQ)
+stan_simLF_LBTS <- list(Ndays=length(LF_LBTS_GPP), 
+                        light=complete_list_OG$LF$light_rel_PAR, GPP = LF_LBTS_GPP,
+                           prior_sig_o_mean = mean_LBTS$LF$sig_o,
+                           prior_sig_o_sd = sd_LBTS$LF$sig_o, 
+                        tQ = complete_list_OG$LF$tQ)
 stan_LBTS_sim_list <- list("AM_LBTS"=stan_simAM_LBTS,
-                           "IU_LBTS"=stan_simIU_LBTS)
+                           "LF_LBTS"=stan_simLF_LBTS)
+
+
+plot(1:length(AM_LBTS_GPP), AM_LBTS_GPP, type="l")
+points(complete_list_OG$AM$GPP) #bad
+plot(1:length(LF_LBTS_GPP), LF_LBTS_GPP, type="l")
+points(complete_list_OG$LF$GPP) #why is it so hight??
 
 ###########################################################################
 ## (7) Fit models to simulated data from initial parameter estimates

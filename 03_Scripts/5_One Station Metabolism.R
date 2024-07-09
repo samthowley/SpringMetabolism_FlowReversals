@@ -362,15 +362,28 @@ depth<-depth[,-c(6)]
 master<-left_join(metabolism,depth,by=c('ID','day', 'month', 'year'))
 
 #For Biomass analysis#########
+chem <- read_csv("02_Clean_data/master_chem1.csv") #for temp
+chem<-chem %>% mutate(day=day(Date), month=month(Date), year=year(Date))
+
 onestation<- read_csv("04_Outputs/master_metabolizer_onestation.csv")
 onestation<-onestation %>% mutate(day=day(Date), month=month(Date), year=year(Date))
-
+unique(onestation$ID)
 Q<-read_csv("02_Clean_data/discharge.csv")
 Q<-Q %>%select(Date, ID, Q_m.s) %>% mutate(day=day(Date), month=month(Date), year=year(Date))
 Q<-Q[,-1]
-biomass_master<-left_join(onestation,Q,by=c('ID','day', 'month', 'year'))
+biomass_1<-left_join(onestation,Q,by=c('ID','day', 'month', 'year'))
+biomass_1<-biomass_1[,-1]
+biomass_1<-left_join(chem,biomass_1,by=c('ID','day', 'month', 'year'))
+biomass_1 <- biomass_1[!duplicated(biomass_1[c('Date','ID')]),]
 
-sites<-split(biomass_master,biomass_master$ID)
+twostation<- read_csv("02_Clean_data/master_metabolism4.csv")
+twostation<-twostation %>% mutate(day=day(Date), month=month(Date), year=year(Date))
+biomass_2<-left_join(twostation,Q,by=c('ID','day', 'month', 'year'))
+biomass_2<-left_join(chem,biomass_2,by=c('ID','day', 'month', 'year'))
+biomass_2 <- biomass_2[!duplicated(biomass_2[c('Date','ID')]),]
+
+unique(biomass_1$ID)
+sites<-split(biomass_1,biomass_1$ID)
 #names(sites)
 AM<-sites[[1]]
 GB<-sites[[2]]
@@ -387,13 +400,12 @@ light_calc <- function(site, Lat, Lon){
 IU<-light_calc(IU, site_locs$Lat[1], site_locs$Lat[1])
 ID<-light_calc(ID, site_locs$Lat[2], site_locs$Lat[2])
 GB<-light_calc(GB, site_locs$Lat[3], site_locs$Lat[3])
-LF<-light_calc(IU, site_locs$Lat[4], site_locs$Lat[4])
+LF<-light_calc(LF, site_locs$Lat[4], site_locs$Lat[4])
 AM<-light_calc(AM, site_locs$Lat[5], site_locs$Lat[5])
 OS<-light_calc(OS, site_locs$Lat[6], site_locs$Lat[6])
 
 light<-rbind(IU, ID, GB, LF, AM, OS)
 light$light[light$light<=0]<-NA
 light<-light %>%mutate(Date=as.Date(Date)) %>% group_by(Date, ID) %>% mutate(light=mean(light, na.rm=T))
-
+unique(light$ID)
 write_csv(light, "02_Clean_data/master_onestation.csv")
-names(master)
