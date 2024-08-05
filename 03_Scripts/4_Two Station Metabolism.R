@@ -10,7 +10,6 @@ library("hydroTSM")
 library(mmand)
 library(imputeTS)
 library(dataRetrieval)
-library(streamMetabolizer)
 library(tools)
 library(cowplot)
 
@@ -162,7 +161,7 @@ two_station_forRecovery<- function(spring) {
 data_retrieval <- function(parameterCd, ventID) {
 
   startDate <- "2022-04-12"
-  endDate <- "2024-06-25"
+  endDate <- "2024-07-25"
 
   vent_15sec<-readNWISuv(ventID,parameterCd,startDate,endDate)
   vent_15sec<-vent_15sec[,-c(1,2,5,7,8)]
@@ -206,12 +205,10 @@ GB1<- GB%>%filter(DO >3.5, Date>'2022-05-20', DO<8.5)
 
 GB_recov<-two_station_forRecovery(GB1)
 
-a<-ggplot(GB_recov, aes(x=Date)) +
-  geom_line(aes(y=ER),size=1)
-b<-ggplot(GB_recov, aes(x=Date)) +
-  geom_line(aes(y=depth),size=1)
-c<-ggplot(GB_recov, aes(x=Date)) +geom_line(aes(y=DO),size=1)
-plot_grid(a,b,c, ncol=1)
+# a<-ggplot(GB_recov, aes(x=Date)) +geom_line(aes(y=ER),size=1)
+# b<-ggplot(GB_recov, aes(x=Date)) +geom_line(aes(y=depth),size=1)
+# c<-ggplot(GB_recov, aes(x=Date)) +geom_line(aes(y=DO),size=1)
+# plot_grid(a,b,c, ncol=1)
 
 write_csv(GB_recov, "04_Outputs/one station inputs/not parsed/GB.csv")
 
@@ -257,14 +254,10 @@ met_output<-two_station(AllenMill1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date)) +
-  geom_line(aes(y=ER),size=1)+
- #geom_hline(yintercept=(0.4))
-geom_line(aes(y=DO*2),size=1, color='darkred')
-# 
-# ggplot(one, aes(x=Date)) +
-#   geom_line(aes(y=ER),size=1)+
-#   geom_hline(yintercept=-35)
+# ggplot(two, aes(x=Date))+ geom_line(aes(y=ER),size=1)+geom_hline(yintercept=(0.4))+
+#   geom_line(aes(y=DO*2),size=1, color='darkred')
+
+# ggplot(one, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept=-35)
 
 write_csv(two, "04_Outputs/two station results/AM.csv")
 write_csv(one, "04_Outputs/one station inputs/AM.csv")
@@ -296,22 +289,17 @@ LF<-LF%>% filter(DO>1.2)
 
 LF_recov<-two_station_forRecovery(LF)
 
-ggplot(LF_recov, aes(x=Date)) +
-  geom_line(aes(y=ER),size=1)
+#ggplot(LF_recov, aes(x=Date)) + geom_line(aes(y=ER),size=1)
 
 write_csv(LF_recov, "04_Outputs/one station inputs/not parsed/LF.csv")
 met_output<-two_station(LF)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-# ggplot(two, aes(x=Date)) +
-#   geom_line(aes(y=ER, color="ER"),size=1)+
-#   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+
-#   geom_hline(yintercept = -30)
-# ggplot(one, aes(x=Date)) +
-#   geom_line(aes(y=ER, color="ER"),size=1)+
-#   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+
-#   geom_hline(yintercept = -30)
+# ggplot(two, aes(x=Date)) +geom_line(aes(y=ER, color="ER"),size=1)+
+#   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
+# ggplot(one, aes(x=Date)) +geom_line(aes(y=ER, color="ER"),size=1)+
+#   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
 
 
 write_csv(two, "04_Outputs/two station results/LF.csv")
@@ -355,8 +343,7 @@ met_output<-two_station_ID(ID1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(one, aes(x=Date)) +
-  geom_line(aes(y=L_max),size=0.4)
+#ggplot(one, aes(x=Date)) +geom_line(aes(y=L_max),size=0.4)
 
 write_csv(two, "04_Outputs/two station results/ID.csv")
 write_csv(one, "04_Outputs/one station inputs/ID.csv")
@@ -421,7 +408,7 @@ IUmet<-read_csv("04_outputs/Stream metabolizer results/IU.csv")
 IUmet<-IUmet %>% mutate(day=day(Date), month=month(Date), year=year(Date))
 
 startDate <- "2022-05-02"
-endDate <- "2024-06-17"
+endDate <- "2024-07-25"
 parameterCd <- c('00060','00065')
 ventID<-'02322700'
 
@@ -435,7 +422,6 @@ IU_recov<-IU_recov %>% mutate(width=28, ID="IU")
 IU_recov<-IU_recov[,x]
 
 recovery<-rbind(recovery,OS_recov,IU_recov) #ID_recov
-
 write_csv(recovery, "02_Clean_data/discharge.csv")
 
 

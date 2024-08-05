@@ -74,7 +74,7 @@ SpC_formatted <- function(fil) {
   colnames(SpC)[2] <- "SpC"
   SpC$ID<-strsplit(basename(fil), '_')[[1]][1]
   SpC$SpC[SpC$SpC>600]<-NA
-  SpC$SpC[SpC$SpC<]<-NA
+  SpC$SpC[SpC$SpC<30]<-NA
   
   return(SpC)}
 SpC_unformatted <- function(fil) {
@@ -205,7 +205,7 @@ write_csv(SpC_everything, "02_Clean_data/Chem/SpC.csv")
 ###IU####
 library(dataRetrieval)
 startDate <- "2024-06-18"
-endDate <- "2024-06-25"
+endDate <- "2024-07-25"
 parameterCd <- c('00010','00300','00095','00400')
 ventID<-'02322700'
 
@@ -218,7 +218,7 @@ IU<-IU %>% rename('Date'='dateTime', 'Temp'='X_00010_00000',
   filter(min==0)
 IU$ID<-'IU'
 IU<-IU[,c("Date", "DO","Temp", "ID","CO2","pH","SpC","min" )]
-write_csv(IU, "01_Raw_data/IU/IU_0625.csv")
+write_csv(IU, "01_Raw_data/IU/IU_0725.csv")
 
 IU<-data.frame()
 file.names <- list.files(path="01_Raw_data/IU", pattern=".csv", full.names=TRUE)

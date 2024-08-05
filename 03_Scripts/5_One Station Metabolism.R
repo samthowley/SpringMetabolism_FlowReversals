@@ -10,6 +10,8 @@ library("hydroTSM")
 library(imputeTS)
 library(streamMetabolizer)
 library(dataRetrieval)
+library(lme4)
+
 #functions####
 bins<- function(site) {
   site<- site %>% mutate(Q_m.s=abs(Q_m.s), K600_1d=abs(K600_1d))
@@ -143,14 +145,12 @@ GB_output<-read_csv("04_Outputs/one station outputs/GB.csv")
 GB2 <- read_csv("04_Outputs/two station results/GB.csv")
 GB<-compile(GB_output, GB2)
 GB$ID<-'GB'
-
-ggplot(data=GB, aes(x=Date)) +geom_line(aes(y=GPPavg), size=1, color='darkgreen')
-
+#ggplot(data=GB, aes(x=Date)) +geom_line(aes(y=GPPavg), size=1, color='darkgreen')
 write_csv(GB, "04_Outputs/Stream metabolizer results/GB.csv")
 
 #all one station
 GB_input <- read_csv("04_Outputs/one station inputs/not parsed/GB.csv")
-#GB_input<-filter(GB_input, Date>'2024-05-04') #last time we ran SM
+GB_input<-filter(GB_input, Date>'2024-05-04') #last time we ran SM
 GB_output<-notparsed_metabolism(GB_input)
 GB_output$ID<-'GB'
 write_csv(GB_output, "04_Outputs/Stream metabolizer results/not parsed/GB/GB_07042024_all.csv")
@@ -361,30 +361,7 @@ depth<-depth %>%mutate(day=day(Date), month=month(Date), year=year(Date))
 depth<-depth[,-c(6)]
 master<-left_join(metabolism,depth,by=c('ID','day', 'month', 'year'))
 
-#For Biomass analysis#########
-chem <- read_csv("02_Clean_data/master_chem1.csv") #for temp
-chem<-chem %>% mutate(day=day(Date), month=month(Date), year=year(Date))
-
-onestation<- read_csv("04_Outputs/master_metabolizer_onestation.csv")
-onestation<-onestation %>% mutate(day=day(Date), month=month(Date), year=year(Date))
-unique(onestation$ID)
-Q<-read_csv("02_Clean_data/discharge.csv")
-Q<-Q %>%select(Date, ID, Q_m.s) %>% mutate(day=day(Date), month=month(Date), year=year(Date))
-Q<-Q[,-1]
-biomass_1<-left_join(onestation,Q,by=c('ID','day', 'month', 'year'))
-biomass_1<-biomass_1[,-1]
-biomass_1<-left_join(chem,biomass_1,by=c('ID','day', 'month', 'year'))
-biomass_1 <- biomass_1[!duplicated(biomass_1[c('Date','ID')]),]
-
-twostation<- read_csv("02_Clean_data/master_metabolism4.csv")
-twostation<-twostation %>% mutate(day=day(Date), month=month(Date), year=year(Date))
-biomass_2<-left_join(twostation,Q,by=c('ID','day', 'month', 'year'))
-biomass_2<-left_join(chem,biomass_2,by=c('ID','day', 'month', 'year'))
-biomass_2 <- biomass_2[!duplicated(biomass_2[c('Date','ID')]),]
-
-unique(biomass_1$ID)
-sites<-split(biomass_1,biomass_1$ID)
-#names(sites)
+sites<-split(master,master$ID)
 AM<-sites[[1]]
 GB<-sites[[2]]
 ID<-sites[[3]]
@@ -392,20 +369,20 @@ IU<-sites[[4]]
 LF<-sites[[5]]
 OS<-sites[[6]]
 
-site_locs<- read_csv("Stream Biomass files/site_locs.csv") #calc light
-light_calc <- function(site, Lat, Lon){
-  site$solar.time <-as.POSIXct(site$Date, format="%Y-%m-%d %H:%M:%S", tz="UTC")
-  site$light<-calc_light(site$solar.time,  Lat, Lon)
-  return(site)}
-IU<-light_calc(IU, site_locs$Lat[1], site_locs$Lat[1])
-ID<-light_calc(ID, site_locs$Lat[2], site_locs$Lat[2])
-GB<-light_calc(GB, site_locs$Lat[3], site_locs$Lat[3])
-LF<-light_calc(LF, site_locs$Lat[4], site_locs$Lat[4])
-AM<-light_calc(AM, site_locs$Lat[5], site_locs$Lat[5])
-OS<-light_calc(OS, site_locs$Lat[6], site_locs$Lat[6])
 
-light<-rbind(IU, ID, GB, LF, AM, OS)
-light$light[light$light<=0]<-NA
-light<-light %>%mutate(Date=as.Date(Date)) %>% group_by(Date, ID) %>% mutate(light=mean(light, na.rm=T))
-unique(light$ID)
-write_csv(light, "02_Clean_data/master_onestation.csv")
+rC <- lmList(logQ ~ logh | ID, data=DG_rC)
+(cf <- coef(rC))
+
+depth<-read_csv('02_Clean_data/depth.csv')
+depth <- depth %>%
+  mutate(Q= case_when(
+    ID== '13'~ (10^cf[1,1]) *depth^(cf[1,2]),
+    ID== '14'~ (10^cf[2,1]) *depth^(cf[2,2]),
+    ID== '15'~ (10^cf[3,1]) *depth^(cf[3,2]),
+    ID== '3'~ (10^cf[4,1]) *depth^(cf[4,2]),
+    ID== '5'~ (10^cf[5,1]) *depth^(cf[5,2]),
+    ID== '5a'~ (10^cf[6,1]) *depth^(cf[6,2]),
+    ID== '6'~ (10^cf[7,1]) *depth^(cf[7,2]),
+    ID== '6a'~ (10^cf[8,1]) *depth^(cf[8,2]),
+    ID== '7'~ (10^cf[9,1]) *depth^(cf[9,2]),
+    ID== '9'~ (10^cf[10,1]) *depth^(cf[10,2])))
