@@ -140,7 +140,6 @@ bayes_specs<-bins(GB_input)
 GB_output<-metabolism(GB_input)
 write_csv(GB_output, "04_Outputs/one station outputs/GB.csv")
 
-
 GB_output<-read_csv("04_Outputs/one station outputs/GB.csv")
 GB2 <- read_csv("04_Outputs/two station results/GB.csv")
 GB<-compile(GB_output, GB2)
