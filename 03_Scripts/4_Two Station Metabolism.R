@@ -110,12 +110,10 @@ two_station_ID<- function(spring) {
   
   spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
   
-  #for ID
   spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
     mutate(u_md=u_mh*24) %>%
     mutate(L_max=(u_md*3)/K600_1d) %>%
-    group_by(day,Month,year) %>%
-    mutate(L_max=max(L_max, na.rm=T)- length*2)
+    group_by(day,Month,year)
   
   
   spring1 <- spring %>%
@@ -205,17 +203,15 @@ GB1<- GB%>%filter(DO >3.5, Date>'2022-05-20', DO<8.5)
 
 GB_recov<-two_station_forRecovery(GB1)
 
-# a<-ggplot(GB_recov, aes(x=Date)) +geom_line(aes(y=ER),size=1)
-# b<-ggplot(GB_recov, aes(x=Date)) +geom_line(aes(y=depth),size=1)
-# c<-ggplot(GB_recov, aes(x=Date)) +geom_line(aes(y=DO),size=1)
-# plot_grid(a,b,c, ncol=1)
-
 write_csv(GB_recov, "04_Outputs/one station inputs/not parsed/GB.csv")
-
-met_output<-two_station(GB)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
+
+# a<-ggplot(two, aes(x=Date)) +geom_line(aes(y=ER),size=1)
+# b<-ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=1)
+# c<-ggplot(two, aes(x=Date)) +geom_line(aes(y=DO),size=1)
+# plot_grid(a,b,c, ncol=1)
 
 write_csv(two, "04_Outputs/two station results/GB.csv")
 write_csv(one, "04_Outputs/one station inputs/GB.csv")
@@ -254,11 +250,11 @@ met_output<-two_station(AllenMill1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-# ggplot(two, aes(x=Date))+ geom_line(aes(y=ER),size=1)+geom_hline(yintercept=(0.4))+
-#   geom_line(aes(y=DO*2),size=1, color='darkred')
+a<-ggplot(two, aes(x=Date))+ geom_line(aes(y=ER),size=1)+geom_hline(yintercept=(0.4))+
+  geom_line(aes(y=DO*2),size=1, color='darkred')
 
-# ggplot(one, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept=-35)
-
+b<-ggplot(one, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept=-35)
+plot_grid(a,b, ncol=1)
 write_csv(two, "04_Outputs/two station results/AM.csv")
 write_csv(one, "04_Outputs/one station inputs/AM.csv")
 
@@ -296,8 +292,8 @@ met_output<-two_station(LF)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-# ggplot(two, aes(x=Date)) +geom_line(aes(y=ER, color="ER"),size=1)+
-#   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
+ ggplot(two, aes(x=Date)) +geom_line(aes(y=ER, color="ER"),size=1)+
+  geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
 # ggplot(one, aes(x=Date)) +geom_line(aes(y=ER, color="ER"),size=1)+
 #   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
 
@@ -331,10 +327,10 @@ rel_k <- lm(k600_1d ~ uh, data=ID_rC)
 (cf <- coef(rel_k))
 ID$K600_1d<- cf[2]*ID$'U/H' + cf[1]
 
-ID1<-ID %>% mutate(depth=depth-0.5) %>%filter(DO<10, DO>3.4)
-#ggplot(ID1, aes(Date, DO)) + geom_line() 
+ID1<-ID %>% mutate(depth=depth-0.5) %>%filter(DO<10)
+ggplot(ID1, aes(Date, DO)) + geom_line() 
 
-ID_recov<-two_station_forRecovery(ID)
+ID_recov<-two_station_forRecovery(ID1)
 
 write_csv(ID_recov, "04_Outputs/one station inputs/not parsed/ID.csv")
 
@@ -343,9 +339,9 @@ met_output<-two_station_ID(ID1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-#ggplot(one, aes(x=Date)) +geom_line(aes(y=L_max),size=0.4)
+ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=0.4)
 
-write_csv(two, "04_Outputs/two station results/ID.csv")
+write_csv(two, "04_Outputs/two station reswrite_csv")
 write_csv(one, "04_Outputs/one station inputs/ID.csv")
 ##OS####
 OS <- master %>% filter(ID=='OS')

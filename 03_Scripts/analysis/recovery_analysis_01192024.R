@@ -163,38 +163,37 @@ IU<-IDs[[4]]
 LF<-IDs[[5]]
 OS<-IDs[[6]]
 #AM ####
+AM<- AM %>% mutate(depthID = case_when(
+  depth<0.9 ~ "low",
+  depth>0.9 & depth<1.2 ~ "moderate",
+  depth>=1.2 ~ "high"))
 
-AMFR<- AM %>% mutate(RI = case_when(Date> "2023-01-10" & Date<"2023-04-27"~ 2))
-AMFR<-filter(AMFR, RI==2)
+
+AMFR<- AM %>% mutate(RI = case_when(Date> "2023-01-10" & Date<"2023-04-27"~ 2)) %>% filter(RI==2)
 #ggplot(AMFR, aes(Date))+geom_line(aes(y=depth_diff), size=1)
-AMFR_0223<-check_ratios(AMFR)
-AMFR_0223<-AMFR_0223 %>% filter(count<90)
+AMFR_0223<-check_ratios(AMFR)%>% filter(count<90)
 #ggplot(AMFR_0223, aes(x=count,y=ERmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_0223<-recovery_calc_FR(AMFR_0223))
 
 
-AMFR<- AM %>% mutate(RI = case_when(Date> "2023-06-03" & Date<"2023-07-20"~ 2))
-AMFR<-filter(AMFR, RI==2)
+AMFR<- AM %>% mutate(RI = case_when(Date> "2023-06-03" & Date<"2023-07-20"~ 2))%>% filter(RI==2)
 #ggplot(AMFR, aes(Date))+geom_line(aes(y=ER), size=1)
 AMFR_0623<-check_ratios(AMFR)
 #ggplot(AMFR_0623, aes(x=count,y=GPPmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_0623<-recovery_calc(AMFR_0623))
 
 
-AMFR<- AM %>% mutate(RI = case_when(
-  Date> "2023-07-20" & Date<"2023-10-31"~ 2))
-AMFR<-filter(AMFR, RI==2)
+AMFR<- AM %>% mutate(RI = case_when(Date> "2023-07-20" & Date<"2023-10-31"~ 2))%>% filter(RI==2)
 #ggplot(AMFR, aes(Date))+geom_line(aes(y=depth), size=1)
 AMFR_0823<-check_ratios(AMFR)
 #ggplot(AMFR_0823, aes(x=count,y=hmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_0823<-recovery_calc(AMFR_0823))
 
 
-AMFR<- AM %>% mutate(RI = case_when(Date>"2023-11-01" & Date<"2023-12-31"~ 2))
-AMFR<-filter(AMFR, RI==2)
-#ggplot(AMFR, aes(Date))+geom_line(aes(y=depth), size=1)
+AMFR<- AM %>% mutate(RI = case_when(Date>"2023-11-01"~2))%>% filter(RI==2) #& Date<"2023-12-31"~ 2))
+ggplot(AMFR, aes(Date))+geom_line(aes(y=depth, color=depthID), size=1)
 AMFR_1223<-check_ratios(AMFR)
-#ggplot(AMFR_1223, aes(x=count,y=GPPmean))+geom_point(size=1)+geom_smooth(method = "lm")
+ggplot(AMFR_1223, aes(x=count,y=GPPmean))+geom_point(size=1)+geom_smooth(method = "lm")
 (AMFR_1223<-recovery_calc_FR(AMFR_1223))
 
 
