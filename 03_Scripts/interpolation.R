@@ -9,6 +9,7 @@ library(ggpmisc)
 library(tidyverse)
 library(readxl)
 library(stats)
+library(minpack.lm)
 
 #functions####
 river_elevation <- function(site_id,parameterCd) {

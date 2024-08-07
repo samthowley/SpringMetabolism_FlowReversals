@@ -92,8 +92,8 @@ ID<-IDs[[3]]
 IU<-IDs[[4]]
 LF<-IDs[[5]]
 OS<-IDs[[6]]
-####GB####
 
+####GB####
 
 GB<- GB %>% mutate(depthID = case_when(
   depth<0.55  ~ "low",
