@@ -149,12 +149,10 @@ recovery_calc_FR <- function(siterecov) {
 
 #data####
 master <- read_csv("02_Clean_data/master_metabolism4.csv")
-master<-master[,c("Date","DO" ,"GPP","ER","depth","ID")]
 
-master<-master %>%group_by(ID) %>% mutate(depth_min=min(depth, na.rm=T))
-master<-master %>%group_by(ID) %>% mutate(depth_diff=depth-depth_min)
-
-master$days<-as.Date(master$Date)
+master<-master %>%select(Date,DO,GPP,ER,depth,ID) %>%group_by(ID) %>% 
+  mutate(depth_min=min(depth, na.rm=T))
+master<-master %>%mutate(depth_diff=depth-depth_min, days=as.Date(Date))
 master <- master[!duplicated(master[c('days', 'ID')]),]
 
 IDs<-split(master,master$ID)

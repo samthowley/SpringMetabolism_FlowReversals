@@ -161,6 +161,7 @@ OS_input$light<-calc_light(OS_input$Date,  29.585, -82.937)
 OS_output<-notparsed_metabolism(OS_input)
 
 OS_output$ID<-'OS'
+OS_output<-OS_output %>%mutate(NEP=GPPavg+ER)%>% select(Date, ER, GPPavg, K600_1d, NEP, ID)
 
 write_csv(OS_output, "04_Outputs/Stream metabolizer results/not parsed/OS.csv")
 write_csv(OS_output, "04_Outputs/Stream metabolizer results/OS.csv")
@@ -171,6 +172,7 @@ bayes_specs<-bins(AM_input)
 AM_onestat<-metabolism(AM_input)
 write_csv(AM_onestat, "04_Outputs/one station outputs/AM.csv")
 
+AM_onestat <- read_csv("04_Outputs/one station outputs/AM.csv")
 AM2 <- read_csv("04_Outputs/two station results/AM.csv")
 AM<-compile(AM_onestat, AM2)
 AM$ID<-'AM'
@@ -186,7 +188,6 @@ LF_input <- read_csv("04_Outputs/one station inputs/LF.csv")
 bayes_specs<-bins(LF_input)
 LF_output<-metabolism(LF_input)
 write_csv(LF_output, "04_Outputs/one station outputs/LF.csv")
-
 
 LF_output<-read_csv("04_Outputs/one station outputs/LF.csv")
 LF2 <- read_csv("04_Outputs/two station results/LF.csv")
@@ -263,6 +264,7 @@ IU_all<-data.frame()
 for(fil in file.names){
   site <- read_csv(fil)
   IU_all<-rbind(IU_all,site)}
+IU_all<-IU_all %>% select(Date, ER, GPPavg, K600_1d, NEP, ID)
 
 
 write_csv(IU_all, "04_Outputs/Stream metabolizer results/IU.csv")
@@ -288,6 +290,7 @@ file.names <- list.files(path="04_Outputs/Stream Metabolizer results/not parsed"
 master_notparsed <- data.frame()
 for(fil in file.names){
   site <- read_csv(fil)
+  site<- site %>% select(Date,ER,GPPavg,K600_1d,NEP,ID)
   master_notparsed<-rbind(master_notparsed,site)}
 
 write_csv(master_notparsed, "04_Outputs/master_metabolizer_onestation.csv")
@@ -306,33 +309,9 @@ metabolism$ER_2 <- ifelse(is.na(metabolism$ER_2), metabolism$ER_1, metabolism$ER
 metabolism<-metabolism %>% mutate(GPP=(GPP_1+GPP_2)/2, ER=(ER_1+ER_2)/2,
                                   day=day(Date), month=month(Date), year=year(Date))
 
-depth<-read_csv("02_Clean_data/master_depth2.csv")
-depth<-depth %>%mutate(day=day(Date), month=month(Date), year=year(Date))
-depth<-depth[,-c(6)]
-master<-left_join(metabolism,depth,by=c('ID','day', 'month', 'year'))
+depth<-read_csv('02_Clean_data/master_depth2.csv')
 
-sites<-split(master,master$ID)
-AM<-sites[[1]]
-GB<-sites[[2]]
-ID<-sites[[3]]
-IU<-sites[[4]]
-LF<-sites[[5]]
-OS<-sites[[6]]
+metabolism<-left_join(metabolism, depth, by=c('Date', 'ID'))
 
+write_csv(metabolism, "02_Clean_data/master_metabolism4.csv")
 
-rC <- lmList(logQ ~ logh | ID, data=DG_rC)
-(cf <- coef(rC))
-
-depth<-read_csv('02_Clean_data/depth.csv')
-depth <- depth %>%
-  mutate(Q= case_when(
-    ID== '13'~ (10^cf[1,1]) *depth^(cf[1,2]),
-    ID== '14'~ (10^cf[2,1]) *depth^(cf[2,2]),
-    ID== '15'~ (10^cf[3,1]) *depth^(cf[3,2]),
-    ID== '3'~ (10^cf[4,1]) *depth^(cf[4,2]),
-    ID== '5'~ (10^cf[5,1]) *depth^(cf[5,2]),
-    ID== '5a'~ (10^cf[6,1]) *depth^(cf[6,2]),
-    ID== '6'~ (10^cf[7,1]) *depth^(cf[7,2]),
-    ID== '6a'~ (10^cf[8,1]) *depth^(cf[8,2]),
-    ID== '7'~ (10^cf[9,1]) *depth^(cf[9,2]),
-    ID== '9'~ (10^cf[10,1]) *depth^(cf[10,2])))
