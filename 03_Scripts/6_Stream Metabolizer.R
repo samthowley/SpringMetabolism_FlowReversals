@@ -259,7 +259,7 @@ IU_all<-data.frame()
 for(fil in file.names){
   site <- read_csv(fil)
   IU_all<-rbind(IU_all,site)}
-IU_all<-IU_all %>% select(Date, ER, GPPavg, K600_1d, NEP, ID)
+IU_all<-IU_all %>% select(Date, ER, GPPavg, K600_1d,GPP_Rhat,ER_Rhat,K600_daily_Rhat,ID)
 
 
 write_csv(IU_all, "04_Outputs/Stream metabolizer results/IU.csv")
@@ -278,29 +278,41 @@ for(fil in file.names){
   master_parsed<-rbind(master_parsed,site)}
 write_csv(master_parsed, "04_Outputs/master_metabolizer_parsed.csv")
 
-#compile one station####
+#compile one station inputs####
 file.names <- list.files(path="04_Outputs/Stream Metabolizer results/not parsed", pattern=".csv", full.names=TRUE)
 master_notparsed <- data.frame()
 for(fil in file.names){
   site <- read_csv(fil)
-  site<- site %>% select(Date,ER,GPPavg,K600_1d,NEP,ID)
   master_notparsed<-rbind(master_notparsed,site)}
+write_csv(master_notparsed, "04_Outputs/master_metabolizer_SM.csv")
 
+#compile one station####
+file.names <- list.files(path="04_Outputs/one station outputs/manual", pattern=".csv", full.names=TRUE)
+onestation <- data.frame()
+for(fil in file.names){
+  site <- read_csv(fil)
+  onestation<-rbind(onestation,site)}
 write_csv(master_notparsed, "04_Outputs/master_metabolizer_onestation.csv")
 
+
 #curate master dataset####
-onestation<- read_csv("04_Outputs/master_metabolizer_onestation.csv")
-onestation<-onestation %>%select(Date, ID, GPPavg, ER, K600_1d)%>%rename('GPP_1'='GPPavg', 'ER_1'='ER', 'K600_1'='K600_1d')
+onestation<- read_csv("04_Outputs/master_metabolizer_SM.csv")
+onestation<-onestation %>%rename('GPP_1'='GPPavg', 'ER_1'='ER', 'K600_1'='K600_1d')
+onestation<- onestation %>% filter(GPP_Rhat> 0.9 & GPP_Rhat<1.05 | ER_Rhat> 0.9 & ER_Rhat<1.05 |
+                                       K600_daily_Rhat> 0.9 & K600_daily_Rhat<1.05)
 
 twostation<- read_csv("04_Outputs/master_metabolizer_parsed.csv")
 twostation<-twostation %>%rename('GPP_2'='GPPavg', 'ER_2'='ER', 'K600_2'='K600_1d')
 
 metabolism<-left_join( onestation, twostation, by=c('ID', 'Date'))
+metabolism <- metabolism[!duplicated(metabolism[c('Date','ID')]),]
+
 metabolism$GPP_2 <- ifelse(is.na(metabolism$GPP_2), metabolism$GPP_1, metabolism$GPP_2)
 metabolism$ER_2 <- ifelse(is.na(metabolism$ER_2), metabolism$ER_1, metabolism$ER_2)
 
 metabolism<-metabolism %>% mutate(GPP=(GPP_1+GPP_2)/2, ER=(ER_1+ER_2)/2,
-                                  day=day(Date), month=month(Date), year=year(Date))
+                                  day=day(Date), month=month(Date), year=year(Date)) %>% 
+  select(Date, GPP_1, GPP_2, GPP, ER_1, ER_2, ER, ID)
 
 depth<-read_csv('02_Clean_data/master_depth2.csv')
 

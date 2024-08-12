@@ -19,6 +19,7 @@ AM_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "AM")
 GB_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "GB")
 OS_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "OS")
 ID_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "ID")
+
 prelim <- function(spring) {
   spring <- spring[complete.cases(spring[ , c('DO', 'Temp', 'depth')]), ]
 
@@ -44,53 +45,10 @@ prelim <- function(spring) {
 
   return(spring)}
 two_station<- function(spring) {
-
-  spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
-  spring$not<-spring$deltaDO_rate-spring$K_reaeration
-  spring$not[spring$not< -37]<- -37
-
-  spring<- spring %>%
-    mutate(hour = hour(Date),day=day(Date),Month=month(Date),year=year(Date))
-
-  spring <- spring %>%mutate(time= case_when(light<=0~ 'ER',light>0~ 'AM'))
-
-  springER<-spring%>% group_by(day,Month,year,time) %>%
-    summarize(ER = mean(not, na.rm=T))
-
-  springER<-filter(springER, time=='ER')
-  spring<-left_join(spring, springER,by=c("day","Month","year"))
-
-  spring$GPP<-spring$not-spring$ER
-  spring$GPP[spring$GPP<0] <- 0
-
-  spring_GPPavg<-spring%>% group_by(day,Month,year) %>%
-    summarize(GPPavg = mean(GPP, na.rm=T))
-
-  spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
-
-  spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
-    mutate(u_md=u_mh*24) %>%
-    mutate(L_max=(u_md*3)/K600_1d) %>%
-    group_by(day,Month,year) %>%
-    mutate(L_max=max(L_max, na.rm=T)- length*2)
-
-  spring1 <- spring %>%
-    mutate(method= case_when(
-      length< L_max ~ '2'))
-  spring1$method[is.na(spring1$method)]<-1
-
-  two<-spring1 %>%group_by(day,Month,year) %>%
-    filter(method== "2" & ER <= -2)
-  one<-spring1 %>%group_by(day,Month,year) %>%
-    filter(method== "1"  | ER > -2)
-
-  return(list(two,one))}
-two_station_ID<- function(spring) {
   
   spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
   spring$not<-spring$deltaDO_rate-spring$K_reaeration
-  spring$not[spring$not< -37]<- -37
-  
+
   spring<- spring %>%
     mutate(hour = hour(Date),day=day(Date),Month=month(Date),year=year(Date))
   
@@ -110,24 +68,20 @@ two_station_ID<- function(spring) {
   
   spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
   
-  spring<-spring %>%rename('u_mh'='velocity_m.h')%>%
-    mutate(u_md=u_mh*24) %>%
-    mutate(L_max=(u_md*3)/K600_1d) %>%
-    group_by(day,Month,year)
+  spring<-spring %>% mutate(u_md=velocity_m.h*24) %>%
+    mutate(L_max=(u_md*3.2)/abs(K600_1d)) 
+    
+  one<-spring %>% filter(L_max<=length) 
+  two<-spring %>% filter(L_max>length)  %>% filter(ER< -2) %>% filter(ER> -30)
   
   
-  spring1 <- spring %>%
-    mutate(method= case_when(
-      length< L_max ~ '2'))
-  spring1$method[is.na(spring1$method)]<-1
+  ggplot(one, aes(x=Date))+  geom_line(aes(y=ER),size=1)
   
-  two<-spring1 %>%group_by(day,Month,year) %>%
-    filter(method== "2" & ER <= -2)
-  one<-spring1 %>%group_by(day,Month,year) %>%
-    filter(method== "1"  | ER > -2)
+
+  
+
   
   return(list(two,one))}
-
 two_station_forRecovery<- function(spring) {
   #spring$K600_1d[spring$K600_1d<0]<-0.1
   #spring$Q_m.s[spring$K600_1d<0]<-0.1
@@ -205,10 +159,12 @@ GB_recov<-two_station_forRecovery(GB1)
 
 write_csv(GB_recov, "04_Outputs/one station inputs/not parsed/GB.csv")
 
+met_output<-two_station(GB1)
+
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-# a<-ggplot(two, aes(x=Date)) +geom_line(aes(y=ER),size=1)
+#ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=1)
 # b<-ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=1)
 # c<-ggplot(two, aes(x=Date)) +geom_line(aes(y=DO),size=1)
 # plot_grid(a,b,c, ncol=1)
@@ -221,16 +177,17 @@ write_csv(one, "04_Outputs/one station inputs/GB.csv")
 AllenMill <- master %>% filter(ID=='AM')
 
 AllenMill$light<-calc_light(AllenMill$Date,  30.155, -83.238)
-length<-520
-width <-24
+length<-600
+width <-20
 area<-length*width
 
 rel_u <- lm(u ~ depth, data=AM_rC)
 (cf <- coef(rel_u))
 AllenMill$"velocity_m.s"<-(AllenMill$depth*cf[2]+cf[1])
 
+
 AllenMill$VentDO<-mean(AM_rC$VentDO, na.rm=T)
-AllenMill$VentDO<-AllenMill$VentDO+3.5
+AllenMill$VentDO<-AllenMill$VentDO+4
 AllenMill$VentTemp_F<-mean(AM_rC$VentTemp, na.rm=T)
 
 AllenMill<-prelim(AllenMill)
@@ -239,19 +196,17 @@ rel_k <- lm(k600_1d ~ uh, data=AM_rC)
 (cf <- coef(rel_k))
 AllenMill$K600_1d<- cf[2]*AllenMill$'U/H' + cf[1]
 
-AllenMill1<- AllenMill %>% filter(DO<10) %>% mutate(depth=depth-0.25)
-#ggplot(AllenMill1, aes(Date, DO)) + geom_line() 
+AllenMill1<- AllenMill %>% filter(DO<10) %>% mutate(depth=depth-1.2)
 
-AM_recov<-two_station_forRecovery(AllenMill1)
-
-write_csv(AM_recov, "04_Outputs/one station inputs/not parsed/AM.csv")
+# AM_recov<-two_station_forRecovery(AllenMill1)
+# 
+# write_csv(AM_recov, "04_Outputs/one station inputs/not parsed/AM.csv")
 met_output<-two_station(AllenMill1)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-a<-ggplot(two, aes(x=Date))+ geom_line(aes(y=ER),size=1)+geom_hline(yintercept=(0.4))+
-  geom_line(aes(y=DO*2),size=1, color='darkred')
+ggplot(two, aes(x=Date))+  geom_line(aes(y=GPPavg),size=1)
 
 b<-ggplot(one, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept=-35)
 plot_grid(a,b, ncol=1)

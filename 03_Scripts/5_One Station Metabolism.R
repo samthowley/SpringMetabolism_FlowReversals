@@ -61,6 +61,8 @@ one_station<- function(spring,min) {
     summarize(GPPavg = mean(GPP, na.rm=T))
 
   spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
+  
+  spring<-spring %>% select(Date, GPPavg, ER, K600_1d)
 
   return(spring)}
 
@@ -89,10 +91,10 @@ AllenMill1<- AllenMill %>% filter(DO<10) %>% mutate(depth=depth-0.25)
 
 AM_met<-one_station(AllenMill1, min)
 
-test<-filter(AM_met, DO<2)
-ggplot(test, aes(Date, ER)) + geom_line() 
+# test<-filter(AM_met, DO<2)
+# ggplot(test, aes(Date, ER)) + geom_line() 
 
-write_csv(one, "04_Outputs/one station outputs/manual/AM.csv")
+write_csv(AM_met, "04_Outputs/one station outputs/manual/AM.csv")
 
 ##OS####
 OS <- master %>% filter(ID=='OS')
@@ -102,27 +104,28 @@ length<-1390
 area<-width*length
 
 OS<-OS %>% select(Date,DO,depth,Temp) %>% mutate(depth=na_interpolation(depth),
-                                                 light=calc_light(Date,30.155,-83.238))
+                                                 light=calc_light(Date,30.155,-83.238),day=as.Date(Date))
 
 OS_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "OS")
 rel_u <- lm(u ~ depth, data=OS_rC)
 (cf <- coef(rel_u))
 OS$"velocity_m.s"<-(OS$depth*cf[2]+cf[1])
 
+
 OS<-prelim(OS)
 
-rel_k <- lm(k600_1d ~ uh, data=OS_rC)
-(cf <- coef(rel_k))
-OS$K600_1d<- cf[2]*OS$'U/H' + cf[1]
-#min(OS_rC$k600_1d, na.rm=T)
-min<-1.32
-ggplot(OS_rC, aes(uh, k600_1d)) + geom_point() 
+OS_sm <- read_csv("04_Outputs/one station outputs/OS.csv")
+OS_sm<-OS_sm%>%rename('day'='Date') %>% select(day, K600_1d)
+OS<-left_join(OS, OS_sm)
+
+min<-min(OS$K600_1d, na.rm=T)
+OS$K600_1d[is.na(OS$K600_1d)]<-min
 
 OS_met<-one_station(OS, min)
 
-test<-filter(OS_met, DO<2)
-ggplot(test, aes(Date, ER)) + geom_line() 
+# test<-filter(OS_met, DO<2)
+# ggplot(test, aes(Date, ER)) + geom_line() 
 
-write_csv(one, "04_Outputs/one station outputs/manual/AM.csv")
+write_csv(OS_met, "04_Outputs/one station outputs/manual/OS.csv")
 
 

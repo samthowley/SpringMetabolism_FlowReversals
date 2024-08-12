@@ -96,7 +96,7 @@ slope_df <- function(site) {
 
 #get data####
 metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
-metabolism<-metabolism[,c('ER', 'ER_1','ER_2','GPP','GPP_1','GPP_2','NEP', 'Date', 'ID')]
+metabolism<-metabolism[,c('ER', 'ER_1','ER_2','GPP','GPP_1','GPP_2', 'Date', 'ID')]
 metabolism<-metabolism %>%rename('day'='Date') %>% mutate(day=as.Date(day))
 depth<-read_csv('02_Clean_data/master_depth2.csv')
 depth$day<-as.Date(depth$Date)
@@ -126,12 +126,7 @@ ER<-master[,c("Date",'depth','depth_diff','ER','ID')]
 ER<-ER %>% rename('prod'='ER') %>% mutate(type='ER', day=as.Date(Date))
 ER <- ER[!duplicated(ER[c('day','ID')]),]
 
-NEP<-master[,c("Date",'depth','depth_diff','NEP','ID')]
-NEP<-NEP %>% rename('prod'='NEP') %>% mutate(type='NEP', day=as.Date(Date))
-NEP <- NEP[!duplicated(NEP[c('day','ID')]),]
-
-master_scatter<-rbind(GPP, ER, NEP)
-master_scatter<-master_scatter %>% filter(type != 'NEP')
+master_scatter<-rbind(GPP, ER)
 
 sites<-split(master_scatter,master_scatter$ID)
 #names(sites)
