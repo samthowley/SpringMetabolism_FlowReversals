@@ -7,7 +7,6 @@ library(ggpmisc)
 library(tidyverse)
 library(readxl)
 library(lme4)
-
 library(nls2)
 
 #constants######
@@ -48,8 +47,7 @@ theme_poster<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
                                 axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
 #get data####
 metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
-metabolism<-metabolism[,c('ER', 'ER_1','ER_2','GPP','GPP_1','GPP_2','NEP', 'Date', 'ID')]
-metabolism<-metabolism %>%rename('day'='Date') %>% mutate(day=as.Date(day))
+metabolism<-metabolism%>%select(ER, ER_1, ER_2, GPP, GPP_1, GPP_2, Date, ID) %>%rename('day'='Date')  
 
 depth<-read_csv('02_Clean_data/master_depth2.csv')
 depth$day<-as.Date(depth$Date)

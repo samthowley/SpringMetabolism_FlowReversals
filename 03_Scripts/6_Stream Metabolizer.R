@@ -286,15 +286,6 @@ for(fil in file.names){
   master_notparsed<-rbind(master_notparsed,site)}
 write_csv(master_notparsed, "04_Outputs/master_metabolizer_SM.csv")
 
-#compile one station####
-file.names <- list.files(path="04_Outputs/one station outputs/manual", pattern=".csv", full.names=TRUE)
-onestation <- data.frame()
-for(fil in file.names){
-  site <- read_csv(fil)
-  onestation<-rbind(onestation,site)}
-write_csv(master_notparsed, "04_Outputs/master_metabolizer_onestation.csv")
-
-
 #curate master dataset####
 onestation<- read_csv("04_Outputs/master_metabolizer_SM.csv")
 onestation<-onestation %>%rename('GPP_1'='GPPavg', 'ER_1'='ER', 'K600_1'='K600_1d')

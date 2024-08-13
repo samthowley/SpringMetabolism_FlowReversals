@@ -15,15 +15,11 @@ library(gridGraphics)
 
 #constants######
 
-#NEPflux<-expression(paste('NEP'~'(g'~O[2]/m^2/'day)'))
 flux<-expression(paste((g~O[2]/m^2/'day')))
-#GPPflux<-expression(paste('GPP'~'(g'~O[2]/m^2/'day)'))
-#ERflux<-expression(paste('ER'~'(g'~O[2]/m^2/'day)'))
 col<-c(NEP ='blue', GPP='darkgreen',ER ='darkred')
 DO<-"DO mg/L"
 h<-expression(paste( h[i]-h[min]~(m)))
 u<-expression(paste('Velocity'~("m"~s^-1)))
-#slopey<-expression(paste('g'~O[2]/m^3/'day'))
 poster_x<-'Depth Above Minimum'
 theme_sam<-theme()+    theme(axis.text.x = element_text(size = 24, angle=0),
                              axis.text.y = element_text(size = 24, angle=0),

@@ -206,10 +206,10 @@ met_output<-two_station(AllenMill1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date))+  geom_line(aes(y=GPPavg),size=1)
-
-b<-ggplot(one, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept=-35)
-plot_grid(a,b, ncol=1)
+# ggplot(two, aes(x=Date))+  geom_line(aes(y=GPPavg),size=1)
+# 
+# b<-ggplot(one, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept=-35)
+# plot_grid(a,b, ncol=1)
 write_csv(two, "04_Outputs/two station results/AM.csv")
 write_csv(one, "04_Outputs/one station inputs/AM.csv")
 
@@ -289,7 +289,7 @@ ID_recov<-two_station_forRecovery(ID1)
 
 write_csv(ID_recov, "04_Outputs/one station inputs/not parsed/ID.csv")
 
-met_output<-two_station_ID(ID1)
+met_output<-two_station(ID1)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
