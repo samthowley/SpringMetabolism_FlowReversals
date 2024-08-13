@@ -301,11 +301,12 @@ metabolism <- metabolism[!duplicated(metabolism[c('Date','ID')]),]
 metabolism$GPP_2 <- ifelse(is.na(metabolism$GPP_2), metabolism$GPP_1, metabolism$GPP_2)
 metabolism$ER_2 <- ifelse(is.na(metabolism$ER_2), metabolism$ER_1, metabolism$ER_2)
 
-metabolism<-metabolism %>% mutate(GPP=(GPP_1+GPP_2)/2, ER=(ER_1+ER_2)/2,
-                                  day=day(Date), month=month(Date), year=year(Date)) %>% 
+metabolism<-metabolism %>% mutate(GPP=(GPP_1+GPP_2)/2, ER=(ER_1+ER_2)/2) %>% 
   select(Date, GPP_1, GPP_2, GPP, ER_1, ER_2, ER, ID)
 
 depth<-read_csv('02_Clean_data/master_depth2.csv')
+depth<-depth %>% mutate(day=as.Date(Date)) %>% group_by(ID, day) %>% mutate(SpC=mean(SpC, na.rm=T)) %>% 
+  select(Date, ID, SpC, DO, pH, depth, Temp)
 
 metabolism<-left_join(metabolism, depth, by=c('Date', 'ID'))
 
