@@ -8,7 +8,7 @@ library(zoo)
 library(cowplot)
 library(mmand)
 
-check_ratios <- function(siteBO) {
+check_ratios <- function(siteBO) {   
   
   siteBO<-siteBO %>% select(Date, DO, depth, ER, GPP, depth_diff, SpC)
 
@@ -41,7 +41,6 @@ check_ratios <- function(siteBO) {
   siteBO$ER_ratio<-siteBO$ER/ER_prior
   siteBO$depth_ratio<-siteBO$depth/h_prior
   return(siteBO)}
-
 recovery_calc <- function(siterecov) {
 
   GPPrecov<-siterecov %>% select(count, GPP_ratio, SpC)
@@ -52,7 +51,7 @@ recovery_calc <- function(siterecov) {
   (GPPrecov_results<-(1-cf[1])/cf[2])
 
   ERrecov<-siterecov%>% select(count, ER_ratio, SpC)
-  ind <- which.max(ERrecov$ER_ratio)
+  ind <- which.min(ERrecov$ER_ratio)
   ERrecov<-ERrecov[-c(0:ind),]
   modER<-lm(ER_ratio ~ count, data = ERrecov)
   cf <- coef(modER)
@@ -79,7 +78,7 @@ recovery_calc <- function(siterecov) {
   return(df)}
 
 #ggplot(IDFR, aes(Date))+ geom_line(aes(y=depth), size=1)
-#ggplot(IDFR_0324, aes(count))+ geom_point(aes(y=ERmean))
+#ggplot(OSFR_0324, aes(x=count,y=ER_ratio))+ geom_point()+geom_smooth(method='lm')
 
 #data####
 master <- read_csv("02_Clean_data/master_metabolism4.csv")
@@ -114,8 +113,6 @@ AMFR_0822<-AMFR_2022 %>% filter(count<50)
 
 
 
-
-
 AMFR<- AM %>% mutate(RI = case_when(Date> "2022-11-01" & Date<"2023-04-01"~ 2)) %>% filter(RI==2)
 AMFR_0223<-check_ratios(AMFR)
 (AMFR_0223<-recovery_calc(AMFR_0223))#rev
@@ -125,13 +122,11 @@ AMFR_0223<-check_ratios(AMFR)
 AMFR<- AM %>% mutate(RI = case_when(Date> "2023-04-25" & Date<"2023-11-30"~ 2))%>% filter(RI==2)
 AMFR_S2023<-check_ratios(AMFR)
 
-AMFR_0723<-AMFR_S2023 %>% filter(count<100)
+AMFR_0723<-AMFR_S2023 %>% filter(count>50 & count<100)
 (AMFR_0723<-recovery_calc(AMFR_0723)) #bo
 
 AMFR_0823<-AMFR_S2023 %>% filter(count>100)%>% filter(count<160) 
 (AMFR_0823<-recovery_calc(AMFR_0823))#BO
-
-
 
 
 
@@ -157,14 +152,9 @@ OSFR_0822<-check_ratios(OSFR)
 
 
 
-
-
-
 OSFR<- OS %>% mutate(RI = case_when(Date> "2022-12-15" & Date<"2023-06-06"~ 2))%>%filter(RI==2)
 OSFR_0723<-check_ratios(OSFR)
 (OSFR_0723<-recovery_calc(OSFR_0723)) #rev
-
-
 
 
 
@@ -173,12 +163,10 @@ OSFR_2024<-check_ratios(OSFR)
 
 OSFR_1223<-OSFR_2024 %>% filter(count<120)
 (OSFR_1223<-recovery_calc(OSFR_1223)) #rev
-OSFR_1223$GPP_recov<-0
 
 
-# OSFR_0324<-OSFR_2024 %>% filter(count>120 & count<200)
+# OSFR_0324<-OSFR_2024 %>% filter(count>150 )
 # (OSFR_0324<-recovery_calc(OSFR_0324)) #rev
-
 
 
 OS_tbl<-rbind(OSFR_0822, OSFR_0723,OSFR_1223)
@@ -194,32 +182,46 @@ LFFR_0822<-check_ratios(LFFR)
 
 LFFR<- LF %>% mutate(RI = case_when(Date> "2022-12-25" & Date<"2023-03-10"~ 2))%>% filter(RI==2)
 LFFR_0323<-check_ratios(LFFR)
-(LFFR_0323<-recovery_calc_FR(LFFR_0323))
+LFFR_0323$GPP_ratio[LFFR_0323$GPP_ratio>3]<-NA
+(LFFR_0323<-recovery_calc(LFFR_0323))
+
 
 LFFR<- LF %>% mutate(RI = case_when(Date> "2023-05-25" & Date<"2023-11-26"~ 2))%>% filter(RI==2)
 LFFR_0723<-check_ratios(LFFR)
-(LFFR_0723<-recovery_calc_FR(LFFR_0723))
+(LFFR_0723<-recovery_calc(LFFR_0723))
+
 
 LFFR<- LF %>% mutate(RI = case_when(Date> "2023-11-01"~ 2))%>% filter(RI==2)
-(LFFR_1223<-recovery_calc_FR(LFFR_1223))
+LFFR_2024<-check_ratios(LFFR)
 
-LFFR_0324<-check_ratios(LFFR) %>% filter(count>195)
-(LFFR_0324<-recovery_calc_FR(LFFR_0324))
+LFFR_0324<-LFFR_2024 %>% filter(count>50 &count<130)
+LFFR_0324$GPP_ratio[LFFR_0324$GPP_ratio>2]<-NA
+(LFFR_0324<-recovery_calc(LFFR_0324)) #h
 
-LF_tbl<-rbind(LFFR_0822,LFFR_0323, LFFR_0723,LFFR_1223, LFFR_0324)
+LFFR_0624<-LFFR_2024 %>% filter(count>170 & count<198)
+(LFFR_0624<-recovery_calc(LFFR_0624)) #rev
+
+
+LFFR_0724<-LFFR_2024 %>% filter(count>205)
+(LFFR_0724<-recovery_calc(LFFR_0724)) #rev
+
+
+
+LF_tbl<-rbind(LFFR_0822,LFFR_0323, LFFR_0723,LFFR_0324, LFFR_0624, LFFR_0724)
 LF_tbl$ID<-'LF'
 LF_tbl$num<-3
-LF_tbl$IF <- c("h","h","h","h","h")
+LF_tbl$IF <- c("h","h","h","h","rev","rev")
 
 #GB####
 
 GBFR<- GB %>% mutate(RI = case_when(Date> "2022-08-01" & Date<"2022-12-22"~ 2))%>%filter(RI==2)
 GBFR_0822<-check_ratios(GBFR)
+GBFR_0822<-GBFR_0822 %>% filter(count>40)
 (GBFR_0822<-recovery_calc(GBFR_0822))
 
 GBFR<- GB %>% mutate(RI = case_when(Date> "2023-10-01" & Date<"2024-02-11"~ 2))%>%filter(RI==2)
 GBFR_1224<-check_ratios(GBFR)
-(GBFR_1224<-recovery_calc_FR(GBFR_1224))
+(GBFR_1224<-recovery_calc(GBFR_1224))
 
 GB_tbl<-rbind(GBFR_0822,GBFR_1224)
 GB_tbl$ID<-'GB'
@@ -230,6 +232,7 @@ GB_tbl$IF <- c("h", 'rev')
 
 IDFR<- ID %>% mutate(RI = case_when(Date<"2023-05-30"~ 2))%>% filter(RI==2)
 IDFR_0223<-check_ratios(IDFR)
+IDFR_0223<-IDFR_0223 %>% filter(count>100)
 (IDFR_0223<-recovery_calc(IDFR_0223))
 
 
@@ -237,50 +240,43 @@ IDFR<- ID %>% mutate(RI = case_when(Date> "2023-06-01" & Date< "2023-12-15"~ 2))
 IDFR_0723<-check_ratios(IDFR)
 (IDFR_0723<-recovery_calc(IDFR_0723))
 
-ggplot(IDFR_0624, aes(Date))+geom_line(aes(y=depth))#+ geom_line(aes(y=ER))
 
-IDFR<- ID %>% mutate(RI = case_when(Date> "2024-04-15" ~ 2))%>% filter(RI==2)
-IDFR_0624<-check_ratios(IDFR)
-(IDFR_0624<-recovery_calc(IDFR_0624))
+IDFR<- ID %>% mutate(RI = case_when(Date> "2024-03-03" ~ 2))%>% filter(RI==2)
+IDFR_2024<-check_ratios(IDFR)
 
-
-
+IDFR_0424<-IDFR_2024 %>% filter(count>50)
+(IDFR_0424<-recovery_calc(IDFR_0424))
 
 
-ID_tbl<-rbind(IDFR_0223,IDFR_0723,IDFR_0923,IDFR_0124,IDFR_0324)
+ID_tbl<-rbind(IDFR_0223,IDFR_0723,IDFR_0424)
 ID_tbl$ID<-'ID'
 ID_tbl$num<-2
-ID_tbl$IF <- c("h","h","h","rev","h")
+ID_tbl$IF <- c("h","h","h")
 
 
 #IU####
-#check
-IUFR<- IU %>% mutate(RI = case_when(Date> "2023-11-20" & Date<"2024-02-10"~ 2))
-IUFR<-filter(IUFR, RI==2)
-#ggplot(IUFR, aes(Date))+geom_line(aes(y=depth), size=1)
-IUFR_0223<-check_ratios(IUFR)
-ggplot(IUFR_0223, aes(count))+geom_point(aes(y=ERmean))
-(IUFR_0223<-recovery_calc_FR(IUFR_0223))
+
+IUFR<- IU %>% mutate(RI = case_when(Date> "2023-12-01"~ 2))%>%filter(RI==2)
+IUFR<-check_ratios(IUFR)
 
 
-IUFR<- IU %>% mutate(RI = case_when(Date> "2024-03-04" & Date<"2024-05-10"~ 2))
-IUFR<-filter(IUFR, RI==2)
-#ggplot(IUFR, aes(x=Date))+geom_line(aes(y=GPP), size=1)
-IUFR_0423<-check_ratios(IDFR)
-IUFR_0423<-filter(IUFR_0423, count<82)
-ggplot(IUFR_0423, aes(count))+geom_point(aes(y=ERmean))
-(IUFR_0423<-recovery_calc_FR(IUFR_0423))
+IUFR_0524<-IUFR %>% filter(count>150 & count<165)
+IUFR_0524$ER_ratio[IUFR_0524$ER_ratio>1.75]<-NA
+(IUFR_0524<-recovery_calc(IUFR_0524))
+
+IUFR_0624<-IUFR %>% filter(count>181 & count<191)
+(IUFR_0624<-recovery_calc(IUFR_0624))
 
 
-IU_tbl<-rbind(IUFR_0223,IUFR_0423)
+IU_tbl<-rbind(IUFR_0524,IUFR_0624)
 IU_tbl$ID<-'IU'
 IU_tbl$num<-1
 IU_tbl$IF <- c("h","h")
 
 ###compile####
 recov<-rbind(IU_tbl, ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl)
-recov<-recov %>% mutate(GPP_recov=abs(GPP_recov),
-                        ER_recov=abs(ER_recov),H_recov=abs(H_recov))
+recov$ER_recov[recov$ER_recov<0]<-NA
+recov$GPP_recov[recov$GPP_recov<0]<-NA
 
 recov$GPP_ratio<-recov$H_recov/recov$GPP_recov
 recov$ER_ratio<-recov$H_recov/recov$ER_recov

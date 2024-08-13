@@ -130,7 +130,7 @@ GBFR<- GB %>% mutate(RI = case_when(Date> "2023-09-16" & Date<"2024-05-11"~ 2))
 GBFR_012024<-extract_reduce(GBFR)
 
 # GBFRcheck<-filter(GBFR,RI==2 )
-# ggplot(GBFRcheck, aes(Date)) + geom_line(aes(y=GPP, color=depthID))+geom_hline(yintercept = 0.75)
+# ggplot(GB, aes(Date)) + geom_line(aes(y=GPP, color=depthID))+geom_hline(yintercept = 0.75)
 
 
 GB_tbl<-rbind(GBFR_102023,GBFR_082023,GBFR_012024)
@@ -161,7 +161,7 @@ OtFR<- OS %>% mutate(RI = case_when(Date> "2023-10-30" ~ 2))
 OSFR_042024<-extract_reduce(OtFR)
 
 # OSFRcheck<-filter(OtFR,RI==2 )
-# ggplot(OSFRcheck, aes(Date)) +geom_line(aes(y=GPP, color=depthID))
+# ggplot(OSFRcheck, aes(Date)) +geom_line(aes(y=depth, color=depthID))
 
 OS_tbl<-rbind(OSFR_092023,OSFR_032023,OSFR_072023,OSFR_042024)
 OS_tbl$ID<-'OS'
@@ -218,8 +218,8 @@ AMFR_092023<-extract_reduce(AMFR)
 AMFR<- AM %>% mutate(RI = case_when(Date> "2023-11-01"~ 2))
 AMFR_012024<-extract_reduce(AMFR)
 
-# AMFRcheck<-filter(AMFR,RI==2 )
-# ggplot(AMFRcheck, aes(Date)) +geom_line(aes(y=GPP, color=depthID))
+AMFRcheck<-filter(AMFR,RI==2 )
+ggplot(AMFRcheck, aes(Date)) +geom_line(aes(y=SpC, color=depthID))
 
 AM_tbl<-rbind(AMFR_072022,AMFR_092022,AMFR_022023,AMFR_072023,AMFR_092023,AMFR_012024)
 AM_tbl$ID<-'AM'
