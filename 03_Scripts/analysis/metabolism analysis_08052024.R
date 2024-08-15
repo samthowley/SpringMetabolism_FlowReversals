@@ -86,114 +86,44 @@ IU<-sites[[4]]
 LF<-sites[[5]]
 OS<-sites[[6]]
 
-#Scatter data#######
-
-GPP<-master %>%select(Date, depth, depth_diff, GPP, ID)%>% rename('prod'='GPP') %>% mutate(type='GPP', day=as.Date(Date))
-GPP <- GPP[!duplicated(GPP[c('day','ID')]),]
-
-
-ER<-master %>% select(Date, depth, depth_diff, ER, ID)%>%rename('prod'='ER') %>% mutate(type='ER', day=as.Date(Date))
-ER <- ER[!duplicated(ER[c('day','ID')]),]
-
-master_scatter<-rbind(GPP, ER)
-master_scatter<-master_scatter %>% filter(type != 'NEP')
-
-sites<-split(master_scatter,master_scatter$ID)
-AM_scatter<-sites[[1]]
-GB_scatter<-sites[[2]]
-ID_scatter<-sites[[3]]
-IU_scatter<-sites[[4]]
-LF_scatter<-sites[[5]]
-OS_scatter<-sites[[6]]
-
-cols<-c(
-  "GPP"="darkgreen",
-  "ER"="darkred",
-  "NEP"="blue")
-
-(AM_sc<-ggplot(data=AM_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+ggtitle("AM")+
-    scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
-    ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-    theme_sam_insideplots)
 ###############
-AM <- AM[complete.cases(AM[ , c('GPP', 'depth','u')]), ]
+GB <- GB[complete.cases(GB[ , c('GPP', 'depth')]), ]
 
+start_values <- expand.grid(
+  a = seq(0, 15, length.out = 10),
+  b = seq(0, 1, length.out = 10),
+  c = seq(0, 5, length.out = 10))
 
-start_vals<-expand.grid(a = seq(1, 10, length = 10), b = seq(0.5, 1.5, length = 10), c = seq(-1, 1, length = 10))
-
+#decaying
 model_1var <- nls2(
-  GPP ~ a * sin(b * depth + c),
-  data = AM,
-  start = expand.grid(a = seq(1, 10, length = 10), b = seq(0.5, 1.5, length = 10), c = seq(-1, 1, length = 10)),
-  algorithm = "brute-force"
-)
+  GPP ~ a * exp(b * depth) + c,
+  data = GB,
+  start = expand.grid(
+    a = seq(0, 15, length.out = 10),
+    b = seq(0, 1, length.out = 10),
+    c = seq(0, 5, length.out = 10)),
+  algorithm = "brute-force")
 
 coef(model_1var)
-AM$predicted_y <- predict(model_1var, newdata = AM)
-plot(AM$depth, AM$GPP, main = "Non-linear Fit", xlab = "x", ylab = "y", pch = 16, col = "blue")
-lines(AM$depth, AM$predicted_y, col = "red", lwd = 2)
+GB$predicted_y <- predict(model_1var, newdata = GB)
+ggplot(data=GB, aes(x=depth, y=GPP)) +
+    geom_point(size=1)+ggtitle("GB")+geom_line(aes(y=predicted_y))
+    
 
-model_exp <- nls2(
-  GPP ~ a * exp(b * depth) * sin(c * u),
-  data = AM,
-  start = start_vals,
-  algorithm = "brute-force"
-)
-AM$predicted_y <- predict(model_exp, newdata = AM)
-plot(AM$depth, AM$GPP, main = "Non-linear Fit", xlab = "x", ylab = "y", pch = 16, col = "blue")
-lines(AM$depth, AM$predicted_y, col = "red", lwd = 2)
+#quadractic
+model_1var <- nls2(
+  GPP ~ a * depth^2 + b * depth + c,
+  data = GB,
+  start = expand.grid(
+    a = seq(0, 15, length.out = 10),
+    b = seq(0, 1, length.out = 10),
+    c = seq(0, 5, length.out = 10)),
+  algorithm = "brute-force")
 
-
-
-
-AM_2<-AM %>% filter(u>0)
-model <- nls2(
-  GPP ~ a * -sin(depth + c) + d,
-  data = AM_2,
-  start = expand.grid(a = seq(1, 5, length = 5), c = seq(-1, 1, length = 3), 
-                      d = seq(1, 3, length = 3)),
-  algorithm = "brute-force"
-)
-AM_2$predicted_y <- predict(model_exp, newdata = AM_2)
-plot(AM_2$depth, AM_2$GPP, main = "Non-linear Fit", xlab = "x", ylab = "y", pch = 16, col = "blue")
-lines(AM_2$depth, AM_2$predicted_y, col = "red", lwd = 2)
+coef(model_1var)
+GB$predicted_y <- predict(model_1var, newdata = GB)
+ggplot(data=GB, aes(x=depth, y=GPP)) +
+  geom_point(size=1)+ggtitle("GB")+geom_line(aes(y=predicted_y))
 
 
-# Plot the original data and the predictions
-plot(AM$depth, AM$GPP, main = "GAM Fit", xlab = "x", ylab = "y")
-lines(AM$depth, predictions, col = "blue", lwd = 2)
-
-
-
-(ID_sc<-ggplot(data=ID_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+ggtitle("ID")+
-    scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
-    ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-    theme_sam_insideplots)
-
-(IU_sc<-ggplot(data=IU_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+
-    scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
-    ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-    theme_sam)
-
-(LF_sc<-ggplot(data=LF_scatter, aes(x=depth_diff, y=prod, color=type)) +ggtitle("LF")+
-    geom_point(size=1)+
-    scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
-    ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-    theme_sam)
-
-(GB_sc<-ggplot(data=GB_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+
-    scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
-    ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-    theme_sam_insideplots+ggtitle("GB"))
-
-
-(OS_sc<-ggplot(data=OS_scatter, aes(x=depth_diff, y=prod, color=type)) +
-    geom_point(size=1)+ggtitle("OS")+
-    scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
-    ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
-    theme_sam_insideplots)
 
