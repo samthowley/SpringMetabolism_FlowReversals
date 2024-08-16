@@ -285,7 +285,8 @@ DO.cols<-c(
     geom_line(aes(y=ER_2, color="Two Station"),size=1)+
     geom_line(aes(y=ER, color="Avg ER"),size=1)+
     geom_line(aes(y=ER_1, color="One Station"),size=1)+
-    theme_sam+ylab(flux)+ggtitle("OS")+  
+    theme_sam+ylab(flux)+ggtitle("OS")+
+    #theme(legend.position = "bottom")+
     scale_colour_manual(name="", values = DO.cols,labels=c("Avg GPP", "Avg ER","Two Station","One Station")))
 
 timeseries<-plot_grid(ID_time,GB_time, LF_time, AM_time,nrow=1)

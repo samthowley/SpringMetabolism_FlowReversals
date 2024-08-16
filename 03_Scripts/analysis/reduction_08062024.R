@@ -1,7 +1,7 @@
 rm(list=ls())
 
-# check<-filter(OtFR,RI==2 )
-# ggplot(check, aes(Date))+geom_line(aes(y=ER))
+check<-filter(GB_102023,RI==2 )
+ggplot(check, aes(Date))+geom_line(aes(y=ER))
 
 ##packages######
 library(ggpubr)

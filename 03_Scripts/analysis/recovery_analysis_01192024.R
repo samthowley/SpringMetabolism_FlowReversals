@@ -7,7 +7,7 @@ library(measurements)
 library(zoo)
 library(cowplot)
 library(mmand)
-
+siterecov<-AMFR_2022
 check_ratios <- function(siteBO) {   
   
   siteBO<-siteBO %>% select(Date, DO, depth, ER, GPP, depth_diff, SpC)
@@ -48,7 +48,7 @@ recovery_calc <- function(siterecov) {
   GPPrecov<-GPPrecov[-c(0:ind),]
   modGPP<-lm(GPP_ratio ~ count, data = GPPrecov)
   cf <- coef(modGPP)
-  (GPPrecov_results<-(1-cf[1])/cf[2])
+  (GPPrecov_results<-(1-cf[1])/cf[2]
 
   ERrecov<-siterecov%>% select(count, ER_ratio, SpC)
   ind <- which.min(ERrecov$ER_ratio)
@@ -358,7 +358,7 @@ ggsave(filename="05_Figures/recovery_magnitude.jpeg",
       plot.title = element_text(size = 27, color='darkgreen'),
       axis.text.x = element_text(size=17)))
 
-(i<-ggplot(recov_excluding_ID, aes(ID, color=IF))+
+(i<-ggplot(recov, aes(ID, color=IF))+
     geom_point(aes(y=ER_ratio), size=6)+
     geom_hline(yintercept = 1, linetype='dashed')+
     scale_colour_manual(name="", values = cols,
