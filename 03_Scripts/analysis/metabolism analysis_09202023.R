@@ -112,11 +112,11 @@ IU<-sites[[4]]
 LF<-sites[[5]]
 OS<-sites[[6]]
 #Scatter data#######
+master<-filter(master, Date<'2023-10-20')
 
 GPP<-master[,c('Date','depth','depth_diff','GPP','ID')]
 GPP<-GPP %>% rename('prod'='GPP') %>% mutate(type='GPP', day=as.Date(Date))
 GPP <- GPP[!duplicated(GPP[c('day','ID')]),]
-
 
 ER<-master[,c("Date",'depth','depth_diff','ER','ID')]
 ER<-ER %>% rename('prod'='ER') %>% mutate(type='ER', day=as.Date(Date))
