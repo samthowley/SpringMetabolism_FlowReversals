@@ -12,6 +12,36 @@ library(imputeTS)
 library(dataRetrieval)
 library(tools)
 library(cowplot)
+library(streamMetabolizer)
+
+two_station_forRecovery<- function(spring) {
+  #spring$K600_1d[spring$K600_1d<0]<-0.1
+  #spring$Q_m.s[spring$K600_1d<0]<-0.1
+  
+  spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
+  spring$not<-spring$deltaDO_rate-spring$K_reaeration
+  
+  spring<- spring %>%
+    mutate(hour = hour(Date),day=day(Date),Month=month(Date),year=year(Date))
+  
+  spring <- spring %>%mutate(time= case_when(light<=0~ 'ER',light>0~ 'AM'))
+  
+  springER<-spring%>% group_by(day,Month,year,time) %>%
+    summarize(ER = mean(not, na.rm=T))
+  
+  springER<-filter(springER, time=='ER')
+  spring<-left_join(spring, springER,by=c("day","Month","year"))
+  
+  spring$GPP<-spring$not-spring$ER
+  spring$GPP[spring$GPP<0] <- 0
+  
+  spring_GPPavg<-spring%>% group_by(day,Month,year) %>%
+    summarize(GPPavg = mean(GPP, na.rm=T))
+  
+  
+  spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
+  
+  return(spring)}
 
 master <- read_csv("02_Clean_data/master_depth2.csv")
 LF_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "LF")
@@ -23,7 +53,7 @@ ID_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "ID")
 prelim <- function(spring) {
   spring <- spring[complete.cases(spring[ , c('DO', 'Temp', 'depth')]), ]
 
-  spring$Q_m.s<-width*spring$depth*spring$velocity_m.s
+  spring$Q_m.s<-width*spring$depth*spring$velocity_m.s #m3/s
 
   (spring$Mouth_Temp_C<- fahrenheit.to.celsius(spring$Temp))
   spring$Mouth_DO_sat<-Cs(spring$Mouth_Temp_C)
@@ -46,7 +76,8 @@ prelim <- function(spring) {
   return(spring)}
 two_station<- function(spring) {
   
-  spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
+  spring$K_reaeration<-(spring$K600_1d*spring$depth)*spring$DO_deficit
+  
   spring$not<-spring$deltaDO_rate-spring$K_reaeration
 
   spring<- spring %>%
@@ -69,47 +100,12 @@ two_station<- function(spring) {
   spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
   
   spring<-spring %>% mutate(u_md=velocity_m.h*24) %>%
-    mutate(L_max=(u_md*3.2)/abs(K600_1d)) 
+    mutate(L_max=u_md/abs(K600_1d))%>%mutate(L_max=L_max*1.5)
     
   one<-spring %>% filter(L_max<=length) 
-  two<-spring %>% filter(L_max>length)  %>% filter(ER< -2) %>% filter(ER> -30)
-  
-  
-  ggplot(one, aes(x=Date))+  geom_line(aes(y=ER),size=1)
-  
-
-  
-
+  two<-spring %>% filter(L_max>length)  #%>% filter(ER< -2) %>% filter(ER> -30)
   
   return(list(two,one))}
-two_station_forRecovery<- function(spring) {
-  #spring$K600_1d[spring$K600_1d<0]<-0.1
-  #spring$Q_m.s[spring$K600_1d<0]<-0.1
-
-  spring$K_reaeration<-spring$K600_1d*spring$depth*spring$DO_deficit
-  spring$not<-spring$deltaDO_rate-spring$K_reaeration
-
-  spring<- spring %>%
-    mutate(hour = hour(Date),day=day(Date),Month=month(Date),year=year(Date))
-
-  spring <- spring %>%mutate(time= case_when(light<=0~ 'ER',light>0~ 'AM'))
-
-  springER<-spring%>% group_by(day,Month,year,time) %>%
-    summarize(ER = mean(not, na.rm=T))
-
-  springER<-filter(springER, time=='ER')
-  spring<-left_join(spring, springER,by=c("day","Month","year"))
-
-  spring$GPP<-spring$not-spring$ER
-  spring$GPP[spring$GPP<0] <- 0
-
-  spring_GPPavg<-spring%>% group_by(day,Month,year) %>%
-    summarize(GPPavg = mean(GPP, na.rm=T))
-
-
-  spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
-
-  return(spring)}
 data_retrieval <- function(parameterCd, ventID) {
 
   startDate <- "2022-04-12"
@@ -153,21 +149,18 @@ rel_k <- lm(k600_1d ~ uh, data=GB_rC)
 GB$K600_1d<- cf[2]*GB$'U/H' + cf[1]
 
 GB1<- GB%>%filter(DO >3.5, Date>'2022-05-20', DO<8.5)
-#ggplot(GB1, aes(Date, DO)) + geom_line()
+#ggplot(GB, aes(Date, DO)) + geom_line()
 
-GB_recov<-two_station_forRecovery(GB1)
-
-write_csv(GB_recov, "04_Outputs/one station inputs/not parsed/GB.csv")
+#GB_recov<-two_station_forRecovery(GB1)
+#write_csv(GB_recov, "04_Outputs/one station inputs/not parsed/GB.csv")
 
 met_output<-two_station(GB1)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-#ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=1)
-# b<-ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=1)
-# c<-ggplot(two, aes(x=Date)) +geom_line(aes(y=DO),size=1)
-# plot_grid(a,b,c, ncol=1)
+ggplot(two, aes(x=Date)) +geom_line(aes(y=ER),size=1,color='darkgreen')
+test<-two%>%filter(ER>0 & light==0)
 
 write_csv(two, "04_Outputs/two station results/GB.csv")
 write_csv(one, "04_Outputs/one station inputs/GB.csv")
@@ -206,7 +199,7 @@ met_output<-two_station(AllenMill1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-# ggplot(two, aes(x=Date))+  geom_line(aes(y=GPPavg),size=1)
+ggplot(two, aes(x=Date))+  geom_line(aes(y=ER),size=1)
 # 
 # b<-ggplot(one, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept=-35)
 # plot_grid(a,b, ncol=1)
@@ -238,11 +231,10 @@ LF$K600_1d<- cf[2]*LF$'U/H' + cf[1]
 LF<-LF%>% filter(DO>1.2)
 #ggplot(LF, aes(Date, DO)) + geom_line() 
 
-LF_recov<-two_station_forRecovery(LF)
-
+#LF_recov<-two_station_forRecovery(LF)
 #ggplot(LF_recov, aes(x=Date)) + geom_line(aes(y=ER),size=1)
+#write_csv(LF_recov, "04_Outputs/one station inputs/not parsed/LF.csv")
 
-write_csv(LF_recov, "04_Outputs/one station inputs/not parsed/LF.csv")
 met_output<-two_station(LF)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
