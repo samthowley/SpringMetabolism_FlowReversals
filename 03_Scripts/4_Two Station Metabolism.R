@@ -13,6 +13,7 @@ library(dataRetrieval)
 library(tools)
 library(cowplot)
 library(streamMetabolizer)
+library(writexl)
 
 two_station_forRecovery<- function(spring) {
   #spring$K600_1d[spring$K600_1d<0]<-0.1
@@ -44,46 +45,48 @@ two_station_forRecovery<- function(spring) {
   return(spring)}
 
 master <- read_csv("02_Clean_data/master_depth2.csv")
-LF_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "LF")
-AM_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "AM")
-GB_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "GB")
-OS_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "OS")
-ID_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "ID")
 
 prelim <- function(spring) {
   spring <- spring[complete.cases(spring[ , c('DO', 'Temp', 'depth')]), ]
 
   spring$Q_m.s<-width*spring$depth*spring$velocity_m.s #m3/s
 
-  (spring$Mouth_Temp_C<- fahrenheit.to.celsius(spring$Temp))
-  spring$Mouth_DO_sat<-Cs(spring$Mouth_Temp_C)
-  spring$Mouth_DO_sat[is.na(spring$Mouth_DO_sat)]<-mean(spring$Mouth_DO_sat, na.rm=T)
+  spring<-spring %>% 
+    mutate(Mouth_Temp_C=fahrenheit.to.celsius(Temp))%>% #F to C
+    mutate(Mouth_DO_sat=Cs(Mouth_Temp_C))%>% # calculate station 2 DO Saturation
+    mutate(mouth_deficit=Mouth_DO_sat-DO) #DO deficit
 
-  spring$mouth_deficit<-spring$Mouth_DO_sat-spring$DO
-  spring$Vent_Temp_C<- fahrenheit.to.celsius(spring$VentTemp_F)
-  spring$Vent_DO_sat<-Cs(spring$Vent_Temp_C)
-  spring$vent_deficit<-spring$Vent_DO_sat-spring$VentDO
-  spring$DO_deficit<-(spring$mouth_deficit+spring$vent_deficit)/2
+  spring<-spring %>% 
+    mutate(Vent_Temp_C=fahrenheit.to.celsius(VentTemp_F))%>%
+    mutate(Vent_DO_sat=Cs(Vent_Temp_C))%>%
+    mutate(vent_deficit=Vent_DO_sat-VentDO)%>%
 
-  spring$"velocity_m.h" <-spring$"velocity_m.s"*60*60
-  spring$"Q_m.h" <-spring$"Q_m.s"*60*60
+    mutate(mean.DO.deficit=(mouth_deficit+vent_deficit)/2)%>% #average DO deficit between the two stations
+    mutate(mean.DO.sat=(Vent_DO_sat+Mouth_DO_sat)/2)%>%
+    mutate(DO.sat.def=mean.DO.deficit/mean.DO.sat)
 
-  spring$'U/H'<-spring$"velocity_m.s"/spring$depth
-
-  spring$deltaDO<-(spring$DO-spring$VentDO)
-  spring$deltaDO_rate<- (spring$deltaDO*spring$"Q_m.h"*24)/area
+  spring<-spring %>%
+    mutate(velocity_m.h=velocity_m.s*60*60) %>%
+    mutate(Q_m.h=Q_m.s*60*60)%>%
+    mutate(u.h=velocity_m.s/depth)
+  
+  spring<-spring %>% 
+    mutate(deltaDO=DO-VentDO) %>% #station2-station1
+    mutate(deltaDO_rate=(deltaDO/area)*Q_m.h*24)
 
   return(spring)}
+
 two_station<- function(spring) {
   
-  spring$K_reaeration<-(spring$K600_1d*spring$depth)*spring$DO_deficit
-  
-  spring$not<-spring$deltaDO_rate-spring$K_reaeration
+  spring<-spring %>% 
+    mutate(K_reaeration=K600_1d*depth*mean.DO.deficit)%>%
+    mutate(rearation=K_reaeration*DO.sat.def)%>%
+    mutate(not=deltaDO_rate-rearation)
 
   spring<- spring %>%
     mutate(hour = hour(Date),day=day(Date),Month=month(Date),year=year(Date))
   
-  spring <- spring %>%mutate(time= case_when(light<=0~ 'ER',light>0~ 'AM'))
+  spring <- spring %>%mutate(time= case_when(light<=200~ 'ER',light>200~ 'AM'))
   
   springER<-spring%>% group_by(day,Month,year,time) %>%
     summarize(ER = mean(not, na.rm=T))
@@ -100,10 +103,13 @@ two_station<- function(spring) {
   spring<-left_join(spring, spring_GPPavg,by=c("day","Month","year"))
   
   spring<-spring %>% mutate(u_md=velocity_m.h*24) %>%
-    mutate(L_max=u_md/abs(K600_1d))%>%mutate(L_max=L_max*1.5)
+    mutate(L_max=(u_md/K600_1d)*3)%>%mutate(L_min=(u_md/K600_1d)*0.4)
+  
+  spring<- spring %>% mutate(demars=case_when(length>L_min & length<L_max~"two"))
+  spring$demars[is.na(spring$demars)]<- "one"
     
-  one<-spring %>% filter(L_max<=length) 
-  two<-spring %>% filter(L_max>length)  #%>% filter(ER< -2) %>% filter(ER> -30)
+  two<-spring %>% filter(demars=="two")  #%>% filter(ER< -2) %>% filter(ER> -30)
+  one<-spring %>% filter(demars=="one")
   
   return(list(two,one))}
 data_retrieval <- function(parameterCd, ventID) {
@@ -124,11 +130,12 @@ data_retrieval <- function(parameterCd, ventID) {
   return(vent)}
 
 ##GB####
+GB_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "GB")
 GB <- master %>% filter(ID=='GB')
 
 GB$light<-calc_light(GB$Date,  29.83, -82.68)
-length<-350
-width <-23
+length<-320
+width <-16.5
 area<-length*width
 
 x<-c('Date', 'DO', "depth", "Temp",'light', 'SpC')
@@ -146,9 +153,9 @@ GB<-prelim(GB)
 
 rel_k <- lm(k600_1d ~ uh, data=GB_rC)
 (cf <- coef(rel_k))
-GB$K600_1d<- cf[2]*GB$'U/H' + cf[1]
+GB$K600_1d<- (cf[2]*GB$u.h + cf[1])
 
-GB1<- GB%>%filter(DO >3.5, Date>'2022-05-20', DO<8.5)
+GB1<- GB%>%filter(DO >3.5, Date>'2022-05-20', DO<8.5)#%>%mutate(depth=depth-0.5)
 #ggplot(GB, aes(Date, DO)) + geom_line()
 
 #GB_recov<-two_station_forRecovery(GB1)
@@ -159,18 +166,19 @@ met_output<-two_station(GB1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date)) +geom_line(aes(y=ER),size=1,color='darkgreen')
-test<-two%>%filter(ER>0 & light==0)
+ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=1)+geom_hline(yintercept = -30)#+geom_line(aes(y=depth*100),size=1,color='darkgreen')
+
+two<-two%>%filter(ER<0)
 
 write_csv(two, "04_Outputs/two station results/GB.csv")
 write_csv(one, "04_Outputs/one station inputs/GB.csv")
 
 ##AM####
-
+AM_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "AM")
 AllenMill <- master %>% filter(ID=='AM')
 
 AllenMill$light<-calc_light(AllenMill$Date,  30.155, -83.238)
-length<-600
+length<-920
 width <-20
 area<-length*width
 
@@ -178,18 +186,17 @@ rel_u <- lm(u ~ depth, data=AM_rC)
 (cf <- coef(rel_u))
 AllenMill$"velocity_m.s"<-(AllenMill$depth*cf[2]+cf[1])
 
-
 AllenMill$VentDO<-mean(AM_rC$VentDO, na.rm=T)
-AllenMill$VentDO<-AllenMill$VentDO+4
+AllenMill$VentDO<-AllenMill$VentDO+3.5
 AllenMill$VentTemp_F<-mean(AM_rC$VentTemp, na.rm=T)
 
 AllenMill<-prelim(AllenMill)
 
 rel_k <- lm(k600_1d ~ uh, data=AM_rC)
 (cf <- coef(rel_k))
-AllenMill$K600_1d<- cf[2]*AllenMill$'U/H' + cf[1]
+AllenMill$K600_1d<- cf[2]*AllenMill$u.h + cf[1]
 
-AllenMill1<- AllenMill %>% filter(DO<10) %>% mutate(depth=depth-1.2)
+AllenMill1<- AllenMill %>% filter(DO<10)# %>% mutate(depth=depth-1.2)
 
 # AM_recov<-two_station_forRecovery(AllenMill1)
 # 
@@ -199,15 +206,14 @@ met_output<-two_station(AllenMill1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date))+  geom_line(aes(y=ER),size=1)
-# 
-# b<-ggplot(one, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept=-35)
-# plot_grid(a,b, ncol=1)
+ggplot(two, aes(x=Date))+  geom_point(aes(y=ER))
+
 write_csv(two, "04_Outputs/two station results/AM.csv")
 write_csv(one, "04_Outputs/one station inputs/AM.csv")
 
 ##LF####
 LF <- master %>% filter(ID=='LF')
+LF_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "LF")
 
 LF$light<-calc_light(LF$Date,  29.585, -82.937)
 length<-350
@@ -226,7 +232,7 @@ LF<-prelim(LF)
 
 rel_k <- lm(k600_1d ~ uh, data=LF_rC)
 (cf <- coef(rel_k))
-LF$K600_1d<- cf[2]*LF$'U/H' + cf[1]
+LF$K600_1d<- cf[2]*LF$u.h + cf[1]
 
 LF<-LF%>% filter(DO>1.2)
 #ggplot(LF, aes(Date, DO)) + geom_line() 
@@ -239,8 +245,8 @@ met_output<-two_station(LF)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
- ggplot(two, aes(x=Date)) +geom_line(aes(y=ER, color="ER"),size=1)+
-  geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
+ ggplot(one, aes(x=depth)) +geom_point(aes(y=ER, color="ER"),size=1)+
+  geom_point(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
 # ggplot(one, aes(x=Date)) +geom_line(aes(y=ER, color="ER"),size=1)+
 #   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
 
@@ -252,6 +258,7 @@ write_csv(one, "04_Outputs/one station inputs/LF.csv")
 parameterCd <- c('00010','00300')
 ventID<-'02322700'
 vent<-data_retrieval(parameterCd, ventID)
+ID_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "ID")
 
 ID <- master %>% filter(ID=='ID')
 ID$light<-calc_light(ID$Date,  29.93, -82.8)
@@ -272,21 +279,21 @@ ID<-prelim(ID)
 
 rel_k <- lm(k600_1d ~ uh, data=ID_rC)
 (cf <- coef(rel_k))
-ID$K600_1d<- cf[2]*ID$'U/H' + cf[1]
+ID$K600_1d<- cf[2]*ID$u.h + cf[1]
 
 ID1<-ID %>% mutate(depth=depth-0.5) %>%filter(DO<10)
 ggplot(ID1, aes(Date, DO)) + geom_line() 
 
-ID_recov<-two_station_forRecovery(ID1)
-
-write_csv(ID_recov, "04_Outputs/one station inputs/not parsed/ID.csv")
+# ID_recov<-two_station_forRecovery(ID1)
+# write_csv(ID_recov, "04_Outputs/one station inputs/not parsed/ID.csv")
 
 met_output<-two_station(ID1)
 
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=0.4)
+ggplot(two, aes(x=depth)) +geom_point(aes(y=ER, color="ER"),size=1)+
+  geom_point(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
 
 write_csv(two, "04_Outputs/two station reswrite_csv")
 write_csv(one, "04_Outputs/one station inputs/ID.csv")
@@ -311,7 +318,7 @@ OS<-prelim(OS)
 
 rel_k <- lm(k600_1d ~ uh, data=OS_rC)
 (cf <- coef(rel_k))
-OS$K600_1d<- cf[2]*OS$'U/H' + cf[1]
+OS$K600_1d<- cf[2]*OS$u.h + cf[1]
 
 #ggplot(OS, aes(Date, DO)) + geom_line() 
 

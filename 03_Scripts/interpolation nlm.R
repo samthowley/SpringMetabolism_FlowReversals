@@ -92,8 +92,11 @@ slope_df <- function(site) {
 metabolism<-read_csv('02_Clean_data/master_metabolism4.csv')
 metabolism<-metabolism[,c('ER', 'ER_1','ER_2','GPP','GPP_1','GPP_2', 'Date', 'ID')]
 metabolism<-metabolism %>%rename('day'='Date') %>% mutate(day=as.Date(day))
+
 depth<-read_csv('02_Clean_data/master_depth2.csv')
-depth$day<-as.Date(depth$Date)
+depth<-depth%>%select(Date,ID,depth,DO,Temp, CO2,pH,SpC)%>%mutate(day=as.Date(Date))%>%
+  group_by(ID, day)%>% mutate(SpC=mean(SpC, na.rm = T))
+
 master<-left_join(depth,metabolism, by=c('ID','day'))
 
 master<- master[!duplicated(master[c('ID','Date')]),]
@@ -109,20 +112,21 @@ ID<-sites[[3]]
 IU<-sites[[4]]
 LF<-sites[[5]]
 OS<-sites[[6]]
-#Scatter data#######
-pre_thesis<-filter(master, Date<'2023-09-20')
 
-GPP<-pre_thesis[,c('Date','depth','depth_diff','GPP','ID')]
-GPP<-GPP %>% rename('prod'='GPP') %>% mutate(type='GPP', day=as.Date(Date))
+ggplot(data=AM, aes(x=Date, y=SpC)) +geom_line(size=1)
+
+#Scatter data#######
+select_frame<-filter(master, Date<"2023-09-10")
+
+GPP<-select_frame %>% select(Date,depth,depth_diff,GPP,ID, SpC) %>%rename('prod'='GPP') %>% mutate(type='GPP', day=as.Date(Date))
 GPP <- GPP[!duplicated(GPP[c('day','ID')]),]
 
-ER<-pre_thesis[,c("Date",'depth','depth_diff','ER','ID')]
-ER<-ER %>% rename('prod'='ER') %>% mutate(type='ER', day=as.Date(Date))
+ER<-select_frame%>% select(Date,depth,depth_diff,ER,ID,SpC)%>% rename('prod'='ER') %>% mutate(type='ER', day=as.Date(Date))
 ER <- ER[!duplicated(ER[c('day','ID')]),]
 
-pre_thesis_scatter<-rbind(GPP, ER)
+select_scatterr<-rbind(GPP, ER)
 
-sites<-split(pre_thesis_scatter,pre_thesis_scatter$ID)
+sites<-split(select_scatterr,select_scatterr$ID)
 #names(sites)
 AM_scatter<-sites[[1]]
 GB_scatter<-sites[[2]]
@@ -153,6 +157,7 @@ cols<-c(
     scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
     ylab(flux)+xlab(h)+scale_x_continuous(n.breaks=4) + scale_y_continuous(n.breaks=3)+
     theme_sam)
+
 
 (AM_sc<-ggplot(data=AM_scatter, aes(x=depth_diff, y=prod, color=type)) +
     geom_point(size=1)+
