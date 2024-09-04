@@ -46,6 +46,22 @@ two_station_forRecovery<- function(spring) {
 
 master <- read_csv("02_Clean_data/master_depth2.csv")
 
+data_retrieval <- function(parameterCd, ventID) {
+  
+  startDate <- "2022-04-12"
+  endDate <- "2024-07-25"
+  
+  vent_15sec<-readNWISuv(ventID,parameterCd,startDate,endDate)
+  vent_15sec<-vent_15sec[,-c(1,2,5,7,8)]
+  vent_15sec<-rename(vent_15sec, 'VentTemp_C'="X_00010_00000", 'Date'="dateTime",'VentDO'="X_00300_00000")
+  
+  vent_15sec<- vent_15sec %>% mutate(minute = minute(Date))
+  vent<-filter(vent_15sec, minute==0)
+  vent$VentDO[is.na(vent$VentDO)]<-mean(vent$VentDO, na.rm = T)
+  vent$VentTemp_C[is.na(vent$VentTemp_C)]<-mean(vent$VentTemp_C, na.rm = T)
+  vent$VentTemp_F<-celsius.to.fahrenheit(vent$VentTemp_C)
+  vent<-vent[,-c(2,4)]
+  return(vent)}
 prelim <- function(spring) {
   spring <- spring[complete.cases(spring[ , c('DO', 'Temp', 'depth')]), ]
 
@@ -75,7 +91,6 @@ prelim <- function(spring) {
     mutate(deltaDO_rate=(deltaDO/area)*Q_m.h*24)
 
   return(spring)}
-
 two_station<- function(spring) {
   
   spring<-spring %>% 
@@ -112,22 +127,6 @@ two_station<- function(spring) {
   one<-spring %>% filter(demars=="one")
   
   return(list(two,one))}
-data_retrieval <- function(parameterCd, ventID) {
-
-  startDate <- "2022-04-12"
-  endDate <- "2024-07-25"
-
-  vent_15sec<-readNWISuv(ventID,parameterCd,startDate,endDate)
-  vent_15sec<-vent_15sec[,-c(1,2,5,7,8)]
-  vent_15sec<-rename(vent_15sec, 'VentTemp_C'="X_00010_00000", 'Date'="dateTime",'VentDO'="X_00300_00000")
-
-  vent_15sec<- vent_15sec %>% mutate(minute = minute(Date))
-  vent<-filter(vent_15sec, minute==0)
-  vent$VentDO[is.na(vent$VentDO)]<-mean(vent$VentDO, na.rm = T)
-  vent$VentTemp_C[is.na(vent$VentTemp_C)]<-mean(vent$VentTemp_C, na.rm = T)
-  vent$VentTemp_F<-celsius.to.fahrenheit(vent$VentTemp_C)
-  vent<-vent[,-c(2,4)]
-  return(vent)}
 
 ##GB####
 GB_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "GB")
@@ -166,8 +165,7 @@ met_output<-two_station(GB1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date)) +geom_line(aes(y=GPPavg),size=1)+geom_hline(yintercept = -30)#+geom_line(aes(y=depth*100),size=1,color='darkgreen')
-
+ggplot(two, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept = -30)#+geom_line(aes(y=depth*100),size=1,color='darkgreen')
 two<-two%>%filter(ER<0)
 
 write_csv(two, "04_Outputs/two station results/GB.csv")
@@ -187,7 +185,7 @@ rel_u <- lm(u ~ depth, data=AM_rC)
 AllenMill$"velocity_m.s"<-(AllenMill$depth*cf[2]+cf[1])
 
 AllenMill$VentDO<-mean(AM_rC$VentDO, na.rm=T)
-AllenMill$VentDO<-AllenMill$VentDO+3.5
+AllenMill$VentDO<-AllenMill$VentDO+4
 AllenMill$VentTemp_F<-mean(AM_rC$VentTemp, na.rm=T)
 
 AllenMill<-prelim(AllenMill)
@@ -207,6 +205,7 @@ two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
 ggplot(two, aes(x=Date))+  geom_point(aes(y=ER))
+two<-two %>% filter(ER<0)%>% filter(ER> -50)
 
 write_csv(two, "04_Outputs/two station results/AM.csv")
 write_csv(one, "04_Outputs/one station inputs/AM.csv")
@@ -245,7 +244,7 @@ met_output<-two_station(LF)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
- ggplot(one, aes(x=depth)) +geom_point(aes(y=ER, color="ER"),size=1)+
+ ggplot(two, aes(x=depth)) +geom_point(aes(y=ER, color="ER"),size=1)+
   geom_point(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
 # ggplot(one, aes(x=Date)) +geom_line(aes(y=ER, color="ER"),size=1)+
 #   geom_line(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
@@ -282,7 +281,7 @@ rel_k <- lm(k600_1d ~ uh, data=ID_rC)
 ID$K600_1d<- cf[2]*ID$u.h + cf[1]
 
 ID1<-ID %>% mutate(depth=depth-0.5) %>%filter(DO<10)
-ggplot(ID1, aes(Date, DO)) + geom_line() 
+#ggplot(ID1, aes(Date, DO)) + geom_line() 
 
 # ID_recov<-two_station_forRecovery(ID1)
 # write_csv(ID_recov, "04_Outputs/one station inputs/not parsed/ID.csv")
@@ -292,7 +291,7 @@ met_output<-two_station(ID1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=depth)) +geom_point(aes(y=ER, color="ER"),size=1)+
+ggplot(one, aes(x=depth)) +geom_point(aes(y=ER, color="ER"),size=1)+
   geom_point(aes(y=GPPavg, color="GPP"),size=0.4)+geom_hline(yintercept = -30)
 
 write_csv(two, "04_Outputs/two station reswrite_csv")
