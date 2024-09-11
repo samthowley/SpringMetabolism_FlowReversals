@@ -133,7 +133,7 @@ GB_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "GB")
 GB <- master %>% filter(ID=='GB')
 
 GB$light<-calc_light(GB$Date,  29.83, -82.68)
-length<-320
+length<-310
 width <-16.5
 area<-length*width
 
@@ -165,7 +165,9 @@ met_output<-two_station(GB1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept = -30)#+geom_line(aes(y=depth*100),size=1,color='darkgreen')
+ggplot(two, aes(x=depth)) +geom_point(aes(y=ER),size=1)#+geom_hline(yintercept = -30)
+ggplot(two, aes(x=Date)) +geom_line(aes(y=ER),size=1)+geom_hline(yintercept = 0)#+geom_line(aes(y=depth*100),size=1,color='darkgreen')
+
 two<-two%>%filter(ER<0)
 
 write_csv(two, "04_Outputs/two station results/GB.csv")
@@ -176,8 +178,8 @@ AM_rC<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "AM")
 AllenMill <- master %>% filter(ID=='AM')
 
 AllenMill$light<-calc_light(AllenMill$Date,  30.155, -83.238)
-length<-920
-width <-20
+length<-950
+width <-30
 area<-length*width
 
 rel_u <- lm(u ~ depth, data=AM_rC)
@@ -204,8 +206,8 @@ met_output<-two_station(AllenMill1)
 two<-data.frame(met_output[1]) #date column
 one<-data.frame(met_output[2]) #date column
 
-ggplot(two, aes(x=Date))+  geom_point(aes(y=ER))
-two<-two %>% filter(ER<0)%>% filter(ER> -50)
+two<-two%>%filter(ER< -2)%>% filter(ER> -50)
+ggplot(two, aes(x=Date))+ geom_line(aes(y=ER))
 
 write_csv(two, "04_Outputs/two station results/AM.csv")
 write_csv(one, "04_Outputs/one station inputs/AM.csv")
