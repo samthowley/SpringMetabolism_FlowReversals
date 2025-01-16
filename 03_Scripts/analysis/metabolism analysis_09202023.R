@@ -112,7 +112,7 @@ IU<-sites[[4]]
 LF<-sites[[5]]
 OS<-sites[[6]]
 #Scatter data#######
-master<-filter(master, Date<'2023-10-20')
+master<-filter(master, Date<'2023-10-20')%>%mutate(NEP=GPP+ER)
 
 GPP<-master[,c('Date','depth','depth_diff','GPP','ID')]
 GPP<-GPP %>% rename('prod'='GPP') %>% mutate(type='GPP', day=as.Date(Date))
@@ -122,7 +122,16 @@ ER<-master[,c("Date",'depth','depth_diff','ER','ID')]
 ER<-ER %>% rename('prod'='ER') %>% mutate(type='ER', day=as.Date(Date))
 ER <- ER[!duplicated(ER[c('day','ID')]),]
 
-master_scatter<-rbind(GPP, ER)
+NEP<-master[,c("Date",'depth','depth_diff','NEP','ID')]
+NEP<-NEP %>% rename('prod'='NEP') %>% mutate(type='NEP', day=as.Date(Date))
+NEP <- NEP[!duplicated(NEP[c('day','ID')]),]
+
+master_scatter<-rbind(GPP, ER, NEP)
+
+library(lme4)
+coef(lm_by_site <- lmList(NEP ~ depth_diff | ID, data = master))
+
+
 
 sites<-split(master_scatter,master_scatter$ID)
 #names(sites)
@@ -139,6 +148,17 @@ cols<-c(
   "NEP"="blue")
 
 #scatter plots####
+
+ggplot(data=master_scatter, aes(x=depth_diff, y=prod, color=type)) +
+  geom_point(size=1)+scale_x_log10()+
+  #   stat_poly_line()+
+  # stat_poly_eq(use_label(c("R2","P")), label.x = 1, size=9)+
+  scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
+  ylab(flux)+xlab(h)+
+  theme_sam_insideplots+ facet_wrap(~ID, scales='free')
+
+
+
 (ID_sc<-ggplot(data=ID_scatter, aes(x=depth_diff, y=prod, color=type)) +
     geom_point(size=1)+ggtitle("ID")+
   scale_colour_manual(name="", values = cols,labels=c("GPP", "ER","NEP"))+
@@ -219,6 +239,10 @@ OS_chem<-sites[[6]]
     geom_point(size=1)+theme_sam+xlab(h)+ggtitle("AM"))
 (OS_DO<-ggplot(data=OS_chem, aes(x=depth_diff, y=DO))+ggtitle("OS")+
     geom_point(size=1)+theme_sam+xlab(h))
+
+(AM_DO<-ggplot(data=AM_chem, aes(x=Date, y=DO)) +
+    geom_point(size=1)+theme_sam+xlab(h)+geom_line(aes(y=depth), color='pink')+
+    ggtitle("AM"))
 
 #Time Series####
 DO.cols<-c(

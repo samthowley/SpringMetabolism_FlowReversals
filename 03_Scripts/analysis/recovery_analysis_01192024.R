@@ -7,7 +7,6 @@ library(measurements)
 library(zoo)
 library(cowplot)
 library(mmand)
-siterecov<-AMFR_2022
 check_ratios <- function(siteBO) {   
   
   siteBO<-siteBO %>% select(Date, DO, depth, ER, GPP, depth_diff, SpC)
@@ -42,13 +41,16 @@ check_ratios <- function(siteBO) {
   siteBO$depth_ratio<-siteBO$depth/h_prior
   return(siteBO)}
 recovery_calc <- function(siterecov) {
+  date<-as.Date(mean(siterecov$Date, na.rm = T))
+  year<-year(date)
+  season<-get_season(date)
 
   GPPrecov<-siterecov %>% select(count, GPP_ratio, SpC)
   ind <- which.min(GPPrecov$GPP_ratio)
   GPPrecov<-GPPrecov[-c(0:ind),]
   modGPP<-lm(GPP_ratio ~ count, data = GPPrecov)
   cf <- coef(modGPP)
-  (GPPrecov_results<-(1-cf[1])/cf[2]
+  (GPPrecov_results<-(1-cf[1])/cf[2])
 
   ERrecov<-siterecov%>% select(count, ER_ratio, SpC)
   ind <- which.min(ERrecov$ER_ratio)
@@ -66,16 +68,32 @@ recovery_calc <- function(siterecov) {
   
   h_diff<-max(siterecov$depth_diff, na.rm=T)
   
-  IDFR_ls<-list(GPPrecov_results,ERrecov_results,hrecov_results,h_diff)
+  IDFR_ls<-list(GPPrecov_results,ERrecov_results,hrecov_results,h_diff, year, season)
   df<- data.frame(IDFR_ls[[1]],IDFR_ls[[2]],IDFR_ls[[3]],
-                  IDFR_ls[[4]])
+                  IDFR_ls[[4]],IDFR_ls[[5]],IDFR_ls[[6]])
 
   colnames(df)[1]<-'GPP_recov'
   colnames(df)[2]<-'ER_recov'
   colnames(df)[3]<-'H_recov'
   colnames(df)[4]<-'h_diff'
+  colnames(df)[5]<-'year'
+  colnames(df)[6]<-'season'
+  
+  return(df)
+}
+get_season <- function(date) {
+  month <- month(date)
+  ifelse(
+    month %in% c(12, 1, 2), "Winter",
+    ifelse(
+      month %in% c(3, 4, 5), "Spring",
+      ifelse(
+        month %in% c(6, 7, 8), "Summer", "Fall"
+      )
+    )
+  )
+}
 
-  return(df)}
 
 #ggplot(IDFR, aes(Date))+ geom_line(aes(y=depth), size=1)
 #ggplot(OSFR_0324, aes(x=count,y=ER_ratio))+ geom_point()+geom_smooth(method='lm')
@@ -287,7 +305,7 @@ write_csv(recov, "04_Outputs/recovery_analysis.csv")
 
 ###compile####
 recov<-read_csv("04_Outputs/recovery_analysis.csv")
-mean(recov$ER_ratio, na.rm = T)
+mean(recov$GPP_ratio, na.rm = T)
 recov$a<-'a'
 cols<-c(
   "h"="deepskyblue3",
@@ -383,3 +401,33 @@ ggsave(filename="05_Figures/recovery_site.jpeg",
        height = 6,
        units = "in")
 
+reduction<-read.csv("04_Outputs/reduction_analysis.csv")
+reduction<-reduction%>% select(-IF, -num)
+reduct_recov<- left_join(reduction, recov, by=c('season','year', 'ID'))
+reduct_recov<-reduct_recov %>% filter(!is.na(ER_recov))
+
+
+a<-ggplot(reduct_recov, aes(ER_reduce, color=IF, shape=ID))+
+  geom_point(aes(y=ER_ratio), size=6)+#scale_y_log10()+
+  scale_colour_manual(name="", values = cols,
+                      labels=c("High Stage Event", "Brownout","Flow Reversal"))+
+  ggtitle("ER Severity vs. Recovery")+theme_sam+
+  theme(
+    axis.title.y =element_text(size = 25, color='darkred'),
+    plot.title = element_text(size = 27, color='darkred'),
+    axis.text.x = element_text(size=17))
+summary(lm(ER_ratio~ER_reduce, data = reduct_recov))
+
+
+b<-ggplot(reduct_recov, aes(GPP_reduce, color=IF, shape=ID))+
+  geom_point(aes(y=GPP_ratio), size=6)+scale_y_log10()+
+  scale_colour_manual(name="", values = cols,
+                      labels=c("High Stage Event", "Brownout","Flow Reversal"))+
+  ggtitle("GPP Severity vs. Recovery")+theme_sam+
+  theme(
+    axis.title.y =element_text(size = 25, color='darkgreen'),
+    plot.title = element_text(size = 27, color='darkgreen'),
+    axis.text.x = element_text(size=17))
+summary(lm(GPP_ratio~GPP_reduce, data = reduct_recov))
+
+plot_grid(a,b, nrow=1)

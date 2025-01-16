@@ -11,6 +11,7 @@ library(StreamMetabolism)
 library(dataRetrieval)
 library(ggpmisc)
 library(tidyverse)
+library(lme4)
 
 baseline <- function(site) {
   site<-site %>% filter(RI==2)%>%select(Date, DO, depth, ER, GPP, depth_diff, depthID, ID)
@@ -32,22 +33,38 @@ extract_reduce <- function(site, baseline) {
   
   site<-site %>% filter(RI==2)%>%select(Date, DO, depth, ER, GPP, depth_diff, depthID, ID)
   
-  h<-max(site$depth_diff, na.rm = T)
-  ER<-min(site$ER, na.rm = T)
-  GPP<-min(site$GPP, na.rm = T)
-  date<-min(site$Date, na.rm = T)
+  site <- site %>%
+    mutate(
+      peak = which.max(depth),  # Find the index of the peak
+      disturbance_count = row_number() - peak)  # Calculate relative position to the peak
   
-  site_ls<-list(h_prior,ER_prior,GPP_prior,h,GPP,ER,date)
+  h<-max(site$depth_diff, na.rm = T)
+  
+  ER <- site %>%
+    filter(disturbance_count >= 0 & disturbance_count <= 5) %>%
+    summarise(ER = mean(ER, na.rm = TRUE)) %>%
+    pull(ER)
+  GPP <- site %>%
+    filter(disturbance_count >= 0 & disturbance_count <= 5) %>%
+    summarise(GPP = mean(GPP, na.rm = TRUE)) %>%
+    pull(GPP)
+  
+  date<-mean(site$Date, na.rm = T)
+  year<-year(date)
+  season<-get_season(date)
+  
+  site_ls<-list(h_prior,ER_prior,GPP_prior,h,GPP,ER,year,season)
   df<- data.frame(site_ls[[1]],site_ls[[2]],site_ls[[3]],
                   site_ls[[4]],site_ls[[5]],site_ls[[6]],
-                  site_ls[[7]])
+                  site_ls[[7]],site_ls[[8]])
   colnames(df)[1]<-'h0'
   colnames(df)[2]<-'ER0'
   colnames(df)[3]<-'GPP0'
   colnames(df)[4]<-'h'
   colnames(df)[5]<-'GPP'
   colnames(df)[6]<-'ER'
-  colnames(df)[7]<-'date'
+  colnames(df)[7]<-'year'
+  colnames(df)[8]<-'season'
   
   return(df)}
 extract_reduce_mod <- function(siteFR) {
@@ -67,20 +84,36 @@ extract_reduce_mod <- function(siteFR) {
   ER<-mean(siteFR_mod$ER, na.rm = T)
   GPP<-mean(siteFR_mod$GPP, na.rm = T)
   date<-mean(siteFR_mod$Date, na.rm = T)
+  year<-year(date)
+  season<-get_season(date)
   
-  sitemod_ls<-list(h0,ER0,GPP0,h,GPP,ER,date)
-  df<- data.frame(sitemod_ls[[1]],sitemod_ls[[2]],sitemod_ls[[3]],
-                  sitemod_ls[[4]],sitemod_ls[[5]],sitemod_ls[[6]],
-                  sitemod_ls[[7]])
+  site_ls<-list(h0,ER0,GPP0,h,GPP,ER,year,season)
+  df<- data.frame(site_ls[[1]],site_ls[[2]],site_ls[[3]],
+                  site_ls[[4]],site_ls[[5]],site_ls[[6]],
+                  site_ls[[7]],site_ls[[8]])
   colnames(df)[1]<-'h0'
   colnames(df)[2]<-'ER0'
   colnames(df)[3]<-'GPP0'
   colnames(df)[4]<-'h'
   colnames(df)[5]<-'GPP'
   colnames(df)[6]<-'ER'
-  colnames(df)[7]<-'date'
+  colnames(df)[7]<-'year'
+  colnames(df)[8]<-'season'
   
   return(df)}
+get_season <- function(date) {
+  month <- month(date)
+  ifelse(
+    month %in% c(12, 1, 2), "Winter",
+    ifelse(
+      month %in% c(3, 4, 5), "Spring",
+      ifelse(
+        month %in% c(6, 7, 8), "Summer", "Fall"
+      )
+    )
+  )
+}
+
 
 #Data##########
 master<-read_csv('02_Clean_data/master_metabolism4.csv')
@@ -378,13 +411,18 @@ R_R<-rbind(IU_tbl, ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl, OSmod_tbl,
 
 R_R$GPP_reduce<-(1-(R_R$GPP/R_R$GPP0))*100
 R_R$ER_reduce<-(1-(R_R$ER0/R_R$ER))*100
-R_R$GPP_reduce[R_R$GPP_reduce<0] <- 0
-R_R$ER_reduce[R_R$ER_reduce<0] <- 0
+# R_R$GPP_reduce[R_R$GPP_reduce<0] <- 0
+# R_R$ER_reduce[R_R$ER_reduce<0] <- 0
 
 write_csv(R_R, "04_Outputs/reduction_analysis.csv")
 
 R_R<-read.csv("04_Outputs/reduction_analysis.csv")
-mean(R_R$ER_reduce, na.rm = T)
+mean(R_R$GPP_reduce, na.rm = T)
+summary(lm(ER_reduce~h, data = R_R))
+summary(lmList(ER_reduce ~ h | ID, data = R_R))
+summary(lm(ER_reduce~num, data = R_R))
+
+
 R_R$a<-'a'
 cols<-c(
   "h"="deepskyblue3",
@@ -441,7 +479,7 @@ ggsave(filename="05_Figures/reduced_mag.jpeg",
        units = "in")
 
 (c<-ggplot(R_R, aes(ID, color= IF))+
-    geom_point(aes(y=ER_reduce), size=6)+
+    geom_point(aes(y=ER_reduce), size=6, alpha=0.5)+
     scale_colour_manual(name="", values = cols,
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
     ggtitle("Backwater Flood Impacts on ER")+
