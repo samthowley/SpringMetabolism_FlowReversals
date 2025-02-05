@@ -37,58 +37,37 @@ master_chem <- read_csv("02_Clean_data/master.csv")
 master_pair <- read_csv("02_Clean_data/master_CO2-O2.csv")
 master<-left_join(master_chem, master_pair, by=c('ID','Date'))
 
-for(i in 1:nrow(master)){if(master$ID=='OS') {
-  master$u[i]<-(master$depth[i]*-0.0868+0.1579)*100
-  master<- master %>% mutate(RI = case_when(
-    depth <=0.82 ~ "hn",
-    depth <1.3 ~ "hh",
-    depth >=1.3 ~ "hb"))
-  master$RI [is.na(master$RI )] <- 'hh'
-  master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
-
-}
-  else if (master$ID=='ID'){
-    master$u[i]<-(master$depth[i]*-4.1+2.33)*100
-    master<- master %>% mutate(RI = case_when(
-      depth<=0.93 ~ "hn",
-      depth<1.37 ~ "hh",
-      depth>=1.37 ~ "hh"))
-    master$RI[is.na(master$RI )] <- 'hn'
-    master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
-
-  }
-  else if(master$ID=='GB'){
-    master$u[i]<-(master[i]$depth*-0.768+0.51)*100
-    master<- master %>% mutate(RI = case_when(
-      depth <0.55 ~ "hn",
-      depth >=0.55 ~ "hh"))
-    master$RI [is.na(master$RI )] <- 'hn'
-    master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
-
-  }
-  else if(master$ID=='LF'){
-    master$u[i]<- (-0.656*master$depth[i] + 0.44)*100
-    master<- master %>% mutate(RI = case_when(
-      depth <0.42 ~ "hn",
-      depth <0.65 ~ "hn",
-      depth >=0.65 ~ "hh"))
-    master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
-
-  }
-  else if(master$ID=='AM'){
-    master$u[i]<-(master$depth[i]*-1.89+1.4)*100
-    master<- master %>% mutate(RI = case_when(
-      depth <0.75 ~ "hn",
-      depth <1.37 ~ "hh",
-      depth <2.14 ~ "hb",
-      depth >=2.14 ~"hrev"))
-    master$RI [is.na(master$RI )] <- 'hb'
-    master$depth_diff[i]<-master$depth[i]-min(master$depth, na.rm=T)
-  }
-  else {master$u[i]<- NULL
-  master$RI <- NULL
-  master$depth_diff[i] <- NULL}}
-
+master <- master %>%
+  mutate(
+    u = case_when(
+      ID == "OS" ~ (depth * -0.0868 + 0.1579) * 100,
+      ID == "ID" ~ (depth * -4.1 + 2.33) * 100,
+      ID == "GB" ~ (depth * -0.768 + 0.51) * 100,
+      ID == "LF" ~ (depth * -0.656 + 0.44) * 100,
+      ID == "AM" ~ (depth * -1.89 + 1.4) * 100,
+      TRUE ~ NA_real_
+    ),
+    RI = case_when(
+      ID == "OS" & depth <= 0.82 ~ "hn",
+      ID == "OS" & depth < 1.3 ~ "hh",
+      ID == "OS" & depth >= 1.3 ~ "hb",
+      ID == "ID" & depth <= 0.93 ~ "hn",
+      ID == "ID" & depth < 1.37 ~ "hh",
+      ID == "ID" & depth >= 1.37 ~ "hh",
+      ID == "GB" & depth < 0.55 ~ "hn",
+      ID == "GB" & depth >= 0.55 ~ "hh",
+      ID == "LF" & depth < 0.42 ~ "hn",
+      ID == "LF" & depth < 0.65 ~ "hn",
+      ID == "LF" & depth >= 0.65 ~ "hh",
+      ID == "AM" & depth < 0.75 ~ "hn",
+      ID == "AM" & depth < 1.37 ~ "hh",
+      ID == "AM" & depth < 2.14 ~ "hb",
+      ID == "AM" & depth >= 2.14 ~ "hrev",
+      TRUE ~ NA_character_
+    ),
+    depth_diff = depth - min(depth, na.rm = TRUE)
+  ) %>%
+  mutate(RI = if_else(is.na(RI), "hh", RI))
 master$EQ<-1/abs(master$slope)
 
 

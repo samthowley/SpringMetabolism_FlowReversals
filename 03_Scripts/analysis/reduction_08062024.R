@@ -16,9 +16,10 @@ library(lme4)
 baseline <- function(site) {
   site<-site %>% filter(RI==2)%>%select(Date, DO, depth, ER, GPP, depth_diff, depthID, ID)
   
-  site <- site %>% group_by(count = cumsum(c(TRUE, diff(Date) >= 1))) %>%ungroup()
+  # site <- site %>% group_by(count = cumsum(c(TRUE, diff(Date) >= 1))) %>%ungroup()
+  # site_prior<- site %>% filter(count<=15)
   
-  site_prior<- site %>% filter(count<=15)
+  site_prior<-site %>% filter(depthID=="low")
   
   (GPP_prior<-mean(site_prior$GPP, na.rm=T))
   (ER_prior<-mean(site_prior$ER, na.rm=T))
@@ -38,14 +39,20 @@ extract_reduce <- function(site, baseline) {
       peak = which.max(depth),  # Find the index of the peak
       disturbance_count = row_number() - peak)  # Calculate relative position to the peak
   
-  h<-max(site$depth_diff, na.rm = T)
+  start<-0
+  end<- 5
   
+  h <- site %>%
+    filter(disturbance_count >= start & disturbance_count <= end) %>%
+    summarise(h = mean(depth, na.rm = TRUE)) %>%
+    pull(h)
+
   ER <- site %>%
-    filter(disturbance_count >= 0 & disturbance_count <= 5) %>%
+    filter(disturbance_count >= start & disturbance_count <= end) %>%
     summarise(ER = mean(ER, na.rm = TRUE)) %>%
     pull(ER)
   GPP <- site %>%
-    filter(disturbance_count >= 0 & disturbance_count <= 5) %>%
+    filter(disturbance_count >= start & disturbance_count <= end) %>%
     summarise(GPP = mean(GPP, na.rm = TRUE)) %>%
     pull(GPP)
   
@@ -229,14 +236,19 @@ AM<- AM %>% mutate(depthID = case_when(
   depth>0.9 & depth<1.2 ~ "moderate",
   depth>=1.2 ~ "high"))
 
+# ggplot(AMFR %>% filter(RI==2), aes(Date))+
+#   geom_line(aes(y=depth))+
+#   geom_line(aes(y=depth))
+  
+
 AMFR<- AM %>% mutate(RI = case_when(Date< "2022-08-27"~ 2))
 base<-baseline(AMFR)
-AMFR_072022<-extract_reduce(AMFR,base) #bo
+AMFR_072022<-extract_reduce(AMFR,base) #h
 
 AMFR<- AM %>% mutate(RI = case_when(Date> "2022-08-01" & Date< "2022-11-20"~ 2))
 AMFR_092022<-extract_reduce(AMFR,base) #bo
 
-AMFR<- AM %>% mutate(RI = case_when(Date> "2023-01-01" & Date< "2023-04-20"~ 2))
+AMFR<- AM %>% mutate(RI = case_when(Date> "2023-01-01" & Date< "2023-04-01"~ 2))
 base<-baseline(AMFR)
 AMFR_022023<-extract_reduce(AMFR,base) #rev
 
@@ -247,8 +259,6 @@ AMFR_072023<-extract_reduce(AMFR,base) #bo
 AMFR<- AM %>% mutate(RI = case_when(Date> "2023-08-01" & Date< "2023-10-01"~ 2))
 base<-baseline(AMFR)
 AMFR_092023<-extract_reduce(AMFR,base) #bo
-
-
 
 AMFR<- AM %>% mutate(RI = case_when(Date> "2023-11-01"~ 2))
 base<-baseline(AMFR)
@@ -267,7 +277,15 @@ AM_tbl<-rbind(AMFR_072022,AMFR_092022,AMFR_022023,AMFR_072023,AMFR_092023,
               AMFR_012024,AMFR_042024,AMFR_052024)
 AM_tbl$ID<-'AM'
 AM_tbl$num<-6
-AM_tbl$IF <- c('bo','bo','rev','bo','bo','rev','bo','bo')
+AM_tbl$IF <- c('h','h','rev','bo','bo','rev','bo','bo')
+
+# AM_tbl<-AM_tbl %>% mutate(GPP_reduce= (1-GPP/GPP0)*100, ER_reduce=(1-(ER0/ER))*100)
+# 
+# ggplot(AM_tbl, aes(h, shape=ID, color= IF))+
+#   geom_point(aes(y=ER_reduce), size=6)+
+#   scale_colour_manual(name="", values = cols,
+#                       labels=c("High Stage Event", "Brownout","Flow Reversal"))+
+#   ggtitle("Backwater Flood Impacts on ER")+theme_sam
 
 #AM mod Reduction######################################
 
@@ -409,15 +427,20 @@ IU_tbl$IF <- c('h', 'h', 'h')
 R_R<-rbind(IU_tbl, ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl, OSmod_tbl,
            AMmod_tbl)
 
-R_R$GPP_reduce<-(1-(R_R$GPP/R_R$GPP0))*100
-R_R$ER_reduce<-(1-(R_R$ER0/R_R$ER))*100
-# R_R$GPP_reduce[R_R$GPP_reduce<0] <- 0
-# R_R$ER_reduce[R_R$ER_reduce<0] <- 0
+R_R<-R_R %>% mutate(GPP_reduce=(1-(GPP/GPP0))*100, ER_reduce=(1-(ER0/ER))*100)
 
-write_csv(R_R, "04_Outputs/reduction_analysis.csv")
+(GPP_mean <- R_R %>%
+    filter(IF== 'rev' & GPP_reduce>0) %>%
+    summarise(GPP_mean = mean(GPP_reduce, na.rm = TRUE)) %>%
+    pull(GPP_mean))
 
-R_R<-read.csv("04_Outputs/reduction_analysis.csv")
-mean(R_R$GPP_reduce, na.rm = T)
+(ER_mean <- R_R %>%
+  filter(ER_reduce> 0) %>%
+  summarise(ER_mean = mean(ER_reduce, na.rm = TRUE)) %>%
+  pull(ER_mean))
+
+
+
 summary(lm(ER_reduce~h, data = R_R))
 summary(lmList(ER_reduce ~ h | ID, data = R_R))
 summary(lm(ER_reduce~num, data = R_R))
@@ -454,7 +477,8 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
       axis.title.y =element_text(size = 27, color="darkgreen"),
       axis.title.x =element_text(size = 27),
       plot.title = element_text(size = 22, color="darkgreen"))+
-    scale_y_continuous(limits = c(0,100)))
+    scale_y_continuous(limits = c(0,100)))#+
+    #theme(legend.position = 'bottom'))
 
 
 (b<-ggplot(R_R, aes(h, shape=ID, color= IF))+
@@ -467,6 +491,11 @@ theme_sam<-theme()+    theme(axis.text.x = element_text(size = 27, angle=0),
       axis.title.x =element_text(size = 27),
       plot.title = element_text(size = 22, color="darkred"))+
     scale_y_continuous(limits = c(0,100)))
+
+backwater_floods<-R_R %>% filter(IF== c('bo', 'rev'))
+summary(lm(ER_reduce ~ h, data=backwater_floods))
+summary(lm(GPP_reduce ~ h, data=backwater_floods))
+
 summary(lm(ER_reduce ~ h, data=R_R))
 summary(lm(GPP_reduce ~ h, data=R_R))
 
@@ -482,19 +511,34 @@ ggsave(filename="05_Figures/reduced_mag.jpeg",
     geom_point(aes(y=ER_reduce), size=6, alpha=0.5)+
     scale_colour_manual(name="", values = cols,
                         labels=c("High Stage Event", "Brownout","Flow Reversal"))+
-    ggtitle("Backwater Flood Impacts on ER")+
+    ggtitle("Backwater 
+            Flood Impacts on ER")+
     scale_x_discrete(limits=c("IU","ID","LF","GB","OS","AM"))+
     xlab(hdiff)+ylab("|ER| Increase (%)")+xlab("River Reversal Frequency")+
     theme_sam+theme(
       axis.title.y =element_text(size = 27, color="darkred"),
       axis.title.x =element_text(size = 18),
       axis.text.x=element_text(size=18),
-      plot.title = element_text(size = 22, color="darkred"))+
-    scale_y_continuous(limits = c(0,100)))
-# summary(lm(ER_reduce ~ h, data=R_R))
-# summary(lm(GPP_reduce ~ h, data=RR_noID))
+      plot.title = element_text(size = 22, color="darkred")))
 
-(flood_site<-plot_grid(a, c, nrow=1))
+(d<-ggplot(R_R, aes(ID, color= IF))+
+    geom_point(aes(y=GPP_reduce), size=6, alpha=0.5)+
+    scale_colour_manual(name="", values = cols,
+                        labels=c("High Stage Event", "Brownout","Flow Reversal"))+
+    ggtitle("Backwater 
+            Flood Impacts on ER")+
+    scale_x_discrete(limits=c("IU","ID","LF","GB","OS","AM"))+
+    xlab(hdiff)+ylab("GPP Reduction (%)")+xlab("River Reversal Frequency")+
+    theme_sam+theme(
+      axis.title.y =element_text(size = 27, color="darkgreen"),
+      axis.title.x =element_text(size = 18),
+      axis.text.x=element_text(size=18),
+      plot.title = element_text(size = 22, color="darkgreen")))
+
+summary(lm(ER_reduce ~ num, data=R_R))
+summary(lm(GPP_reduce ~ num, data=R_R))
+
+(flood_site<-plot_grid(c, d,nrow=1))
 
 ggsave(filename="05_Figures/ERreduced_site.jpeg",
        plot = flood_site,
@@ -527,3 +571,6 @@ ggsave(filename="05_Figures/reduced legend.jpeg",
        width =12,
        height = 10,
        units = "in")
+
+write_csv(R_R, "04_Outputs/reduction_analysis.csv")
+R_R<-read.csv("04_Outputs/reduction_analysis.csv")

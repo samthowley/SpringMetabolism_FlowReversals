@@ -226,6 +226,8 @@ IU_chem<-sites[[4]]
 LF_chem<-sites[[5]]
 OS_chem<-sites[[6]]
 
+ggplot(data=master_chem %>% filter(ID != 'IU'), aes(x=depth_diff, y=CO2)) +
+  geom_point(size=1)+theme_sam+xlab(h)+facet_wrap(~ID, scale='free')
 
 (ID_DO<-ggplot(data=ID_chem, aes(x=depth_diff, y=DO)) +
    geom_point(size=1)+theme_sam+xlab(h)+ggtitle("ID"))
@@ -313,7 +315,7 @@ DO.cols<-c(
     #theme(legend.position = "bottom")+
     scale_colour_manual(name="", values = DO.cols,labels=c("Avg GPP", "Avg ER","Two Station","One Station")))
 
-timeseries<-plot_grid(ID_time,GB_time, LF_time, AM_time,nrow=1)
+timeseries<-plot_grid(ID_time,GB_time, LF_time, AM_time,nrow=2)
 
 #slope######
 
@@ -626,3 +628,9 @@ ggsave(filename="05_Figures/interested2.jpeg",
        width =35,
        height = 18,
        units = "in")
+
+
+ggplot(master_chem, aes(x=Date))+
+    geom_line(aes(y=SpC), color="black", linewidth=0.8)+theme_sam+scale_y_log10()+
+  facet_wrap(~ID, scales='free')+theme(axis.text.x = element_text(size=12))
+

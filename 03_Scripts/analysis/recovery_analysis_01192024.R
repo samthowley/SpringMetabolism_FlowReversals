@@ -305,7 +305,7 @@ write_csv(recov, "04_Outputs/recovery_analysis.csv")
 
 ###compile####
 recov<-read_csv("04_Outputs/recovery_analysis.csv")
-mean(recov$GPP_ratio, na.rm = T)
+mean(recov$ER_ratio, na.rm = T)
 recov$a<-'a'
 cols<-c(
   "h"="deepskyblue3",
@@ -389,11 +389,8 @@ ggsave(filename="05_Figures/recovery_magnitude.jpeg",
       axis.title.y =element_text(size = 25, color='darkred'),
       plot.title = element_text(size = 27, color='darkred'),
       axis.text.x = element_text(size=17)))
-recov_excluding_ID<-filter(recov, ER_ratio<1.9)
-summary(lm(log10(GPP_ratio) ~ ID, data=recov_excluding_ID))
 
-
-both<-plot_grid(h,i, ncol=2)
+plot_grid(h, i)
 
 ggsave(filename="05_Figures/recovery_site.jpeg",
        plot = both,
@@ -408,7 +405,8 @@ reduct_recov<-reduct_recov %>% filter(!is.na(ER_recov))
 
 
 a<-ggplot(reduct_recov, aes(ER_reduce, color=IF, shape=ID))+
-  geom_point(aes(y=ER_ratio), size=6)+#scale_y_log10()+
+  geom_point(aes(y=ER_ratio), size=6)+scale_y_log10()+
+  geom_hline(yintercept = 1, linetype='dashed')+
   scale_colour_manual(name="", values = cols,
                       labels=c("High Stage Event", "Brownout","Flow Reversal"))+
   ggtitle("ER Severity vs. Recovery")+theme_sam+
@@ -421,6 +419,7 @@ summary(lm(ER_ratio~ER_reduce, data = reduct_recov))
 
 b<-ggplot(reduct_recov, aes(GPP_reduce, color=IF, shape=ID))+
   geom_point(aes(y=GPP_ratio), size=6)+scale_y_log10()+
+  geom_hline(yintercept = 1, linetype='dashed')+
   scale_colour_manual(name="", values = cols,
                       labels=c("High Stage Event", "Brownout","Flow Reversal"))+
   ggtitle("GPP Severity vs. Recovery")+theme_sam+
