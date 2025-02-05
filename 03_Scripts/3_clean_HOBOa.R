@@ -204,16 +204,6 @@ master <- reduce(data, left_join, by = c("ID", 'Date'))
 master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0) %>%select(-min)
 master <- master[!duplicated(master[c('Date','ID')]),]
 
-master<-master %>% mutate(SpC=if_else(SpC>600, NA, SpC),
-                          SpC=if_else(SpC<30, NA, SpC))%>%
-   mutate(SpC=if_else(ID=='GB'& SpC<360 | ID=='GB'& SpC>420, NA, SpC),
-          SpC=if_else(ID=='AM'&depth<2&SpC<300 | ID=='AM' & SpC>430, NA, SpC),
-          SpC=if_else(ID=='LF'&SpC<470, NA, SpC),
-          SpC=if_else(ID=='ID'&depth<1.2& SpC<300 |ID=='ID'& SpC>360 , NA, SpC),
-          SpC=if_else(ID=='ID'& SpC<300, NA, SpC),
-          SpC=if_else(ID=='OS'& depth<1.2 & SpC<200, NA, SpC))
-
-
 master<-master %>% mutate(DO=if_else(DO>12, NA, DO))%>%
   mutate(DO=if_else(ID=='GB'& DO>9 | ID=='GB'& DO<3.8, NA, DO),
          DO=if_else(ID=='GB'& Date<='2023-01-01' & DO>8 , NA, DO),
@@ -232,8 +222,17 @@ master<-master %>% mutate(DO=if_else(DO>12, NA, DO))%>%
          DO=if_else(ID=='AM'& Date>'2023-06-01'& Date<'2024-02-01'& DO>9.5, NA, DO),
          DO=if_else(ID=='AM'& Date>'2024-01-01'& DO>8, NA, DO),
          DO=if_else(ID=='AM' &depth<1.1 & Date<'2023-04-01'& DO<3.7, NA, DO))
+
+# ggplot(data=master%>%filter(ID=='AM'), aes(x=Date)) +
+#   # geom_point(aes(y=DO*10),color='red')+
+#   #geom_point(aes(y=depth*100),color='blue')+
+#   geom_point(aes(y=pH))+
+#   facet_wrap(~ID)#+geom_hline(yintercept=130)
+
+
   
 master<-master %>%mutate(pH=if_else(pH>10, NA, pH),
+                      pH=if_else(ID=='AM'& Date<'2024-01-01', pH-1, pH),
                        pH=if_else(ID=='AM'& Date<'2023-01-01'& pH<4, NA, pH),
                        pH=if_else(ID=='AM'& Date>'2024-04-01'& pH>7.6, NA, pH),
                        pH=if_else(ID=='AM'& depth<0.8 & pH>9, NA, pH),
@@ -249,52 +248,81 @@ master<-master %>%mutate(pH=if_else(pH>10, NA, pH),
                        pH=if_else(ID=='OS'&pH<7&Date<'2023-01-01', NA, pH)
                        )
 
-ggplot(data=master, aes(x=Date)) +
-    geom_line(aes(y=pH),size=1, color='blue')+geom_hline(yintercept =7.48)+
-    facet_wrap(~ID, scale='free')
+# ggplot(data=master%>%filter(ID=='AM'), aes(x=Date)) +
+#   # geom_point(aes(y=DO*10),color='red')+
+#   #geom_point(aes(y=depth*100),color='blue')+
+#   geom_point(aes(y=pH))+
+#   facet_wrap(~ID)#+geom_hline(yintercept=130)
 
 
-ggplot(data=SpC_everything, aes(x=Date)) +
-  geom_line(aes(y=SpC/100),size=1, color='blue')+
-  facet_wrap(~ID, scale='free')
+master<-master %>%mutate(CO2=if_else(ID=='AM' & CO2<1850, NA, CO2),
+                       CO2=if_else(ID=='AM' & Date>'2023-07-01'& Date<'2023-12-01'& CO2<3450, NA, CO2),
+                       CO2=if_else(ID=='AM' & Date>'2023-07-01'& Date<'2023-09-01'& CO2<4600, NA, CO2),
+                       CO2=if_else(ID=='AM' & Date<'2022-09-01', NA, CO2),
+                       
+                       CO2=if_else(ID=='GB' & Date<'2023-10-01' & CO2<4000, NA, CO2),
+                       CO2=if_else(ID=='GB' & Date<'2023-01-01' & CO2<5100, NA, CO2),
+                       CO2=if_else(ID=='GB' &Date<'2023-07-01' &Date>'2023-01-01' & CO2>7000, NA, CO2),
+                       
+                       CO2=if_else(ID=='LF'&CO2<2000, NA, CO2),
+                       CO2=if_else(ID=='LF'&CO2<3500& Date<'2022-09-01', NA, CO2),
+                       CO2=if_else(ID=='LF'&CO2>15000& Date<'2022-07-01', NA, CO2),
+                       CO2=if_else(ID=='LF'&CO2<3500& Date>'2023-12-01', NA, CO2),
+                       
+                       CO2=if_else(ID=='ID' & CO2<500, NA, CO2),
+                       
+                       CO2=if_else(ID=='OS' & CO2>40000, NA, CO2),
+                       CO2=if_else(ID=='OS' & CO2<650, NA, CO2),
+                       CO2=if_else(ID=='OS' & CO2<1500 & Date<'2023-10-01', NA, CO2),
+                       CO2=if_else(ID=='OS' & CO2<10000 & Date<'2022-07-01', NA, CO2)
+                       
+                    ) #%>%mutate(CO2=if_else(ID=='OS', CO2/6, CO2))
 
-write_csv(master, "02_Clean_data/master_chem1.csv")
 
-###IU####
+master<-master %>% 
+  mutate(
+    SpC=if_else(ID=='AM'&SpC>435, NA, SpC),
+    SpC=if_else(ID=='AM'&SpC<350 & depth<=1.3, NA, SpC),
+    
+    SpC=if_else(ID=='GB'&SpC>420, NA, SpC),
+    SpC=if_else(ID=='GB'&SpC<360, NA, SpC),
+    SpC=if_else(ID=='GB'& Date> '2023-07-01'& SpC>410, NA, SpC),
+    
+    SpC=if_else(ID=='LF'&SpC>590, NA, SpC),
+    SpC=if_else(ID=='LF'&SpC<400, NA, SpC),
+    
+    SpC=if_else(ID=='ID'&SpC>365, NA, SpC),
+    SpC=if_else(ID=='ID'&SpC<300, NA, SpC),
+    
+    SpC=if_else(ID=='OS'&SpC>600, NA, SpC),
+    SpC=if_else(ID=='OS'&SpC<75, NA, SpC),
+    SpC=if_else(ID=='OS'&SpC<300 & depth < 1, NA, SpC)
+  )
+
+
+ggplot(data=master%>%filter(ID=='AM'), aes(x=Date)) +
+  # geom_point(aes(y=DO*10),color='red')+
+  geom_point(aes(y=depth*100),color='blue')+
+  geom_point(aes(y=SpC))+
+  facet_wrap(~ID)+geom_hline(yintercept=130)
+
+    
+    
+
+###Include IU####
+library(dataRetrieval)
 startDate <- "2022-05-12"
 endDate <- "2024-07-25"
-parameterCd <- c('00065')
-ventID<-'02322700'
-IU<- readNWISuv(ventID,parameterCd, startDate, endDate)
-IU<-IU %>% rename('Date'='dateTime')%>%
-  mutate(min=minute(Date)) %>% filter(min==0) %>%
-  mutate(ID='IU', depth=X_00065_00000-13.72)
-IU<-IU[,x]
-
-stage<-rbind(AM, GB, LF, ID, OS, IU)
-
-ggplot(stage, aes(Date, depth)) + geom_line() + facet_wrap(~ ID, ncol=2)
-
-library(dataRetrieval)
-startDate <- "2024-06-18"
-endDate <- "2024-07-25"
-parameterCd <- c('00010','00300','00095','00400')
+parameterCd <- c('00010','00300','00095','00400','00065')
 ventID<-'02322700'
 
 IU<- readNWISuv(ventID,parameterCd, startDate, endDate)
-IU<-IU %>% rename('Date'='dateTime', 'Temp'='X_00010_00000',
+IU<-IU %>% 
+  rename('Date'='dateTime', 'Temp'='X_00010_00000',
                   'DO'='X_00300_00000', 'SpC'='X_00095_00000',
-                  'pH'='X_00400_00000')%>%
+                  'pH'='X_00400_00000', 'depth'='X_00065_00000')%>%
   mutate(min=minute(Date), day=day(Date), mnth=month(Date), yr=year(Date))%>%
-  mutate(min=minute(Date),CO2=NA)%>%
-  filter(min==0)
-IU$ID<-'IU'
-IU<-IU[,c("Date", "DO","Temp", "ID","CO2","pH","SpC" )]
-write_csv(IU, "01_Raw_data/IU/IU_0725.csv")
+  mutate(min=minute(Date),CO2=NA,depth=depth-13.72, ID='IU')%>%
+  filter(min==0)%>% select(Date, depth, ID, SpC, CO2, DO, Temp, pH)
 
-IU<-data.frame()
-file.names <- list.files(path="01_Raw_data/IU", pattern=".csv", full.names=TRUE)
-for(fil in file.names){
-  site <- read_csv(fil)
-  IU<-rbind(IU,site)}
-master<-rbind(master, IU)
+master<- rbind(master, IU)
