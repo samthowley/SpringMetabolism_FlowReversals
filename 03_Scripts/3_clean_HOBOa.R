@@ -207,13 +207,13 @@ master <- master[!duplicated(master[c('Date','ID')]),]
 master<-master %>% mutate(DO=if_else(DO>12, NA, DO))%>%
   mutate(DO=if_else(ID=='GB'& DO>9 | ID=='GB'& DO<3.8, NA, DO),
          DO=if_else(ID=='GB'& Date<='2023-01-01' & DO>8 , NA, DO),
-         DO=if_else(ID=='GB'& Date>'2024-05-01' & DO<4 , NA, DO),
+         #DO=if_else(ID=='GB'& Date>'2024-05-01' & DO<4 , NA, DO),
          
          DO=if_else(ID=='LF'& DO<1 , NA, DO),
          DO=if_else(ID=='LF'& Date<'2022-08-20'& DO<2, NA, DO),
          DO=if_else(ID=='LF'& Date<'2022-07-01'& DO>6, NA, DO),
          DO=if_else(ID=='LF'& Date>'2024-01-01'& DO>8, NA, DO),
-         DO=if_else(ID=='LF'& Date<'2024-05-01'& DO<1.5, NA, DO),
+         #DO=if_else(ID=='LF'& Date<'2024-05-01'& DO<1.5, NA, DO),
          
          DO=if_else(ID=='ID'& Date<'2024-05-01'& Date>'2023-05-01'& DO<3.87, NA, DO),
          DO=if_else(ID=='ID'& Date<'2023-03-01'&  DO>9, NA, DO),
@@ -223,13 +223,9 @@ master<-master %>% mutate(DO=if_else(DO>12, NA, DO))%>%
          DO=if_else(ID=='AM'& Date>'2024-01-01'& DO>8, NA, DO),
          DO=if_else(ID=='AM' &depth<1.1 & Date<'2023-04-01'& DO<3.7, NA, DO))
 
-# ggplot(data=master%>%filter(ID=='AM'), aes(x=Date)) +
-#   # geom_point(aes(y=DO*10),color='red')+
-#   #geom_point(aes(y=depth*100),color='blue')+
-#   geom_point(aes(y=pH))+
-#   facet_wrap(~ID)#+geom_hline(yintercept=130)
-
-
+# ggplot(data=master, aes(x=Date)) +
+#   geom_line(aes(y=DO),color='red')+facet_wrap(~ID)
+# 
   
 master<-master %>%mutate(pH=if_else(pH>10, NA, pH),
                       pH=if_else(ID=='AM'& Date<'2024-01-01', pH-1, pH),
@@ -248,11 +244,8 @@ master<-master %>%mutate(pH=if_else(pH>10, NA, pH),
                        pH=if_else(ID=='OS'&pH<7&Date<'2023-01-01', NA, pH)
                        )
 
-# ggplot(data=master%>%filter(ID=='AM'), aes(x=Date)) +
-#   # geom_point(aes(y=DO*10),color='red')+
-#   #geom_point(aes(y=depth*100),color='blue')+
-#   geom_point(aes(y=pH))+
-#   facet_wrap(~ID)#+geom_hline(yintercept=130)
+ggplot(data=master%>%filter(ID=='GB'), aes(x=Date)) +
+  geom_line(aes(y=DO))+facet_wrap(~ID)
 
 
 master<-master %>%mutate(CO2=if_else(ID=='AM' & CO2<1850, NA, CO2),
@@ -285,11 +278,11 @@ master<-master %>%
     SpC=if_else(ID=='AM'&SpC<350 & depth<=1.3, NA, SpC),
     
     SpC=if_else(ID=='GB'&SpC>420, NA, SpC),
-    SpC=if_else(ID=='GB'&SpC<360, NA, SpC),
+    SpC=if_else(ID=='GB'&SpC<360& Date<'2023-12-01', NA, SpC),
     SpC=if_else(ID=='GB'& Date> '2023-07-01'& SpC>410, NA, SpC),
     
     SpC=if_else(ID=='LF'&SpC>590, NA, SpC),
-    SpC=if_else(ID=='LF'&SpC<400, NA, SpC),
+    SpC=if_else(ID=='LF'&SpC<400 &Date<'2024-01-01', NA, SpC),
     
     SpC=if_else(ID=='ID'&SpC>365, NA, SpC),
     SpC=if_else(ID=='ID'&SpC<300, NA, SpC),
@@ -300,11 +293,11 @@ master<-master %>%
   )
 
 
-ggplot(data=master%>%filter(ID=='AM'), aes(x=Date)) +
-  # geom_point(aes(y=DO*10),color='red')+
-  geom_point(aes(y=depth*100),color='blue')+
-  geom_point(aes(y=SpC))+
-  facet_wrap(~ID)+geom_hline(yintercept=130)
+# ggplot(data=master%>%filter(ID=='LF'), aes(x=Date)) +
+#   # geom_point(aes(y=DO*10),color='red')+
+#   geom_point(aes(y=depth*100),color='blue')+
+#   geom_point(aes(y=SpC))+
+#   facet_wrap(~ID)+geom_hline(yintercept=360)
 
     
     
@@ -326,3 +319,5 @@ IU<-IU %>%
   filter(min==0)%>% select(Date, depth, ID, SpC, CO2, DO, Temp, pH)
 
 master<- rbind(master, IU)
+
+write_csv(master, "02_Clean_data/master_chem1.csv")

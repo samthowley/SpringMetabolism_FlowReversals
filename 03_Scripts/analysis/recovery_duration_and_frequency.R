@@ -60,19 +60,4 @@ ggplot(data=chem%>% filter(ID=='GB'), aes(x=Date, color=SpC_disturb)) +
 
 
 
-IDs<-split(chem,chem$ID)
-AM<-IDs[[1]]
-GB<-IDs[[2]]
-ID<-IDs[[3]]
-LF<-IDs[[4]]
-OS<-IDs[[5]]
 
-library(TTR)  # Dynamic Linear Models package
-
-LF <- LF %>%
-  group_by(ID) %>%
-  mutate(SpC_smooth = rollmean(SpC, k = 48, fill = NA, align = "center"))
-
-ggplot(data=LF, aes(x=Date)) +
-  geom_line(aes(y=SpC),size=1, color='blue')
-  
