@@ -15,8 +15,6 @@ chem<-chem %>%group_by(ID) %>%
   mutate(depth_min=min(depth, na.rm=T))%>% 
   mutate(depth_diff=depth-depth_min)
 
-
-
 chem<-chem %>% mutate(depthID = case_when(
   ID=='AM' & depth<0.9 ~ "low",
   ID=='AM' &depth>0.9 & depth<1.2 ~ "moderate",
@@ -37,7 +35,7 @@ chem<-chem %>% mutate(depthID = case_when(
   mutate(SpC_disturb=case_when(
     SpC<=300~'1',
     ID=='AM' & SpC<=340~'1',
-    ID=='LF' & SpC<=400~'1',
+    ID=='LF' & SpC<=400 & Date>'2024-01-20'~'1',
     ID=='GB' & SpC<=350~'1'
   ))%>%
   mutate(pH_disturb=case_when(
@@ -50,11 +48,42 @@ chem<-chem %>% mutate(depthID = case_when(
 chem <- chem %>%
   mutate(pH_disturb = ifelse(is.na(pH_disturb), '0', pH_disturb),
          SpC_disturb = ifelse(is.na(SpC_disturb), '0', SpC_disturb))
-         
 
-ggplot(data=chem%>% filter(ID=='GB'), aes(x=Date, color=SpC_disturb)) +
-  geom_point(aes(y=SpC))+
-  facet_wrap(~ID)
+#frequency 
+chem <- chem %>%
+  group_by(ID) %>%  
+  mutate(
+    pH_disturb = as.numeric(pH_disturb),  # Convert to numeric
+    hours_btwn_pH = ifelse(pH_disturb == 0, sequence(rle(pH_disturb == 0)$lengths), 0)
+  ) %>%
+  mutate(
+    SpC_disturb = as.numeric(SpC_disturb),  # Convert to numeric
+    hours_btwn_SpC = ifelse(SpC_disturb == 0, sequence(rle(SpC_disturb == 0)$lengths), 0)
+  ) %>%  
+  mutate(
+   hours_btwn_h = ifelse(depthID != "high", sequence(rle(depthID != "high")$lengths), 0)
+  ) %>%
+  ungroup() 
+
+#duration
+chem <- chem %>%
+  group_by(ID) %>%  # Group by ID if needed
+  mutate(
+    duration_h = ifelse(depthID == "high", sequence(rle(depthID == "high")$lengths), 0)
+  ) %>% 
+  mutate(
+    duration_pH = ifelse(pH_disturb == 1, sequence(rle(pH_disturb == 1)$lengths), 0)
+  ) %>%
+  mutate(
+    duration_SpC = ifelse(SpC_disturb == 1, sequence(rle(SpC_disturb == 1)$lengths), 0)
+  ) %>%
+  ungroup()
+
+
+chem<-chem %>%mutate(floodID=case_when(
+  depthID=='high'& SpC_disturb==1~ "backwater",
+  depthID=='high'& pH_disturb==1~ "backwater")) %>%
+  mutate(floodID = ifelse(is.na(floodID), 'high-stage', floodID))
 
 
 
