@@ -4,7 +4,6 @@ rm(list=ls())
 library(tidyverse)
 library(readxl)
 library(measurements)
-library(zoo)
 library(cowplot)
 library(mmand)
 
@@ -35,7 +34,7 @@ chem<-left_join(chem, master_metabolism4, by=c('Date', 'ID'))
 
 chem<-chem %>%group_by(ID) %>% 
   mutate(depth_min=min(depth, na.rm=T))%>% 
-  mutate(depth_diff=depth-depth_min)
+  mutate(depth_diff=depth-depth_min)%>% distinct(ID, Date, .keep_all = TRUE) 
 
 chem<-chem %>% mutate(depthID = case_when(
   ID=='AM' & depth<0.9 ~ "low",
@@ -101,11 +100,16 @@ chem <- chem %>%
   )) %>%ungroup()
 
 
+
+ggplot(chem, aes(Date, color=flood_count))+
+  geom_point(aes(y=depth))+facet_wrap(~ID, scales='free')
+
+
+
+
 #baseline, hours to days
 chem<-chem%>%  
   mutate(year=year(Date), season=get_season(Date))%>%
-  mutate(time_btwn_days = as.numeric(time_btwn)/24, flood_count_days = as.numeric(flood_count)/24)%>%
-  
   group_by(season, year, ID, floodID) %>%
   mutate(
     max_height = which.max(replace(depth, is.na(depth), -Inf)), 
@@ -119,27 +123,24 @@ chem<-chem%>%
     GPP_baseline = mean(GPP[depthID == "low"], na.rm = TRUE),
     ER_baseline = mean(ER[depthID == "low"], na.rm = TRUE)) 
 
-#formulate table
-frequency <- chem %>%
+table <- chem %>%
   group_by(floodID, ID, season, year) %>%
   summarise(
-    time_btwn=max(time_btwn_days),
-    Date = mean(Date, na.rm = TRUE),
-    .groups = 'keep')
-
-duration <- chem %>%
-  group_by(floodID, ID, season, year) %>%
-  summarise(
-    duration=max(flood_count_days),
+    duration=max(flood_count),
+    time_btwn=max(time_btwn),
     Date = mean(Date, na.rm = TRUE),
     GPP_disturb = ifelse(all(is.na(GPP[flood_count > 0 & flood_count < 5])), NA, mean(GPP[flood_count > 0 & flood_count < 5], na.rm = TRUE)),
     ER_disturb = ifelse(all(is.na(ER[flood_count > 0 & flood_count < 5])), NA, mean(ER[flood_count > 0 & flood_count < 5], na.rm = TRUE)),
     GPP_baseline = mean(GPP_baseline, na.rm = TRUE), 
     ER_baseline = mean(ER_baseline, na.rm = TRUE),
-    .groups = 'keep') %>%
-  filter(floodID != 'baseline') %>%
+    .groups = 'keep') %>%ungroup()%>%
+  
+  arrange(ID, Date) %>%
+  mutate(time_btwn = if_else(time_btwn == 0, NA, time_btwn))%>%  
   mutate( GPP_reduce = (1 - (GPP_disturb / GPP_baseline)) * 100, 
-          ER_reduce = (1 - (ER_baseline / ER_disturb)) * 100)
+          ER_reduce = (1 - (ER_baseline / ER_disturb)) * 100)%>%  arrange(ID, Date) %>% 
+  arrange(ID, Date) %>% 
+  fill(time_btwn, .direction = "down") %>% filter(duration>0)
 
 #write_csv(disturbance_table, "04_Outputs/duration_recovery.csv")
 ##########
