@@ -60,18 +60,19 @@ extract_reduce <- function(site, baseline) {
   year<-year(date)
   season<-get_season(date)
   
-  site_ls<-list(h_prior,ER_prior,GPP_prior,h,GPP,ER,year,season)
+  site_ls<-list(h_prior,ER_prior,GPP_prior,h,GPP,ER,date)
   df<- data.frame(site_ls[[1]],site_ls[[2]],site_ls[[3]],
                   site_ls[[4]],site_ls[[5]],site_ls[[6]],
-                  site_ls[[7]],site_ls[[8]])
+                  site_ls[[7]])
   colnames(df)[1]<-'h0'
   colnames(df)[2]<-'ER0'
   colnames(df)[3]<-'GPP0'
   colnames(df)[4]<-'h'
   colnames(df)[5]<-'GPP'
   colnames(df)[6]<-'ER'
-  colnames(df)[7]<-'year'
-  colnames(df)[8]<-'season'
+  colnames(df)[7]<-'Date'
+  
+
   
   return(df)}
 extract_reduce_mod <- function(siteFR) {
@@ -94,18 +95,18 @@ extract_reduce_mod <- function(siteFR) {
   year<-year(date)
   season<-get_season(date)
   
-  site_ls<-list(h0,ER0,GPP0,h,GPP,ER,year,season)
+  site_ls<-list(h0,ER0,GPP0,h,GPP,ER,date)
   df<- data.frame(site_ls[[1]],site_ls[[2]],site_ls[[3]],
                   site_ls[[4]],site_ls[[5]],site_ls[[6]],
-                  site_ls[[7]],site_ls[[8]])
+                  site_ls[[7]])
   colnames(df)[1]<-'h0'
   colnames(df)[2]<-'ER0'
   colnames(df)[3]<-'GPP0'
   colnames(df)[4]<-'h'
   colnames(df)[5]<-'GPP'
   colnames(df)[6]<-'ER'
-  colnames(df)[7]<-'year'
-  colnames(df)[8]<-'season'
+  colnames(df)[7]<-'Date'
+  
   
   return(df)}
 get_season <- function(date) {
@@ -429,6 +430,8 @@ R_R<-rbind(IU_tbl, ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl, OSmod_tbl,
 
 R_R<-R_R %>% mutate(GPP_reduce=(1-(GPP/GPP0))*100, ER_reduce=(1-(ER0/ER))*100)
 
+write_csv(R_R, "04_Outputs/reduction_analysis.csv")
+
 (GPP_mean <- R_R %>%
     filter(IF== 'rev' & GPP_reduce>0) %>%
     summarise(GPP_mean = mean(GPP_reduce, na.rm = TRUE)) %>%
@@ -572,5 +575,4 @@ ggsave(filename="05_Figures/reduced legend.jpeg",
        height = 10,
        units = "in")
 
-write_csv(R_R, "04_Outputs/reduction_analysis.csv")
 R_R<-read.csv("04_Outputs/reduction_analysis.csv")

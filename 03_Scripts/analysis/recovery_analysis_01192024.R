@@ -68,16 +68,15 @@ recovery_calc <- function(siterecov) {
   
   h_diff<-max(siterecov$depth_diff, na.rm=T)
   
-  IDFR_ls<-list(GPPrecov_results,ERrecov_results,hrecov_results,h_diff, year, season)
+  IDFR_ls<-list(GPPrecov_results,ERrecov_results,hrecov_results,h_diff,date)
   df<- data.frame(IDFR_ls[[1]],IDFR_ls[[2]],IDFR_ls[[3]],
-                  IDFR_ls[[4]],IDFR_ls[[5]],IDFR_ls[[6]])
+                  IDFR_ls[[4]],IDFR_ls[[5]])
 
   colnames(df)[1]<-'GPP_recov'
   colnames(df)[2]<-'ER_recov'
   colnames(df)[3]<-'H_recov'
   colnames(df)[4]<-'h_diff'
-  colnames(df)[5]<-'year'
-  colnames(df)[6]<-'season'
+  colnames(df)[5]<-'Date'
   
   return(df)
 }
@@ -93,10 +92,6 @@ get_season <- function(date) {
     )
   )
 }
-
-
-#ggplot(IDFR, aes(Date))+ geom_line(aes(y=depth), size=1)
-#ggplot(OSFR_0324, aes(x=count,y=ER_ratio))+ geom_point()+geom_smooth(method='lm')
 
 #data####
 master <- read_csv("02_Clean_data/master_metabolism4.csv")
@@ -298,8 +293,6 @@ recov$GPP_recov[recov$GPP_recov<0]<-NA
 
 recov$GPP_ratio<-recov$H_recov/recov$GPP_recov
 recov$ER_ratio<-recov$H_recov/recov$ER_recov
-# recov$GPP_ratio[recov$GPP_ratio>10] <- NA
-# recov$ER_ratio[recov$ER_ratio>10] <- NA
 
 write_csv(recov, "04_Outputs/recovery_analysis.csv")
 
