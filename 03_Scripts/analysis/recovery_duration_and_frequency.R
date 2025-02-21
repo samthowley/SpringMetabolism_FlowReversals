@@ -60,9 +60,9 @@ variableID <- variableID %>%
          SpC_disturb = ifelse(is.na(SpC_disturb), '0', SpC_disturb))
 
 
-ggplot(data=variableID%>%filter(ID=='LF'), aes(x=Date, color=depthID)) +
-  geom_point(aes(y=depth))+geom_hline(yintercept = 0.65)
-
+# ggplot(data=variableID%>%filter(ID=='LF'), aes(x=Date, color=depthID)) +
+#   geom_point(aes(y=depth))+geom_hline(yintercept = 0.65)
+# 
 
 #ID disturbance#
 stageID <- variableID %>%
@@ -100,14 +100,12 @@ time_btwn <- duration %>%
 IDs <- time_btwn %>%
   mutate(
     flood_group = cumsum(stageID == "high" & lag(stageID, default = "baseline") != "high"),
-    flood_ID = ifelse(stageID == "high", flood_group, NA)  # Assign unique numbers only to "high"
-  ) %>%
+    flood_ID = ifelse(stageID == "high", flood_group, NA)) %>%
   select(-flood_group)%>%
   mutate(flood_count = ifelse(is.na(flood_count), 0, flood_count))%>%
   
   mutate(baseline_ID = ifelse(stageID == "baseline", 
                           cumsum(stageID == "baseline" & lag(stageID, default = "high") != "baseline"), NA))
-
 
 
 #seperate baseline df from flood df
@@ -127,7 +125,28 @@ baseline_stats<-baseline%>%
   mutate(GPP_baseline = mean(GPP[depthID == "low"], na.rm = TRUE),
          ER_baseline = mean(ER[depthID == "low"], na.rm = TRUE),
          h_baseline = mean(depth[depthID == "low"], na.rm = TRUE))%>%
-  select(Date, ID, time_btwn, baseline_ID, GPP_baseline, ER_baseline, h_baseline)
+  select(Date, ID, depth, h_count, time_btwn, baseline_ID, GPP_baseline, ER_baseline, h_baseline)
+
+
+ggplot(data=baseline_stats%>%filter(ID=='ID'), aes(x=Date, color=h_count)) +
+  geom_point(aes(y=depth))+facet_wrap(~ID, scales='free')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #baseline summary
 baseline_tbl <- baseline_stats %>%
