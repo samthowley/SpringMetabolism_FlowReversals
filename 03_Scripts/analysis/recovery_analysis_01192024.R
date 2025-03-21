@@ -7,6 +7,7 @@ library(measurements)
 library(zoo)
 library(cowplot)
 library(mmand)
+library(lme4)
 check_ratios <- function(siteBO) {   
   
   siteBO<-siteBO %>% select(Date, DO, depth, ER, GPP, depth_diff, SpC)
@@ -40,11 +41,9 @@ check_ratios <- function(siteBO) {
   siteBO$ER_ratio<-siteBO$ER/ER_prior
   siteBO$depth_ratio<-siteBO$depth/h_prior
   return(siteBO)}
+siterecov<-AMFR_2022
 recovery_calc <- function(siterecov) {
-  date<-as.Date(mean(siterecov$Date, na.rm = T))
-  year<-year(date)
-  season<-get_season(date)
-
+  
   GPPrecov<-siterecov %>% select(count, GPP_ratio, SpC)
   ind <- which.min(GPPrecov$GPP_ratio)
   GPPrecov<-GPPrecov[-c(0:ind),]
@@ -59,9 +58,20 @@ recovery_calc <- function(siterecov) {
   cf <- coef(modER)
   (ERrecov_results<-(1-cf[1])/cf[2])
 
-  hrecov<-siterecov%>% select(count, depth_ratio, SpC)
+  hrecov<-siterecov%>% select(count, Date,depth, depth_ratio, SpC)
+  
+  hrecov<-hrecov%>%  
+    mutate(
+      max_height = which.max(replace(depth, is.na(depth), -Inf)), 
+      h_count = case_when(row_number() == max_height ~ 0))
+  
+  date<-hrecov$Date[hrecov$h_count == 0]
+  year<-year(date)
+  season<-get_season(date)
+
   ind <- which.max(hrecov$depth_ratio)
   hrecov<-hrecov[-c(0:ind),]
+  
   modh<-lm(depth_ratio ~ count, data = hrecov)
   cf <- coef(modh)
   (hrecov_results<-(1-cf[1])/cf[2])
@@ -96,10 +106,24 @@ get_season <- function(date) {
 #data####
 master <- read_csv("02_Clean_data/master_metabolism4.csv")
 
-master<-master %>%select(Date,DO,GPP,ER,depth,ID, SpC) %>%group_by(ID) %>% 
+master<-master %>%select(Date,DO,GPP,ER,depth,ID,SpC,pH) %>%group_by(ID) %>% 
   mutate(depth_min=min(depth, na.rm=T))
 master<-master %>%mutate(depth_diff=depth-depth_min, days=as.Date(Date))
 master <- master[!duplicated(master[c('days', 'ID')]),]
+
+u<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "velocity")
+
+rC <- lmList(u ~ depth | ID, data=u)
+(cf <- coef(rC))
+
+velocity <- master %>%
+  mutate(velocity= case_when(
+    ID== 'AM'~ cf[1,1]+(depth*cf[1,2]),
+    ID== 'GB'~ cf[2,1]+(depth*cf[2,2]),
+    ID== 'ID'~ cf[3,1]+(depth*cf[3,2]),
+    ID== 'LF'~ cf[4,1]+(depth*cf[4,2]),
+    ID== 'OS'~ cf[5,1]+(depth*cf[5,2])))
+  
 
 IDs<-split(master,master$ID)
 AM<-IDs[[1]]
@@ -108,6 +132,7 @@ ID<-IDs[[3]]
 IU<-IDs[[4]]
 LF<-IDs[[5]]
 OS<-IDs[[6]]
+
 #AM ####
 AM<- AM %>% mutate(depthID = case_when(
   depth<0.9 ~ "low",
@@ -118,44 +143,45 @@ AMFR<- AM %>% mutate(RI = case_when(Date<"2022-11-20"~ 2)) %>% filter(RI==2)
 AMFR_2022<-check_ratios(AMFR)
 
 AMFR_0922<-AMFR_2022 %>% filter(count>50) %>% filter(count<110) 
-(AMFR_0922<-recovery_calc(AMFR_0922))#BO
+(AMFR_0922_results<-recovery_calc(AMFR_0922))#BO
 
 AMFR_0822<-AMFR_2022 %>% filter(count<50)  
-(AMFR_0822<-recovery_calc(AMFR_0822))#h
-
-
+(AMFR_0822_results<-recovery_calc(AMFR_0822))#h
 
 
 AMFR<- AM %>% mutate(RI = case_when(Date> "2022-11-01" & Date<"2023-04-01"~ 2)) %>% filter(RI==2)
 AMFR_0223<-check_ratios(AMFR)
-(AMFR_0223<-recovery_calc(AMFR_0223))#rev
-
+(AMFR_0223_results<-recovery_calc(AMFR_0223))#rev
 
 
 AMFR<- AM %>% mutate(RI = case_when(Date> "2023-04-25" & Date<"2023-11-30"~ 2))%>% filter(RI==2)
 AMFR_S2023<-check_ratios(AMFR)
 
 AMFR_0723<-AMFR_S2023 %>% filter(count>50 & count<100)
-(AMFR_0723<-recovery_calc(AMFR_0723)) #bo
+(AMFR_0723_results<-recovery_calc(AMFR_0723)) #bo
 
 AMFR_0823<-AMFR_S2023 %>% filter(count>100)%>% filter(count<160) 
-(AMFR_0823<-recovery_calc(AMFR_0823))#BO
-
+(AMFR_0823_results<-recovery_calc(AMFR_0823))#BO
 
 
 AMFR<- AM %>% mutate(RI = case_when(Date>"2023-10-25"~2))%>% filter(RI==2) 
 AMFR_2024<-check_ratios(AMFR)
 
 AMFR_1223<-AMFR_2024 %>% filter(count<120)
-(AMFR_1223<-recovery_calc(AMFR_1223)) #rev
+(AMFR_1223_results<-recovery_calc(AMFR_1223)) #rev
 
 AMFR_0224<-AMFR_2024 %>% filter(count>200)
-(AMFR_0224<-recovery_calc(AMFR_0224))#bo
+(AMFR_0224_results<-recovery_calc(AMFR_0224))#bo
 
 AM_tbl<-rbind(AMFR_0922, AMFR_0822,AMFR_0223,AMFR_0723,AMFR_0823,AMFR_1223,AMFR_0224)
 AM_tbl$ID<-'AM'
 AM_tbl$num<-6
 AM_tbl$IF <- c('bo','h','rev','bo','bo','rev','bo')
+
+
+ggplot(AM_tbl, aes(Date))+
+  geom_point(aes(y=depth))
+
 
 #OS####
 
@@ -230,16 +256,21 @@ LF_tbl$IF <- c("h","h","h","h","rev","rev")
 GBFR<- GB %>% mutate(RI = case_when(Date> "2022-08-01" & Date<"2022-12-22"~ 2))%>%filter(RI==2)
 GBFR_0822<-check_ratios(GBFR)
 GBFR_0822<-GBFR_0822 %>% filter(count>40)
-(GBFR_0822<-recovery_calc(GBFR_0822))
+(GBFR_0822_results<-recovery_calc(GBFR_0822))
 
 GBFR<- GB %>% mutate(RI = case_when(Date> "2023-10-01" & Date<"2024-02-11"~ 2))%>%filter(RI==2)
 GBFR_1224<-check_ratios(GBFR)
-(GBFR_1224<-recovery_calc(GBFR_1224))
+(GBFR_1224_results<-recovery_calc(GBFR_1224))
 
 GB_tbl<-rbind(GBFR_0822,GBFR_1224)
 GB_tbl$ID<-'GB'
 GB_tbl$num<-3
 GB_tbl$IF <- c("h", 'rev')
+
+
+test_recovery<-rbind(AM_tbl, GB_tbl)
+
+write_csv(test_recovery, "test_recovery.csv")
 
 #ID####
 
@@ -294,6 +325,7 @@ recov$GPP_recov[recov$GPP_recov<0]<-NA
 recov$GPP_ratio<-recov$H_recov/recov$GPP_recov
 recov$ER_ratio<-recov$H_recov/recov$ER_recov
 
+recov<-recov%>% arrange(ID, Date)
 write_csv(recov, "04_Outputs/recovery_analysis.csv")
 
 ###compile####

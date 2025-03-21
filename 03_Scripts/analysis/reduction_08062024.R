@@ -131,6 +131,19 @@ master<-master %>%
 
 master$depth_diff<-master$depth-master$depth_min
 
+u<- read_excel("04_Outputs/rC_k600_edited.xlsx",sheet = "velocity")
+
+rC <- lmList(u ~ depth | ID, data=u)
+(cf <- coef(rC))
+
+master <- master %>%
+  mutate(velocity= case_when(
+    ID== 'AM'~ cf[1,1]+(depth*cf[1,2]),
+    ID== 'GB'~ cf[2,1]+(depth*cf[2,2]),
+    ID== 'ID'~ cf[3,1]+(depth*cf[3,2]),
+    ID== 'LF'~ cf[4,1]+(depth*cf[4,2]),
+    ID== 'OS'~ cf[5,1]+(depth*cf[5,2])))
+
 IDs<-split(master,master$ID)
 AM<-IDs[[1]]
 GB<-IDs[[2]]
@@ -428,9 +441,9 @@ IU_tbl$IF <- c('h', 'h', 'h')
 R_R<-rbind(IU_tbl, ID_tbl, LF_tbl, GB_tbl, AM_tbl, OS_tbl, OSmod_tbl,
            AMmod_tbl)
 
-R_R<-R_R %>% mutate(GPP_reduce=(1-(GPP/GPP0))*100, ER_reduce=(1-(ER0/ER))*100)
+R_R<-R_R %>% mutate(GPP_reduce=(1-(GPP/GPP0))*100, ER_reduce=(1-(ER0/ER))*100)%>%arrange(ID, Date)
 
-write_csv(R_R, "04_Outputs/reduction_analysis.csv")
+write_csv(R_R, "04_Outputs/reduction_analysis_2024.csv")
 
 (GPP_mean <- R_R %>%
     filter(IF== 'rev' & GPP_reduce>0) %>%

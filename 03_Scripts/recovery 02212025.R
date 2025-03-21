@@ -97,28 +97,38 @@ baseline_stats<-IDs%>%arrange(ID, Date)%>%
                   h_baseline = mean(depth[depthID == "low"], na.rm = TRUE))%>%ungroup%>%
   group_by(ID)%>%
   fill(GPP_baseline,ER_baseline,h_baseline, .direction = "downup")
-  
+
+
 recovery <- baseline_stats %>%
   mutate(
     GPP_ratio = GPP / GPP_baseline, 
     ER_ratio = ER / ER_baseline, 
-    h_ratio = depth / h_baseline
-  ) %>%
+    h_ratio = depth / h_baseline) %>%
   group_by(ID) %>%
   mutate(group = cumsum(h_count == 1 & lag(h_count, default = 0) == 0)) %>%
   ungroup() %>%
   group_by(group, ID) %>%
   mutate(
     GPP_recover = if_else(h_count > 0, cumsum(GPP_ratio <= 0.8), NA_real_),
-    ER_recover  = if_else(h_count > 0, cumsum(ER_ratio <= 0.8), NA_real_),
-  ) %>%
-  ungroup()%>% group_by(ID, flood_group)%>% mutate(
-    h_recover = if_else(h_count > 0, cumsum(h_ratio <= 0.8), NA_real_)) 
-  
+    ER_recover  = if_else(h_count > 0, cumsum(ER_ratio <= 0.8), NA_real_)) %>%
+  ungroup() %>%
+  group_by(ID, flood_group) %>%
+  mutate(
+    h_recover = if_else(h_count > 0, row_number() - which.max(h_ratio > 0.8), NA_real_)) %>%
+  ungroup()
+
+ggplot(data=recovery%>%filter(ID=='AM'), aes(x=Date, color=flood_group))+
+  geom_point(aes(y=ER_ratio))+facet_wrap(~ID, scales='free')+geom_hline(yintercept = 1)
 
 
-ggplot(data=recovery%>%filter(ID=='AM'), aes(x=Date, color=h_recover))+
-  geom_point(aes(y=depth))+facet_wrap(~ID, scales='free')+geom_hline(yintercept = 1)
+flood_tbl <- recovery %>%
+  group_by(ID, flood_ID) %>%
+  summarise(
+    floodtype=max(flood_group, na.rm=T),
+    recovery_ER=max(ER_recover, na.rm=T),
+    recovery_GPP=max(GPP_recover, na.rm=T),
+    recovery_h=max(h_recover, na.rm=T),
+    depth=max(depth, na.rm=T),
+    Date = mean(Date, na.rm = TRUE),
+        .groups = 'keep') %>%ungroup()
 
-range(recovery$h_ratio, na.rm = T)
-  
