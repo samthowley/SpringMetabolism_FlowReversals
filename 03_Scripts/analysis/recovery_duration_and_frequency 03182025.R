@@ -200,7 +200,7 @@ joined_tbl<-full_join(baseline_tbl_edit,flood_tble_edit, by=c('ID', 'Date'))%>%
   arrange(ID, Date)%>%
   fill(time_btwn,GPP_baseline,ER_baseline,h_baseline, .direction = 'down')%>%
   filter(!is.na(duration))%>%filter(!is.na(floodtype))%>%
-  select(-baseline_ID, flood_ID)%>%
+  select(-baseline_ID)%>%
   mutate(GPP_reduce=(1-(disturb_GPP/GPP_baseline))*100,
          ER_reduce=(1-(disturb_ER/ER_baseline))*100,
          h_diff=disturb_h-h_baseline)
@@ -215,23 +215,42 @@ brwn_events<-joined_tbl%>%filter(floodtype!='HS')
 recovery_df<-left_join(IDs, baseline_tbl, by=c('ID', 'baseline_ID'))%>%
   fill(GPP_baseline, ER_baseline, h_baseline, .direction = 'down')%>%
   mutate(event_ID=if_else(is.na(flood_ID), baseline_ID, flood_ID))%>%
-  select(ID, Date, GPP_baseline, ER_baseline, h_baseline, GPP, ER, depth,event_ID)%>%
   mutate(GPP_frac=GPP/GPP_baseline, ER_frac= ER/ER_baseline, h_frac=depth/h_baseline)%>%
-  filter(ID=='GB')
+  filter(ID=='AM')%>%filter(floodtype %in% c('BO',"FR") )
 
-h_count<-recovery_df %>%
-  group_by(ID, event_ID)%>%
+ggplot(recovery_df, aes(Date,color=as.factor(event_ID)))+
+  geom_point(aes(y=depth), size=1)+
+  facet_wrap(~ID, scales='free', ncol=2)+
+  geom_hline(yintercept = 1)+ 
+  geom_smooth(aes(y = depth), method = 'lm')
+
+h_count<-recovery_df%>%
+  group_by(ID, event_ID) %>%
   mutate(
     max_height = which.max(replace(depth, is.na(depth), -Inf)), 
     h_count = case_when(
       row_number() < max_height ~ row_number() - max_height,
       row_number() == max_height ~ 0,
       row_number() > max_height ~ row_number() - max_height))%>%
-  filter(h_count>=0)
+  filter(h_count>0)
 
-ggplot(h_count, aes(Date,color=as.factor(event_ID)))+
-  geom_point(aes(y=h_frac), size=1)+facet_wrap(~ID, scales='free', ncol=2)+
-  geom_hline(yintercept = 1)
+lm_h<-h_count %>%
+  group_by(event_ID, ID) %>%
+  nest() %>%
+  mutate(model = map(data, ~ lm(depth ~ h_count, data = .x)),
+         model_summary = map(model, summary))%>%
+  mutate(tidy_model = map(model, broom::tidy)) %>%
+  unnest(tidy_model) %>%
+  select(event_ID, ID, term, estimate) %>%
+  pivot_wider(names_from = term, values_from = estimate)%>%
+  mutate(h_recovery=abs((1-`(Intercept)`)/h_count))%>%
+  select(event_ID, ID, h_recovery)
+
+  
+
+ggplot(h_count%>% filter(event_ID==9), aes(h_count))+
+  geom_point(aes(y=ER_frac, color='GPP'), size=1)+
+  geom_point(aes(y=DO, color='DO'), size=1)
 
 lm_GPP<-h_count %>%
   group_by(event_ID, ID) %>%
@@ -242,7 +261,6 @@ lm_GPP<-h_count %>%
   unnest(tidy_model) %>%
   select(event_ID, ID, term, estimate) %>%
   pivot_wider(names_from = term, values_from = estimate)%>%
-  filter(h_count<0)%>%
   mutate(GPP_recovery=(1-`(Intercept)`)/h_count)%>%
   select(event_ID, ID, GPP_recovery)
 
@@ -255,29 +273,20 @@ lm_ER<-h_count %>%
   unnest(tidy_model) %>%
   select(event_ID, ID, term, estimate) %>%
   pivot_wider(names_from = term, values_from = estimate)%>%
-  filter(h_count<0)%>%
   mutate(ER_recovery=(1-`(Intercept)`)/h_count)%>%
   select(event_ID, ID, ER_recovery)
 
 
-lm_h<-h_count %>%
-  group_by(event_ID, ID) %>%
-  nest() %>%
-  mutate(model = map(data, ~ lm(ER_frac ~ h_count, data = .x)),
-         model_summary = map(model, summary))%>%
-  mutate(tidy_model = map(model, broom::tidy)) %>%
-  unnest(tidy_model) %>%
-  select(event_ID, ID, term, estimate) %>%
-  pivot_wider(names_from = term, values_from = estimate)%>%
-  filter(h_count<0)%>%
-  mutate(h_recovery=(1-`(Intercept)`)/h_count)%>%
-  select(event_ID, ID, h_recovery)
 
 
 recovery<-left_join(lm_GPP, lm_ER, by=c('ID', 'event_ID'))
-recovery<-left_join(recovery, lm_ER, by=c('ID', 'event_ID'))
+recovery<-left_join(recovery, lm_h, by=c('ID', 'event_ID'))%>%
+  mutate(ER_ratio= ER_recovery/h_recovery, GPP_ratio= GPP_recovery/h_recovery)
 
-
+recovery_summary<-recovery_df %>%
+  group_by(event_ID, ID)%>%
+  summarize(floodtype=mean(floodtype_num, na.rm=T))
+  
 
 ####################
 #Figures###########
