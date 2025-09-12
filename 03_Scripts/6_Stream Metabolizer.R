@@ -10,43 +10,49 @@ library(imputeTS)
 library(streamMetabolizer)
 library(dataRetrieval)
 
+file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
+file.names<-file.names[c(2,3,5)]
+data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
+
+merged_data <- reduce(data, left_join, by = c("ID", 'Date'))
+  
+filter(complete.cases(DO, depth))%>%
+  mutate(ln.Q=log(Q))%>%
+  group_by(ID)%>%
+  mutate(split_q=case_when(depth>mean(depth, na.rm=T)~'hi',
+                           depth<=mean(depth, na.rm=T)~'lo'))%>%
+  mutate(ID_q = paste(ID, split_q, sep = "_"))
+
 #functions####
-bins<- function(site) {
-  site_positive<- site %>% filter(K600_1d>0)
-
-  IQR<-quantile(site_positive$Q_m.s, probs = c(0,0.25,0.5,0.75,1), na.rm=T)
-  bin<-filter(site_positive, Q_m.s<=IQR[1])
-  (Q<-mean(bin$Q_m.s))
-  (K<-mean(bin$K600_1d))
-
-  bin2<-filter(site_positive, Q_m.s<=IQR[2])
-  (Q2<-mean(bin2$Q_m.s))
-  (K2<-mean(bin2$K600_1d))
-
-  bin3<-filter(site_positive, Q_m.s<=IQR[3])
-  (Q3<-mean(bin3$Q_m.s))
-  (K3<-mean(bin3$K600_1d, na.rm=T))
-
-  bin4<-filter(site_positive, Q_m.s>=IQR[4])
-  (Q4<-mean(bin4$Q_m.s))
-  (K4<-mean(bin4$K600_1d, na.rm=T))
-
-  bin5<-filter(site_positive, Q_m.s>=IQR[5])
-  (Q5<-mean(bin5$Q_m.s))
-  (K5<-mean(bin5$K600_1d, na.rm=T))
-
+bins <- function(site) {
+  
+  breaks <- quantile(site_positive$Q_m.s, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
+  
+  site <- site %>%
+    mutate(bin = cut(Q_m.s, breaks = breaks, include.lowest = TRUE, labels = FALSE))
+  
+  summary <- site%>%
+    group_by(bin) %>%
+    summarise(
+      Q_mean = mean(Q_m.s, na.rm = TRUE),
+      K_mean = mean(K600_1d, na.rm = TRUE)
+    ) %>%
+    arrange(bin)
+  
+  Q_vals <- summary$Q_mean
+  K_vals <- summary$K_mean
+  
   bayes_specs <- specs(bayes_name,
-                       K600_lnQ_nodes_centers = c(Q,Q2,Q3,Q4,Q5),
-                       K600_lnQ_nodes_meanlog= log(c(K,K2,K3,K4,K5)),
-                       K600_lnQ_nodes_sdlog= 0.1,
+                       K600_lnQ_nodes_centers = Q_vals,
+                       K600_lnQ_nodes_meanlog = log(K_vals),
+                       K600_lnQ_nodes_sdlog = 0.1,
                        K600_lnQ_nodediffs_sdlog = 0.05,
-                       K600_daily_sigma_sigma= 0.24,
-                       burnin_steps=1000, saved_steps=1000)
-
-  return(bayes_specs)}
+                       K600_daily_sigma_sigma = 0.24,
+                       burnin_steps = 1000, saved_steps = 1000)
+  
+  return(bayes_specs)
+}
 metabolism <- function(site) {
-
-  site<- site %>% mutate(Q_m.s=abs(Q_m.s), K600_1d=abs(K600_1d))
 
   samplingperiod <- data.frame(Date = rep(seq(from=as.POSIXct(min(site$Date)),
                                               to=as.POSIXct(max(site$Date)),by="hour")))
@@ -75,10 +81,6 @@ metabolism <- function(site) {
   
   return(site_output)
 }
-compile<- function(site_output, site2) {
-  site2<-site2 %>% select(Date, ER, GPPavg, K600_1d) %>% mutate(GPP_Rhat=1,ER_Rhat=1,K600_daily_Rhat=1)
-  site<-rbind(site2, site_output)
-  return(site)}
 
 notparsed_metabolism<- function(site) {
   keep<-c('Date', 'DO', 'depth', 'Temp', 'K600_1d', 'Q_m.s')

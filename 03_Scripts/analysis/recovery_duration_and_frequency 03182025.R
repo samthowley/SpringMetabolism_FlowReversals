@@ -9,6 +9,7 @@ library(mmand)
 library(zoo)
 library(lme4)
 library(plotly)
+library(broom)
 #data####
 chem <- read_csv("02_Clean_data/master_chem1.csv")%>%
   arrange(ID, Date) %>% group_by(ID)%>%
@@ -17,9 +18,9 @@ chem <- read_csv("02_Clean_data/master_chem1.csv")%>%
   ungroup() %>% group_by(ID, Date)%>%
   mutate(pH=mean(pH, na.rm=T), SpC=mean(SpC, na.rm=T), 
          depth=mean(depth, na.rm=T),
-         DO=mean(DO, na.rm=T), Temp=mean(Temp, na.rm=T))%>%ungroup()%>%
-  distinct(ID, Date, .keep_all = T)%>% select(-CO2)
-
+         DO=mean(DO, na.rm=T,), Temp=mean(Temp, na.rm=T), 
+         CO2=mean(CO2, na.rm=T))%>%ungroup()%>%
+  distinct(ID, Date, .keep_all = T)
 master_metabolism4 <- read_csv("02_Clean_data/master_metabolism4.csv")%>%
   select(Date, ID, GPP, ER) %>%
   filter(GPP != is.nan(GPP)| ER!=is.nan(ER))
@@ -92,7 +93,7 @@ floodID <- stageID %>%
   #filter(ID=='GB')
 
 ggplot(floodID, aes(Date, color=floodtype))+
-  geom_point(aes(y=GPP), size=1)+facet_wrap(~ID, scales='free', ncol=2)
+  geom_point(aes(y=depth), size=1)+facet_wrap(~ID, scales='free', ncol=2)
 
 
 ###################################################
@@ -141,9 +142,11 @@ baseline <- IDs %>%
   arrange(depth) %>%
   slice_head(n = 14) %>%  
   summarize(
+    CO2_baseline = if_else(all(is.na(CO2)), NA_real_, mean(CO2, na.rm = TRUE)),
     GPP_baseline = if_else(all(is.na(GPP)), NA_real_, mean(GPP, na.rm = TRUE)),
     ER_baseline = if_else(all(is.na(ER)), NA_real_, mean(ER, na.rm = TRUE)),
     h_baseline = if_else(all(is.na(depth)), NA_real_, mean(depth, na.rm = TRUE)),
+    DO_baseline = if_else(all(is.na(DO)), NA_real_, mean(DO, na.rm = TRUE)),
     baseline_ID = max(baseline_ID, na.rm = TRUE),
     baseline_Date = mean(Date, na.rm = TRUE)
   )
@@ -152,15 +155,33 @@ baseline <- IDs %>%
 timebtwn_tbl<-IDs%>%  
   group_by(ID, baseline_ID) %>%
   summarize(
-    time_btwn= max(time_bwtn, na.rm = T))
+    time_btwn= max(time_bwtn, na.rm = T),
+    Date=mean(Date, na.rm=T))
 
 baseline_tbl<- full_join(baseline, timebtwn_tbl, by=c('baseline_ID', 'ID'))
 
 ##################################
-#prepare flood table#############
+#join flood and baseline periods#############
+#################################
+floods<-floodID %>% 
+  select(Date,ID, GPP, ER, depth, CO2, DO, SpC, floodtype, stageID, depthID)%>%
+  mutate(floodtype=if_else(is.na(floodtype), "norm", floodtype))
+
+daily_floods<- full_join(floods, baseline_tbl, by=c('Date', 'ID'))%>% 
+  arrange(ID, Date)%>% 
+  fill(baseline_ID, CO2_baseline,GPP_baseline,ER_baseline,h_baseline,DO_baseline,time_btwn,.direction='down')%>%
+  mutate(CO2_reduc=1-(CO2/CO2_baseline),
+         GPP_reduc=1-(GPP/GPP_baseline),
+         ER_reduc=1-(ER/ER_baseline),
+         h_reduc=1-(depth/h_baseline),
+         h_diff=depth-h_baseline)
+
+unique(floods$floodtype)
+##################################
+#prepare average tables#############
 #################################
 floods <- IDs %>% filter(depthID=='high')%>%
-  select(Date, ID, GPP, ER, flood_count, flood_ID, depth, floodtype,floodtype_num)
+  select(Date, ID, GPP, ER,DO, flood_count, flood_ID, depth, floodtype,floodtype_num)
 
 disturbed_averages <- floods %>%
   group_by(flood_ID,ID, floodtype) %>%
@@ -170,6 +191,7 @@ disturbed_averages <- floods %>%
     disturb_GPP = mean(GPP, na.rm = TRUE),
     disturb_ER = mean(ER, na.rm = TRUE),
     disturb_h = mean(depth, na.rm=T),
+    disturb_DO = mean(DO, na.rm=T),
     flood_Date= mean(Date, na.rm=T),
     .groups = 'keep')%>%ungroup()
 
@@ -182,9 +204,6 @@ floodtype_duration<-floods%>%
 
 flood_tble <-full_join(disturbed_averages, floodtype_duration, by=c('ID', 'flood_ID', 'floodtype'))
 
-########################
-#join tables############
-########################
 baseline_tbl_edit<-baseline_tbl %>%
   rename(Date=baseline_Date)%>% 
   group_by(ID)%>%
@@ -210,47 +229,168 @@ brwn_events<-joined_tbl%>%filter(floodtype!='HS')
 
 #################################
 #Recovery#######################
-################################
+##############################
 
 recovery_df<-left_join(IDs, baseline_tbl, by=c('ID', 'baseline_ID'))%>%
-  fill(GPP_baseline, ER_baseline, h_baseline, .direction = 'down')%>%
-  mutate(event_ID=if_else(is.na(flood_ID), baseline_ID, flood_ID))%>%
-  mutate(GPP_frac=GPP/GPP_baseline, ER_frac= ER/ER_baseline, h_frac=depth/h_baseline)%>%
-  filter(ID=='AM')%>%filter(floodtype %in% c('BO',"FR") )
+  fill(CO2_baseline, DO_baseline, GPP_baseline, ER_baseline, h_baseline, .direction = 'downup')%>%
+  mutate(across(c(GPP, depth, DO, ER, CO2), ~rollmean(.x, k = 5, fill = NA, align = "center"), .names = "{.col}"))
 
-ggplot(recovery_df, aes(Date,color=as.factor(event_ID)))+
-  geom_point(aes(y=depth), size=1)+
-  facet_wrap(~ID, scales='free', ncol=2)+
-  geom_hline(yintercept = 1)+ 
-  geom_smooth(aes(y = depth), method = 'lm')
+perc_change<-recovery_df%>% mutate(h_change=(depth-lag(depth))/lag(depth),
+                                   DO_change=(DO-lag(DO))/lag(DO), CO2_change=(CO2-lag(CO2))/lag(CO2), 
+                                   GPP_change=(GPP-lag(GPP))/lag(GPP),
+                                   ER_change=(ER-lag(ER))/lag(ER))
 
-h_count<-recovery_df%>%
-  group_by(ID, event_ID) %>%
-  mutate(
-    max_height = which.max(replace(depth, is.na(depth), -Inf)), 
+split_change <- perc_change %>%
+  arrange(ID, Date) %>% group_by(ID) %>%
+  mutate(flood_ssn = cumsum(replace_na(h_change > 0.1, FALSE))) %>%
+  ungroup()
+
+h_count<-split_change%>%
+  arrange(ID, Date) %>%  # Make sure it's sorted by Date (not group)
+  group_by(ID, flood_ssn) %>%
+  mutate(max_h = which.max(replace(depth, is.na(depth), -Inf)),
     h_count = case_when(
-      row_number() < max_height ~ row_number() - max_height,
-      row_number() == max_height ~ 0,
-      row_number() > max_height ~ row_number() - max_height))%>%
-  filter(h_count>0)
+      row_number() < max_h ~ row_number() - max_h,
+      row_number() == max_h ~ 0,
+      row_number() > max_h ~ row_number() - max_h))
 
-lm_h<-h_count %>%
-  group_by(event_ID, ID) %>%
+for_h_lm <- h_count %>%
+  group_by(ID, flood_ssn) %>%
+  filter(h_count>0)%>%
+    mutate(
+      days_diff = as.numeric(difftime(Date, lag(Date), units = "days")),
+      flood_day = cumsum(replace_na(days_diff, 0)))%>%
+  filter(flood_day<90)%>%
+  filter(flood_day>=5)
+
+lm_h <- for_h_lm %>%
+  group_by(flood_ssn, ID) %>%
   nest() %>%
   mutate(model = map(data, ~ lm(depth ~ h_count, data = .x)),
-         model_summary = map(model, summary))%>%
-  mutate(tidy_model = map(model, broom::tidy)) %>%
-  unnest(tidy_model) %>%
-  select(event_ID, ID, term, estimate) %>%
-  pivot_wider(names_from = term, values_from = estimate)%>%
-  mutate(h_recovery=abs((1-`(Intercept)`)/h_count))%>%
-  select(event_ID, ID, h_recovery)
-
+    coef_info = map(model, tidy),
+    glance_info = map(model, glance)) %>%
+  mutate(slope = map_dbl(coef_info, ~ .x$estimate[.x$term == "h_count"]),
+    intercept = map_dbl(coef_info, ~ .x$estimate[.x$term == "(Intercept)"]),
+    r_squared = map_dbl(glance_info, ~ .x$r.squared),
+    p_value = map_dbl(coef_info, ~ .x$p.value[.x$term == "h_count"])) %>%
+  select(ID, flood_ssn, slope, intercept, r_squared, p_value)%>%
+  rename(slope_h=slope, intercept_h=intercept, r2_h=r_squared, p_h=p_value)
   
+GPP_count <- h_count %>%
+  filter(depthID != 'low')%>%
+  group_by(ID, flood_ssn) %>%
+  mutate(GPP = if_else(GPP < 0.000005, 0, GPP)) %>%
+  mutate(GPP_fixed = replace(GPP, is.na(GPP), Inf),
+    min_GPP_index = max(which(GPP_fixed == min(GPP_fixed, na.rm = TRUE))),
+    GPP_count = row_number() - min_GPP_index) %>%
+  select(-GPP_fixed)
 
-ggplot(h_count%>% filter(event_ID==9), aes(h_count))+
-  geom_point(aes(y=ER_frac, color='GPP'), size=1)+
-  geom_point(aes(y=DO, color='DO'), size=1)
+for_GPP_lm<-GPP_count %>%
+  filter(depthID != 'low')%>%
+  filter(GPP_count>0)%>%
+    filter(n() > 5) %>% 
+  mutate(GPP= if_else(GPP>GPP_baseline, NA, GPP))%>%
+  mutate(GPP=if_else(ID=='AM'& flood_ssn==24 & GPP_count>6, NA, GPP))
+
+
+ggplot(for_GPP_lm, aes(Date,y=ER, color=as.factor(flood_ssn)))+
+  geom_point(size=2)+
+  facet_wrap(~ID, scales='free', ncol=2)+
+  geom_smooth(method = 'lm', se=F)+ggtitle('LF')
+
+
+GPP_lm <- for_GPP_lm %>%
+  group_by(flood_ssn, ID) %>%
+  nest() %>%
+  mutate(model = map(data, ~ lm(depth ~ GPP_count, data = .x)),
+    coef_info = map(model, tidy),
+    glance_info = map(model, glance)) %>%
+  mutate(slope = map_dbl(coef_info, ~ .x$estimate[.x$term == "GPP_count"]),
+    intercept = map_dbl(coef_info, ~ .x$estimate[.x$term == "(Intercept)"]),
+    r_squared = map_dbl(glance_info, ~ .x$r.squared),
+    p_value = map_dbl(coef_info, ~ .x$p.value[.x$term == "GPP_count"])) %>%
+  select(ID, flood_ssn, slope, intercept, r_squared, p_value)%>%
+  rename(slope_GPP=slope, intercept_GPP=intercept, r2_GPP=r_squared, p_GPP=p_value)
+
+ER_count<-GPP_count %>%group_by(ID, flood_ssn)%>%
+  mutate(min_ER = which.min(replace(ER, is.na(ER), -Inf)),
+         ER_count = case_when(
+           row_number() < min_ER ~ row_number() - min_ER,
+           row_number() == min_ER ~ 0,
+           row_number() > min_ER ~ row_number() - min_ER))%>%
+  mutate(days_diff = as.numeric(difftime(Date, lag(Date), units = "days")),
+    flood_day = cumsum(replace_na(days_diff, 0)))
+
+for_ER_lm <- ER_count %>%
+  filter(depthID != 'low', ER_count > 0) %>%
+  arrange(ID, flood_ssn, Date) %>%
+  group_by(ID, flood_ssn) %>%
+  mutate(
+    days_diff = as.numeric(difftime(Date, lag(Date), units = "days")),
+    flood_day = cumsum(replace_na(days_diff, 0)),
+    ER = if_else(ER > ER_baseline, NA_real_, ER)
+  ) %>%  ungroup()
+
+ggplot(for_ER_lm, aes(Date,y=ER, color=as.factor(flood_ssn)))+
+  geom_point(size=2)+
+  facet_wrap(~ID, scales='free', ncol=2)+
+  geom_smooth(method = 'lm', se=F)+ggtitle('LF')
+
+ER_lm <- ER_count %>%
+  group_by(flood_ssn, ID) %>%
+  nest() %>%
+  mutate(model = map(data, ~ lm(depth ~ ER_count, data = .x)),
+    coef_info = map(model, tidy),
+    glance_info = map(model, glance)) %>%
+  mutate(slope = map_dbl(coef_info, ~ .x$estimate[.x$term == "ER_count"]),
+    intercept = map_dbl(coef_info, ~ .x$estimate[.x$term == "(Intercept)"]),
+    r_squared = map_dbl(glance_info, ~ .x$r.squared),
+    p_value = map_dbl(coef_info, ~ .x$p.value[.x$term == "ER_count"])) %>%
+  select(ID, flood_ssn, slope, intercept, r_squared, p_value)%>%
+  rename(slope_ER=slope, intercept_ER=intercept, r2_ER=r_squared, p_ER=p_value)
+
+DO_count<-ER_count %>%group_by(ID, flood_ssn)%>%
+  mutate(min_DO = which.min(replace(DO, is.na(DO), -Inf)),
+         DO_count = case_when(
+           row_number() < min_DO ~ row_number() - min_DO,
+           row_number() == min_DO ~ 0,
+           row_number() > min_DO ~ row_number() - min_DO))%>%
+  mutate(days_diff = as.numeric(difftime(Date, lag(Date), units = "days")),
+         flood_day = cumsum(replace_na(days_diff, 0)))
+
+for_DO_lm <- DO_count %>%
+  filter(depthID != 'low', DO_count > 0) %>%
+  arrange(ID, flood_ssn, Date) %>%
+  group_by(ID, flood_ssn) %>%
+  fill(DO_baseline, .direction='down')%>%
+  mutate(
+    days_diff = as.numeric(difftime(Date, lag(Date), units = "days")),
+    flood_day = cumsum(replace_na(days_diff, 0)), #counting days after flood
+    DO = if_else(DO > DO_baseline, NA_real_, DO)
+  ) %>%  ungroup()
+
+ggplot(for_DO_lm, aes(Date,y=DO, color=as.factor(flood_ssn)))+
+  geom_point(size=2)+
+  facet_wrap(~ID, scales='free', ncol=2)
+
+#############################
+##Recovery for DO/GPP/ER####
+############################
+
+ggplot(h_count%>%filter(ID=='AM'), aes(Date,color=as.factor(higher_event)))+
+  geom_point(aes(y=GPP), size=1)+
+  facet_wrap(~ID, scales='free', ncol=2)+
+  geom_hline(yintercept = 1)+ 
+  geom_smooth(aes(y = GPP), method = 'lm')
+
+
+
+
+
+
+
+
+
 
 lm_GPP<-h_count %>%
   group_by(event_ID, ID) %>%
@@ -308,7 +448,7 @@ theme_sam<-theme()+theme(axis.text.x = element_text(size = 17, angle=0),
                              axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "black"))
 
 
-(a<-ggplot(brwn_events, aes(h_diff, y=GPP_reduce, shape=ID, color=floodtype))+
+(a<-ggplot(daily_floods%>% filter(!floodtype %in% c(NA), ID=='AM') , aes(h_diff, y=GPP_reduc, shape=ID, color=floodtype))+
   geom_point(size=3)+
   geom_smooth(aes(group=1),method = lm, se=F, linetype='dotted', color='black')+
   scale_colour_manual(name="", values = cols,labels=c("BO","FR"))+
@@ -316,7 +456,7 @@ theme_sam<-theme()+theme(axis.text.x = element_text(size = 17, angle=0),
   scale_x_log10()+
   ylab("GPP Reduction (%)")+theme_sam)
 
-(b<-ggplot(brwn_events, aes(h_diff,y=ER_reduce, shape=ID, color=as.factor(floodtype)))+
+(b<-ggplot(daily_floods%>%filter(stageID=='high'), aes(h_diff,y=ER_reduc, shape=ID, color=as.factor(floodtype)))+
   geom_point(size=3)+
     geom_smooth(aes(group=1),method = lm, se=F, linetype='dotted', color='black')+
   scale_colour_manual(name="", values = cols,labels=c("BO","FR"))+
@@ -326,36 +466,35 @@ theme_sam<-theme()+theme(axis.text.x = element_text(size = 17, angle=0),
 
 plot_grid(a,b)
 
-HS_events<-HS_events%>%mutate(GPP_improve=GPP_reduce*-1)
 
-(a1<-ggplot(HS_events, aes(duration, y=ER_reduce, shape=ID, color=floodtype))+
-    geom_point(size=3)+
-    geom_smooth(aes(group=1),method = lm, se=F, linetype='dotted', color='black')+
-    scale_colour_manual(name="", values = cols,labels=c("HS"))+
-    ggtitle("Backwater Flood Impacts on GPP")+
-    scale_x_log10()+
-    ylab("ER Reduction (%)")+theme_sam)
-
-(a2<-ggplot(HS_events, aes(time_btwn, y=ER_reduce, shape=ID, color=floodtype))+
-    geom_point(size=3)+
-    geom_smooth(aes(group=1),method = lm, se=F, linetype='dotted', color='black')+
-    scale_colour_manual(name="", values = cols,labels=c("HS"))+
-    ggtitle("Backwater Flood Impacts on GPP")+
-    scale_x_log10()+
-    ylab("ER Reduction (%)")+theme_sam)
-
-(a3<-ggplot(HS_events, aes(h_diff, y=ER_reduce, shape=ID, color=floodtype))+
-    geom_point(size=3)+
-    geom_smooth(aes(group=1),method = lm, se=F, linetype='dotted', color='black')+
-    scale_colour_manual(name="", values = cols,labels=c("HS"))+
-    ggtitle("Backwater Flood Impacts on GPP")+
-    scale_x_log10()+
-    ylab("ER Reduction (%)")+theme_sam)
+ggplot(daily_floods%>%filter(floodtype!='HS'), aes(h_reduc,y=ER_reduc, shape=ID, color=as.factor(floodtype)))+
+  geom_point(size=3)+
+  geom_smooth(aes(group=1),method = lm, se=F, linetype='dotted', color='black')+
+  scale_colour_manual(name="", values = cols,labels=c("BO","FR"))+
+  ggtitle("Backwater Flood Impacts on ER")+
+  ylab("ER Reduction (%)")+theme_sam
 
 
-plot_grid(a1, a2, a3, ncol=3)
+for_hist_GPP<-daily_floods%>%select(ID, Date, baseline_ID, floodtype, GPP)%>%
+  rename(met=GPP)%>% mutate(met_type='GPP')
+for_hist_ER<-daily_floods%>%select(ID, Date, baseline_ID, floodtype, ER)%>%
+  rename(met=ER)%>% mutate(met_type='ER')
+
+
+hist_met<-rbind(for_hist_ER, for_hist_GPP)%>%filter(complete.cases(met))#%>%
+  # group_by(baseline_ID) %>%
+  # filter(n_distinct(floodtype) == 4) %>%
+  # ungroup()
+
+hist_met$floodtype <- factor(hist_met$floodtype , levels=c('norm', 'HS', 'BO', 'FR'))
+
+ggplot(hist_met,aes(x=floodtype, y=met, fill=met_type)) +
+  geom_boxplot()+
+  scale_fill_manual(name="", values = c('darkred', 'darkgreen'))+
+  facet_wrap(~ID, scales='free')
 
 
 dev.new()
 ggplotly(a)
 
+unique(hist_met$floodtype)
