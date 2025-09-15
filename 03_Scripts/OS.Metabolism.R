@@ -142,3 +142,4 @@ met_results <- bind_rows(met_list_base, .id = "ID")%>%
   rename(
     GPP=GPP_daily_mean, ER=ER_daily_mean, K600=K600_daily_mean)
 
+write_csv(met_results, "04_Outputs/master_metabolism.OS.csv")
