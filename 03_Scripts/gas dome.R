@@ -84,9 +84,10 @@ for(fil in file.names){
   gasdome<-rbind(gasdome,gas)
 }
 
+k600 <- gasdome%>%
+  distinct(k600_1d,ID,day, .keep_all = T)%>%
+  filter(!is.na(depth))
 
-k600 <- gasdome[!duplicated(gasdome[c('day','ID','rep')]),]
-k600 <- k600[complete.cases(k600[ ,c('depth')]), ]
 
 u <- read_csv("01_Raw_data/u.csv")
 u$day<-mdy(u$Date)
@@ -96,4 +97,4 @@ k600$uh<-k600$u/k600$depth
 k600<-k600 %>% select(Date,depth,u,ID,uh,k600_1d, VentDO, VentTemp)
 
 split<-k600 %>% split(k600$ID)
-write.xlsx(split, file = '04_Outputs/rC_k600.xlsx')
+write.xlsx(split, file = '04_Outputs/rC_k600_edited.xlsx')

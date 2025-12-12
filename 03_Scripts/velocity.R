@@ -2,15 +2,43 @@ library(tidyverse)
 library(readxl)
 library(measurements)
 
-u <- read_excel("04_Outputs/rC_k600_edited.xlsx", 
-                             sheet = "velocity")
 
-#ggplot(u, aes(x=depth, y=u))+geom_point()+facet_wrap(~ID, scales='free')
+u <- read_csv("01_Raw_data/u.csv")%>%mutate(Date=mdy(Date))
+
+h <- read_csv("02_Clean_data/master_depth2.csv") %>%select(Date, ID, depth)%>%
+  fill(depth, .direction = 'updown')%>%
+  mutate(Date=as.Date(Date))%>%
+  group_by(ID, Date)%>%
+  summarise(depth=mean(depth, na.rm=T))
+
+u.h<-left_join(u, h)%>% 
+  select(ID, Date, depth, everything())
+
+
+split<-u.h %>% split(u.h$ID)
+write.xlsx(split, file = '04_Outputs/velocity.xlsx')
+
+#check#####
+
+sheet_names <- excel_sheets("04_Outputs/velocity.xlsx")
+list_of_ks <- list()
+for (sheet in sheet_names) {
+  df <- read_excel("04_Outputs/velocity.xlsx", sheet = sheet)
+  list_of_ks[[sheet]] <- df
+}
+
+u <- bind_rows(list_of_ks, .id = "ID")
+
+ggplot(u, aes(x=depth, y=u))+
+  geom_point()+geom_smooth(method = lm, se=F)+
+  facet_wrap(~ID, scales='free')
+
+
+#rating curve#############
+depth <- read_csv("02_Clean_data/master_depth2.csv") %>%select(Date, ID, depth)
 
 rC <- lmList(u ~ depth | ID, data=u)
 (cf <- coef(rC))
-
-depth <- read_csv("02_Clean_data/Chem/depth.csv")
 
 velocity<-depth%>%mutate(
   velocity=case_when(

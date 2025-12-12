@@ -2,11 +2,25 @@
 library(tidyverse)
 library(readxl)
 library(lme4)
+library(cowplot)
+theme_set(theme(    strip.text = element_text(size = 12),
+                    axis.title.y = element_text(size=13, angle=90),
+                    axis.title.x = element_text(size=13),
+                    axis.text.x = element_text(size=12),
+                    axis.text.y = element_text(size=12),
+                    panel.grid.major.x = element_line(size = 0.5, linetype = "solid", colour = "gray"),  # Customize x-axis major gridlines
+                    panel.grid.minor.y = element_blank(),
+                    panel.background = element_rect(fill = 'white'),
+                    axis.line.x = element_line(size = 0.5, linetype = "solid", colour = "gray"),
+                    axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "gray")))
+
 
 depth <- read_csv("02_Clean_data/Chem/depth.csv")
 
-sheet_names <- excel_sheets("04_Outputs/rC_K600_edited.xlsx")
-ks <- sheet_names[!sheet_names %in% c("velocity")]
+u <- read_csv("02_Clean_data/Chem/velocity.csv")%>%
+  mutate(Date=as.Date(Date))%>%rename(velocity.interpolated=velocity)
+
+sheet_names <- excel_sheets("04_Outputs/rC_K600.xlsx")
 
 list_of_ks <- list()
 for (sheet in ks) {
@@ -14,7 +28,20 @@ for (sheet in ks) {
   list_of_ks[[sheet]] <- df
 }
 
-k600s <- bind_rows(list_of_ks, .id = "ID")
+k600s <- bind_rows(list_of_ks, .id = "ID")%>%
+  distinct(k600_1d, .keep_all = T)%>% filter(ID != 'Vent DO')%>%
+  mutate(Date=mdy(Date))
+
+l<- read_excel("01_Raw_data/Depth_length_velocity_width/length width.xlsx",
+               sheet = "length ")
+
+k600s<-left_join(k600s, u)%>%distinct(ID, Date, k600_1d, .keep_all = T)%>%
+  mutate(u_m.day=velocity.interpolated*86400, reach= (u_m.day/k600_1d)/10^3)
+
+k600s<-left_join(k600s, l)%>%
+  mutate(reach.test=if_else(reach>3*km, 'above', 'passes'),
+         reach.test=if_else(reach<0.4*km, 'below', reach.test))
+
 
 rC <- lmList(k600_1d ~ depth | ID, data=k600s)
 (cf <- coef(rC))
@@ -32,6 +59,40 @@ k600s<-depth%>%mutate(
 )%>%select(Date, ID, k600_1d)%>%
   mutate(k600_1d=if_else(k600_1d<0, 0.1, k600_1d))
 
-#ggplot(k600s, aes(x=Date, y=k600_1d))+geom_line()+facet_wrap(~ID, scales='free')
 
 write_csv(k600s, "02_Clean_data/Chem/K600.csv")
+
+
+#check #######
+
+h.limit <- read_excel("01_Raw_data/Depth_length_velocity_width/length width.xlsx", 
+                           sheet = "depth threshold")
+
+ggplot(k600s, aes(x =velocity.interpolated, y = u)) +
+  geom_point(size=2) +
+  facet_wrap(~ ID, scales = "free")+
+  geom_smooth(method = lm, se=F)
+
+ggplot(k600s, aes(x =depth, y = k600_1d, color=reach.test)) +
+  geom_point(size=2) +
+  facet_wrap(~ ID, scales = "free")+
+  geom_smooth(method = lm, se=F)
+
+plot_grid(
+  
+  ggplot(k600s, aes(x = depth, y = k600_1d, color = reach.test)) +
+    geom_point(size=2) +
+    facet_wrap(~ ID, scales = "free", nrow = 1) +
+    geom_hline(
+      data = h.limit,
+      aes(yintercept = max),
+      colour = "red",
+      linetype = "dashed",
+      alpha = 0.7),
+  
+  ggplot(k600s, aes(x = Date, y = u, color = reach.test)) +
+    geom_point(size=2) +
+    facet_wrap(~ ID, scales = "free", nrow = 1),
+  
+    ncol=1)
+
