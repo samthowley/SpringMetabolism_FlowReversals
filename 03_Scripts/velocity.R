@@ -1,7 +1,7 @@
 library(tidyverse)
 library(readxl)
 library(measurements)
-
+library(openxlsx)
 
 u <- read_csv("01_Raw_data/u.csv")%>%mutate(Date=mdy(Date))
 
@@ -35,7 +35,7 @@ ggplot(u, aes(x=depth, y=u))+
 
 
 #rating curve#############
-depth <- read_csv("02_Clean_data/master_depth2.csv") %>%select(Date, ID, depth)
+#depth <- read_csv("02_Clean_data/master_depth2.csv") %>%select(Date, ID, depth)
 
 rC <- lmList(u ~ depth | ID, data=u)
 (cf <- coef(rC))

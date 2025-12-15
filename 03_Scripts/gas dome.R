@@ -6,6 +6,7 @@ library(writexl)
 library(openxlsx)
 library(weathermetrics)
 library(lme4)
+
 #k600 calculation constants######
 dome_length<-0.38
 dome_width<-0.22
@@ -18,12 +19,15 @@ R<-0.08205
 dome_length<-0.38
 library(tools)
 
-
+velocity <- read_csv("02_Clean_data/Chem/velocity.csv")
+ 
 stream <- read_csv("02_Clean_data/master_depth2.csv")
-stream<-stream%>%fill(CO2, .direction = 'up')%>%fill(depth, .direction = 'up')
+stream<-left_join(stream, velocity)%>%
+  fill(CO2, .direction = "up") %>%
+  fill(depth, velocity, .direction = "updown")
 GasDome <- function(gas,stream) {
   stream<-stream %>%  rename("CO2_enviro"='CO2')%>% mutate(day=day(Date), hour=hour(Date), month=month(Date),yr=year(Date))%>%
-    select(CO2_enviro,Temp,depth,day, hour,month,yr,ID)
+    select(CO2_enviro,Temp,depth, velocity, day, hour,month,yr,ID)
 
   gas<-gas %>% mutate(day=day(Date), hour=hour(Date), month=month(Date),yr=year(Date))
   gas<-left_join(gas,stream, by=c('hour', 'day', 'month', 'yr', 'ID'), relationship = "many-to-many")
@@ -49,15 +53,15 @@ GasDome <- function(gas,stream) {
   gas$KH<-0.034*exp(2400*((1/gas$Temp_K)-(1/298.15)))
   gas$KH_1000<-gas$KH*1000 #mol/m^3/atm
 
-  gas$KCO2_dh<-gas$FCO2/gas$KH_1000/(gas$pCO2_air-gas$pCO2_water)#m/h
-  gas$kO2_dh<-gas$KCO2_dh*(gas$SchmidtCO2hi/gas$SchmidtO2hi)^(-2/3)#m/h
-  gas$k600_dh<- gas$KCO2_dh*(600/gas$SchmidtCO2hi)^(-2/3) #m/h
+  gas$KCO2_m.day<-gas$FCO2/gas$KH_1000/(gas$pCO2_air-gas$pCO2_water)#m/h
+  gas$kO2_m.day<-gas$KCO2_m.day*(gas$SchmidtCO2hi/gas$SchmidtO2hi)^(-2/3)#m/h
+  gas$k600_m.day<- gas$KCO2_m.day*(600/gas$SchmidtCO2hi)^(-2/3) #m/h
   
-  gas$KO2_1d<-(gas$kO2_dh/gas$depth)*24
-  gas$KCO2_1d<-(gas$KCO2_dh/gas$depth)*24
-  gas$k600_1d<- (gas$k600_dh/gas$depth)*24
+  gas$KO2_1.day<-(gas$kO2_m.day/gas$depth)*24
+  gas$KCO2_1.day<-(gas$KCO2_m.day/gas$depth)*24
+  gas$k600_1.day<- (gas$k600_m.day/gas$depth)*24
   
-  gas<-gas%>% select(day,ID,rep,CO2,CO2_enviro,depth,k600_1d)
+  gas<-gas%>% select(day,ID,rep,CO2,CO2_enviro,depth,k600_1.day,velocity)
 
 
   return(gas)
@@ -85,16 +89,14 @@ for(fil in file.names){
 }
 
 k600 <- gasdome%>%
-  distinct(k600_1d,ID,day, .keep_all = T)%>%
-  filter(!is.na(depth))
-
+  distinct(k600_1.day,ID,day, .keep_all = T)
 
 u <- read_csv("01_Raw_data/u.csv")
 u$day<-mdy(u$Date)
 
 k600<-left_join(k600,u, by=c('day','ID'))
 k600$uh<-k600$u/k600$depth
-k600<-k600 %>% select(Date,depth,u,ID,uh,k600_1d, VentDO, VentTemp)
+k600<-k600 %>% select(Date,depth,u,velocity,ID,uh,k600_1.day, VentDO, VentTemp)
 
 split<-k600 %>% split(k600$ID)
 write.xlsx(split, file = '04_Outputs/rC_k600_edited.xlsx')

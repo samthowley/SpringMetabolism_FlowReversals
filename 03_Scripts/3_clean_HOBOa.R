@@ -169,10 +169,32 @@ for(fil in file.names){
   DO_everything <- DO_everything[!duplicated(DO_everything[c('Date','ID')]),]
 }
 
-DO_everything<-rename_ID(DO_everything)
-DO_everything<-DO_everything %>% filter(Date>"2022-01-01")%>%mutate(DO=abs(DO))
+DO_everything<-rename_ID(DO_everything) %>% filter(Date>"2022-01-01")%>%mutate(DO=abs(DO))%>%
+  distinct(Date, ID, .keep_all = T)
 
-write_csv(DO_everything, "02_Clean_data/Chem/DO.csv")
+DO_CQ<-DO_everything%>%
+  filter(DO<11.5,
+         Temp<80,
+         Temp>50)%>%
+  mutate(DO=if_else(ID=='LF'& Date<'2022-07-01'& DO>6, NA, DO),
+         DO=if_else(ID=='LF' & DO<2 |DO>10, NA, DO),
+         DO=if_else(ID=='ID' & DO<2.8 |DO>10, NA, DO),
+         DO=if_else(ID=='GB' & DO<3.5 |DO>8.5, NA, DO),
+         
+         Temp=if_else(ID=='LF' & Temp<60, NA, Temp),
+         Temp=if_else(ID=='ID' & Temp>76, NA, Temp),
+         Temp=if_else(ID=='GB' & Temp>78, NA, Temp)
+         )
+
+
+ggplot(data=DO_CQ, aes(x=Date)) +
+  geom_line(aes(y=DO))+
+  #geom_line(aes(y=DO), color='red')+
+  facet_wrap(~ID)
+
+#test<-DO_CQ%>%filter(ID=='AM', Date>'2023-06-20' & Date<'2023-09-01')
+
+write_csv(DO_CQ, "02_Clean_data/Chem/DO.csv")
 
 ###SpC####
 SpC_everything<-data.frame()
