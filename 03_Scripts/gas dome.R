@@ -91,12 +91,7 @@ for(fil in file.names){
 k600 <- gasdome%>%
   distinct(k600_1.day,ID,day, .keep_all = T)
 
-u <- read_csv("01_Raw_data/u.csv")
-u$day<-mdy(u$Date)
-
-k600<-left_join(k600,u, by=c('day','ID'))
-k600$uh<-k600$u/k600$depth
-k600<-k600 %>% select(Date,depth,u,velocity,ID,uh,k600_1.day, VentDO, VentTemp)
+k600<-k600 %>% rename(Date=day)%>%select(Date,depth,ID,k600_1.day)
 
 split<-k600 %>% split(k600$ID)
 write.xlsx(split, file = '04_Outputs/rC_k600_edited.xlsx')

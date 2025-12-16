@@ -41,6 +41,9 @@ ggplot(master, aes(x = Date, y = DO)) +
 discharge<-master%>%
   mutate(discharge=w*depth*velocity*86400)
 
+# discharge<-discharge%>%select(Date, ID, discharge)
+# write_csv(discharge, "02_Clean_data/Chem/discharge.csv")
+
 #2. Estimate change in total DO flux####
 change.DO.flux<-discharge%>%
   mutate(
@@ -88,11 +91,12 @@ ggplot(active.reach, aes(x = Date, y = velocity)) +
   geom_hline(yintercept = 0)+
   facet_wrap(~ID, scales='free')
 
-master_metabolism_LF_GB_OS <- read_csv("04_Outputs/master_metabolism.LF.GB.OS.csv")
+onestation <- read_csv("04_Outputs/one.station.metabolism.csv")
 
-ggplot(master_metabolism_LF_GB_OS, aes(x = date, y = K600)) +
+ggplot(onestation, aes(x = date, y = K600)) +
   geom_line()+
-  facet_wrap(~ID, scales='free')
+  facet_wrap(~ID, scales='free')+
+  ggtitle("Gas Dome Experiments")
 
   
 #parse day from night####
