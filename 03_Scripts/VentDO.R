@@ -6,7 +6,11 @@ library(weathermetrics)
 
 VentDO <- read_csv("01_Raw_data/VentDO.csv")%>%
 mutate(Date=paste(Date, "00:00:00"),
-       Date=mdy_hms(Date))
+       Date=mdy_hms(Date))%>%
+  group_by(ID)%>%
+  mutate(VentDO=mean(VentDO, na.rm=T),
+         VentTemp=mean(VentTemp, na.rm=T))%>%
+  distinct(ID, .keep_all = T)
 
 
 

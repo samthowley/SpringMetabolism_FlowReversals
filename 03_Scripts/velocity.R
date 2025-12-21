@@ -20,14 +20,7 @@ write.xlsx(split, file = '04_Outputs/velocity.xlsx')
 
 #check#####
 
-sheet_names <- excel_sheets("04_Outputs/velocity.xlsx")
-list_of_ks <- list()
-for (sheet in sheet_names) {
-  df <- read_excel("04_Outputs/velocity.xlsx", sheet = sheet)
-  list_of_ks[[sheet]] <- df
-}
 
-u <- bind_rows(list_of_ks, .id = "ID")
 
 ggplot(u, aes(x=depth, y=u))+
   geom_point()+geom_smooth(method = lm, se=F)+
@@ -35,8 +28,18 @@ ggplot(u, aes(x=depth, y=u))+
 
 
 #rating curve#############
-#depth <- read_csv("02_Clean_data/master_depth2.csv") %>%select(Date, ID, depth)
+sheet_names <- excel_sheets("04_Outputs/velocity_edit.xlsx")
+list_of_ks <- list()
+for (sheet in sheet_names) {
+  df <- read_excel("04_Outputs/velocity_edit.xlsx", sheet = sheet)
+  list_of_ks[[sheet]] <- df
+}
 
+u <- bind_rows(list_of_ks, .id = "ID")
+
+
+depth <- read_csv("02_Clean_data/Chem/depth.csv")
+library(lme4)
 rC <- lmList(u ~ depth | ID, data=u)
 (cf <- coef(rC))
 
@@ -50,6 +53,6 @@ velocity<-depth%>%mutate(
     )
   )%>%select(-depth)
 
-ggplot(velocity, aes(x=Date, y=velocity))+geom_line()+facet_wrap(~ID, scales='free')
+#ggplot(velocity, aes(x=Date, y=velocity))+geom_line()+facet_wrap(~ID, scales='free')
 
 write_csv(velocity, "02_Clean_data/Chem/velocity.csv")

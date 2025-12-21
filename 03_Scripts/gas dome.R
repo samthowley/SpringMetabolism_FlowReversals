@@ -19,15 +19,17 @@ R<-0.08205
 dome_length<-0.38
 library(tools)
 
-velocity <- read_csv("02_Clean_data/Chem/velocity.csv")
- 
-stream <- read_csv("02_Clean_data/master_depth2.csv")
-stream<-left_join(stream, velocity)%>%
-  fill(CO2, .direction = "up") %>%
-  fill(depth, velocity, .direction = "updown")
+
+(file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
+file.names<-file.names[c(1,2,4)]
+
+data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
+stream <- reduce(data, full_join, by = c("ID", 'Date'))%>%
+  fill(CO2, .direction = "updown") %>%
+  fill(depth, .direction = "updown")
 GasDome <- function(gas,stream) {
   stream<-stream %>%  rename("CO2_enviro"='CO2')%>% mutate(day=day(Date), hour=hour(Date), month=month(Date),yr=year(Date))%>%
-    select(CO2_enviro,Temp,depth, velocity, day, hour,month,yr,ID)
+    select(CO2_enviro,Temp,depth, day, hour,month,yr,ID)
 
   gas<-gas %>% mutate(day=day(Date), hour=hour(Date), month=month(Date),yr=year(Date))
   gas<-left_join(gas,stream, by=c('hour', 'day', 'month', 'yr', 'ID'), relationship = "many-to-many")
@@ -61,7 +63,7 @@ GasDome <- function(gas,stream) {
   gas$KCO2_1.day<-(gas$KCO2_m.day/gas$depth)*24
   gas$k600_1.day<- (gas$k600_m.day/gas$depth)*24
   
-  gas<-gas%>% select(day,ID,rep,CO2,CO2_enviro,depth,k600_1.day,velocity)
+  gas<-gas%>% select(day,ID,rep,CO2,CO2_enviro,depth,k600_1.day)
 
 
   return(gas)
@@ -94,4 +96,4 @@ k600 <- gasdome%>%
 k600<-k600 %>% rename(Date=day)%>%select(Date,depth,ID,k600_1.day)
 
 split<-k600 %>% split(k600$ID)
-write.xlsx(split, file = '04_Outputs/rC_k600_edited.xlsx')
+write.xlsx(split, file = '04_Outputs/rC_k600.xlsx')

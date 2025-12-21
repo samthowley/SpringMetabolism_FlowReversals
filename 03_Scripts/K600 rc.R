@@ -16,6 +16,10 @@ theme_set(theme(    strip.text = element_text(size = 12),
 
 
 
+
+
+#rating curve#####
+
 sheet_names <- excel_sheets("04_Outputs/rC_K600_edited.xlsx")
 
 list_of_ks <- list()
@@ -28,39 +32,6 @@ k600s <- bind_rows(list_of_ks, .id = "ID")%>%
   distinct(k600_1.day, .keep_all = T)%>% filter(ID != 'Vent DO')%>%
   mutate(Date=mdy(Date))
 
-
-#check #######
-plot_grid(
-ggplot(u.h, aes(x =depth, y = u)) +
-  geom_point(size=2) +
-  facet_wrap(~ ID, scales = "free", nrow=1)+
-  geom_smooth(method = lm, se=F)
-,
-
-ggplot(k600s, aes(x =depth, y = k600_m.day/depth)) +
-  geom_point(size=2) +
-  facet_wrap(~ ID, scales = "free", nrow=1)+
-  geom_smooth(method = lm, se=F)
-,
-ncol=1)
-
-
-l<- read_excel("01_Raw_data/Depth_length_velocity_width/length width.xlsx",
-               sheet = "length ")
-
-k600s<-k600s%>%distinct(ID, Date, k600_m.day, .keep_all = T)%>%
-  mutate(k600_1.day=k600_m.day/depth)%>%
-  mutate(velocity_m.day=u*86400, reach= (velocity_m.day/k600_1.day)/10^3)
-
-k600s<-left_join(k600s, l)%>%
-  mutate(reach.test=if_else(reach>3*km, 'above', 'passes'),
-         reach.test=if_else(reach<0.4*km, 'below', reach.test))
-
-h.limit <- read_excel("01_Raw_data/Depth_length_velocity_width/length width.xlsx", 
-                      sheet = "depth threshold")
-
-
-#rating curve#####
 rC <- lmList(k600_1.day ~ depth | ID, data=k600s)
 (cf <- coef(rC))
 
@@ -88,5 +59,23 @@ Work<-K600.daily%>%
   mutate(Date=paste(Date, "00:00:00"))
 
 write_csv(Work, "02_Clean_data/Chem/K600.csv")
+
+
+
+#check #######
+
+l<- read_excel("01_Raw_data/Depth_length_velocity_width/length width.xlsx",
+               sheet = "length ")
+
+k600s<-k600s%>%distinct(ID, Date, k600_m.day, .keep_all = T)%>%
+  mutate(k600_1.day=k600_m.day/depth)%>%
+  mutate(velocity_m.day=u*86400, reach= (velocity_m.day/k600_1.day)/10^3)
+
+k600s<-left_join(k600s, l)%>%
+  mutate(reach.test=if_else(reach>3*km, 'above', 'passes'),
+         reach.test=if_else(reach<0.4*km, 'below', reach.test))
+
+h.limit <- read_excel("01_Raw_data/Depth_length_velocity_width/length width.xlsx", 
+                      sheet = "depth threshold")
 
 
