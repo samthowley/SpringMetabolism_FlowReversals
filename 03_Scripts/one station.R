@@ -11,7 +11,7 @@ library(streamMetabolizer)
 library(dataRetrieval)
 
 #call in data for two station sites####
-data <- read_csv("01_Raw_data/prepped.for.one.station.csv")
+data <- read_csv("01_Raw_data/prepped.for.one.station.csv")%>%filter(ID!='OS')
 
 #split high and low periods#####
 
@@ -26,11 +26,6 @@ df_tail <- data %>%
   mutate(ID_q = paste(ID, threshold, sep = "_"))
 
 ggplot(df_tail, aes(discharge, color=threshold))+geom_histogram()+facet_wrap(~ID, scales='free')
-
-ggplot(data=df_tail, aes(x=Date, color=threshold)) +
-  geom_line(aes(y=discharge))+
-  #geom_line(aes(y=DO), color='red')+
-  facet_wrap(~ID)
 
 #Prepare data for two station sites#######
 
@@ -248,34 +243,5 @@ write_csv(met_results, "04_Outputs/one.station.metabolism.csv")
 
 
 
-bayes_specs <- function(site) {
-  
-  breaks <- unique(quantile(site$discharge, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE))
-  
-  site <- site %>%
-    mutate(bin = cut(discharge, breaks = breaks, include.lowest = TRUE, labels = FALSE))
-  
-  summary <- site%>%
-    group_by(bin) %>%
-    summarise(
-      Q_mean = mean(discharge, na.rm = TRUE),
-      K_mean = mean(k600_1.day, na.rm = TRUE)
-    ) %>%
-    arrange(bin)
-  
-  Q_vals <- summary$Q_mean
-  K_vals <- summary$K_mean
-  
-  
-  bayes_specs <- specs(bayes_name,
-                       K600_lnQ_nodes_centers = Q_vals,
-                       K600_lnQ_nodes_meanlog = log(K_vals),
-                       K600_lnQ_nodes_sdlog = 0.1,
-                       K600_lnQ_nodediffs_sdlog = 0.05,
-                       K600_daily_sigma_sigma = 0.24,
-                       burnin_steps = 1000, saved_steps = 1000)
-  
-  return(bayes_specs)
-}
-bayes_name <- mm_name(type='bayes', pool_K600="binned", err_obs_iid=TRUE, err_proc_iid=TRUE)
+
 

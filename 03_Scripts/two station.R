@@ -15,7 +15,7 @@ area<-left_join(width, length)%>% mutate(area=w*m)
 (file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
 file.names<-file.names[c(2,4,6,11)]
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
-master <- reduce(data, full_join, by = c("ID", 'Date'))%>%filter(!ID=='OS')%>%
+master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
   left_join(area)#%>%
   #left_join(lat.lon)
 
@@ -34,7 +34,8 @@ ggplot(master%>%filter(ID=='AM'), aes(x = Date, y = DO)) +
 discharge<-master%>%
   mutate(discharge=w*depth*velocity*86400)
 
-OS<-discharge%>%filter(ID=='OS')%>%select(ID, Date, DO, Temp, discharge, depth)
+prepped.for.one<-discharge%>% select(ID, Date, DO, discharge, depth, Temp)
+write_csv(prepped.for.one, "01_Raw_data/prepped.for.one.station.csv")
 
 # discharge<-discharge%>%select(Date, ID, discharge)
 # write_csv(discharge, "02_Clean_data/Chem/discharge.csv")
@@ -109,7 +110,7 @@ GPP<-isolate%>%filter(time=='day')%>%rename(GPP=avg)%>%select(-time)
 NEP<-left_join(GPP, ER)
 
 all.the.data<-left_join(day.parse, NEP)
-#####
+#8. Create datasets####
 
 for.two <- all.the.data %>%
   filter(
@@ -128,6 +129,7 @@ ggplot(for.one, aes(x = Date)) +
   facet_wrap(~ID, scales='free')
 
 #write_csv(all.the.data%>%filter(ID=='AM'), "check.csv")
+write_csv(for.two, "04_Outputs/two.station.results.csv")
 #prepare data for one station######
 
 prepped.for.one<-for.one%>% select(ID, Date, DO, discharge, depth, Temp)
