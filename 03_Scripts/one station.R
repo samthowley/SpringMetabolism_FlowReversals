@@ -153,7 +153,8 @@ met_list_base <- lapply(metab_results_base, function(metab_results) {
   return(prediction2)
 })
 
-met_results_two <- bind_rows(met_list_base, .id = "ID")
+met_results_two <- bind_rows(met_list_base, .id = "ID")%>%select(date, ID, GPP_daily_mean, ER_daily_mean, K600_daily_mean, ER_Rhat, K600_daily_Rhat)
+
 
 #OS########
 (file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
@@ -192,6 +193,12 @@ bayes_specs.OS <- specs(bayes_name.OS,
 mm<-metab(bayes_specs.OS, data = input.OS)
 prediction2.OS <- mm@fit$daily
 
+OS.edit<-prediction2.OS%>%
+  mutate(
+    ID='OS'
+  )%>%
+  select(date, ID, GPP_daily_mean, ER_daily_mean, K600_daily_mean, ER_Rhat, K600_daily_Rhat)
+
 #IU##########
 library(dataRetrieval)
 
@@ -218,9 +225,14 @@ bayes_specs <- specs(bayes_name, K600_daily_meanlog_meanlog=0.1, K600_daily_mean
 mm<- metab(bayes_specs, IU)
 prediction2.IU <- mm@fit$daily 
 
+IU.edit<-prediction2.IU%>%
+  mutate(
+    ID='IU'
+  )%>%
+  select(date, ID, GPP_daily_mean, ER_daily_mean, K600_daily_mean, ER_Rhat, K600_daily_Rhat)
 
 #organize#####
-master.met<-rbind(met_results_two, prediction2.OS, prediction2.IU)%>%
+master.met<-rbind(met_results_two, OS.edit, IU.edit)%>%
   filter(
     GPP_daily_mean>0, ER_daily_mean<0, ER_Rhat > 0.9 & ER_Rhat < 1.2,K600_daily_Rhat > 0.9 & K600_daily_Rhat < 1.2)%>%
   separate(
@@ -231,15 +243,14 @@ master.met<-rbind(met_results_two, prediction2.OS, prediction2.IU)%>%
   rename(
     GPP=GPP_daily_mean, ER=ER_daily_mean, K600=K600_daily_mean)
 
-
-ggplot(met_results, aes(x = date)) +
-  geom_line(aes(y = K600))+
-  # geom_line(aes(y = GPP), color='green')+
-  # geom_line(aes(y = ER), color='red')+
+ggplot(master.met, aes(x = date)) +
+  #geom_line(aes(y = K600))+
+  geom_line(aes(y = GPP), color='green')+
+  geom_line(aes(y = ER), color='red')+
   geom_hline(yintercept = 0)+
   facet_wrap(~ID, scales='free')
 
-write_csv(met_results, "04_Outputs/one.station.metabolism.csv")
+write_csv(master.met, "04_Outputs/one.station.metabolism.csv")
 
 
 
