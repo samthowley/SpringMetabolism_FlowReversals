@@ -28,3 +28,5 @@ ggplot(all, aes(x = Date, color=method)) +
   geom_point(aes(y = ER))+
   geom_hline(yintercept = 0)+
   facet_wrap(~ID, scales='free')
+
+write_csv(all, "04_Outputs/master.metabolism.csv")

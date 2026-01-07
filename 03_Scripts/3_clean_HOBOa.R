@@ -152,6 +152,16 @@ GB_pH <- GB_pH %>%
 
 pH_everything<-rbind(GB_pH,pH_everything)
 
+pH.edit<-pH_everything %>% filter(pH<9,pH>4, ID!="RovingBox")%>%
+  mutate(ID=if_else(ID=="GilBlue04272022.xlsx", "GB", ID),
+         pH=if_else(ID=='AM'& Date<'2024-01-01', pH-1, pH)
+         )
+
+# ggplot(data=pH.edit, aes(x=Date, y=pH)) +
+#   geom_point()+
+#   facet_wrap(~ID)#+geom_hline(yintercept=360)
+
+
 write_csv(pH_everything, "02_Clean_data/Chem/pH.csv")
 ###DO#####
 DO_everything<-data.frame()
@@ -186,13 +196,11 @@ DO_CQ<-DO_everything%>%
          Temp=if_else(ID=='GB' & Temp>78, NA, Temp)
          )
 
-
 ggplot(data=DO_CQ, aes(x=Date)) +
   geom_line(aes(y=DO))+
   #geom_line(aes(y=DO), color='red')+
   facet_wrap(~ID)
 
-#test<-DO_CQ%>%filter(ID=='AM', Date>'2023-06-20' & Date<'2023-09-01')
 
 write_csv(DO_CQ, "02_Clean_data/Chem/DO.csv")
 
@@ -213,115 +221,32 @@ for(fil in file.names){
 }
 
 SpC_everything<-rename_ID(SpC_everything)
-SpC_everything$Date<-ymd_hms(SpC_everything$Date)
+SpC.edited<-SpC_everything %>%
+  mutate(
+    Date=ymd_hms(Date),
+    SpC=if_else(ID=='AM' & SpC>450, NA, SpC),
+    SpC=if_else(ID=='GB' & SpC>430, NA, SpC),
+    SpC=if_else(ID=='ID' & SpC>400, NA, SpC)
+    )%>%
+  filter(SpC<575)
+  
+
+ggplot(data=SpC.edited, aes(x=Date, y=SpC)) +
+  geom_point()+
+  facet_wrap(~ID)#+geom_hline(yintercept=360)
+
+
 
 write_csv(SpC_everything, "02_Clean_data/Chem/SpC.csv")
 
 ###compile####
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
-file.names<-file.names[c(2,8,1,3,5)]
+file.names<-file.names[c(1, 2, 4, 7, 10)]
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
-master <- reduce(data, left_join, by = c("ID", 'Date'))
+master <- reduce(data, full_join, by = c("ID", 'Date'))
 
 master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0) %>%select(-min)
 master <- master[!duplicated(master[c('Date','ID')]),]
-
-master<-master %>% mutate(DO=if_else(DO>12, NA, DO))%>%
-  mutate(DO=if_else(ID=='GB'& DO>9 | ID=='GB'& DO<3.8, NA, DO),
-         DO=if_else(ID=='GB'& Date<='2023-01-01' & DO>8 , NA, DO),
-         #DO=if_else(ID=='GB'& Date>'2024-05-01' & DO<4 , NA, DO),
-         
-         DO=if_else(ID=='LF'& DO<1 , NA, DO),
-         DO=if_else(ID=='LF'& Date<'2022-08-20'& DO<2, NA, DO),
-         DO=if_else(ID=='LF'& Date<'2022-07-01'& DO>6, NA, DO),
-         DO=if_else(ID=='LF'& Date>'2024-01-01'& DO>8, NA, DO),
-         #DO=if_else(ID=='LF'& Date<'2024-05-01'& DO<1.5, NA, DO),
-         
-         DO=if_else(ID=='ID'& Date<'2024-05-01'& Date>'2023-05-01'& DO<3.87, NA, DO),
-         DO=if_else(ID=='ID'& Date<'2023-03-01'&  DO>9, NA, DO),
-         DO=if_else(ID=='ID'& Date<'2023-03-01'&  DO<4.2, NA, DO),
-         
-         DO=if_else(ID=='AM'& Date>'2023-06-01'& Date<'2024-02-01'& DO>9.5, NA, DO),
-         DO=if_else(ID=='AM'& Date>'2024-01-01'& DO>8, NA, DO),
-         DO=if_else(ID=='AM' &depth<1.1 & Date<'2023-04-01'& DO<3.7, NA, DO))
-
-# ggplot(data=master, aes(x=Date)) +
-#   geom_line(aes(y=DO),color='red')+facet_wrap(~ID)
-# 
-  
-master<-master %>%mutate(pH=if_else(pH>10, NA, pH),
-                      pH=if_else(ID=='AM'& Date<'2024-01-01', pH-1, pH),
-                       pH=if_else(ID=='AM'& Date<'2023-01-01'& pH<4, NA, pH),
-                       pH=if_else(ID=='AM'& Date>'2024-04-01'& pH>7.6, NA, pH),
-                       pH=if_else(ID=='AM'& depth<0.8 & pH>9, NA, pH),
-                       
-                       pH=if_else(ID=='LF'& Date<'2023-01-01' & pH<7, NA, pH),
-                       pH=if_else(ID=='LF'& Date<'2023-01-01' & pH>8, NA, pH),
-                       
-                       pH=if_else(ID=='ID'&pH<7.27, NA, pH),
-                       pH=if_else(ID=='ID'&pH<7.48 & Date>'2023-10-01', NA, pH),
-                       
-                       pH=if_else(ID=='OS'&pH<6, NA, pH),
-                       pH=if_else(ID=='OS'&pH>8, NA, pH),
-                       pH=if_else(ID=='OS'&pH<7&Date<'2023-01-01', NA, pH)
-                       )
-
-ggplot(data=master%>%filter(ID=='GB'), aes(x=Date)) +
-  geom_line(aes(y=DO))+facet_wrap(~ID)
-
-
-master<-master %>%mutate(CO2=if_else(ID=='AM' & CO2<1850, NA, CO2),
-                       CO2=if_else(ID=='AM' & Date>'2023-07-01'& Date<'2023-12-01'& CO2<3450, NA, CO2),
-                       CO2=if_else(ID=='AM' & Date>'2023-07-01'& Date<'2023-09-01'& CO2<4600, NA, CO2),
-                       CO2=if_else(ID=='AM' & Date<'2022-09-01', NA, CO2),
-                       
-                       CO2=if_else(ID=='GB' & Date<'2023-10-01' & CO2<4000, NA, CO2),
-                       CO2=if_else(ID=='GB' & Date<'2023-01-01' & CO2<5100, NA, CO2),
-                       CO2=if_else(ID=='GB' &Date<'2023-07-01' &Date>'2023-01-01' & CO2>7000, NA, CO2),
-                       
-                       CO2=if_else(ID=='LF'&CO2<2000, NA, CO2),
-                       CO2=if_else(ID=='LF'&CO2<3500& Date<'2022-09-01', NA, CO2),
-                       CO2=if_else(ID=='LF'&CO2>15000& Date<'2022-07-01', NA, CO2),
-                       CO2=if_else(ID=='LF'&CO2<3500& Date>'2023-12-01', NA, CO2),
-                       
-                       CO2=if_else(ID=='ID' & CO2<500, NA, CO2),
-                       
-                       CO2=if_else(ID=='OS' & CO2>40000, NA, CO2),
-                       CO2=if_else(ID=='OS' & CO2<650, NA, CO2),
-                       CO2=if_else(ID=='OS' & CO2<1500 & Date<'2023-10-01', NA, CO2),
-                       CO2=if_else(ID=='OS' & CO2<10000 & Date<'2022-07-01', NA, CO2)
-                       
-                    ) #%>%mutate(CO2=if_else(ID=='OS', CO2/6, CO2))
-
-
-master<-master %>% 
-  mutate(
-    SpC=if_else(ID=='AM'&SpC>435, NA, SpC),
-    SpC=if_else(ID=='AM'&SpC<350 & depth<=1.3, NA, SpC),
-    
-    SpC=if_else(ID=='GB'&SpC>420, NA, SpC),
-    SpC=if_else(ID=='GB'&SpC<360& Date<'2023-12-01', NA, SpC),
-    SpC=if_else(ID=='GB'& Date> '2023-07-01'& SpC>410, NA, SpC),
-    
-    SpC=if_else(ID=='LF'&SpC>590, NA, SpC),
-    SpC=if_else(ID=='LF'&SpC<400 &Date<'2024-01-01', NA, SpC),
-    
-    SpC=if_else(ID=='ID'&SpC>365, NA, SpC),
-    SpC=if_else(ID=='ID'&SpC<300, NA, SpC),
-    
-    SpC=if_else(ID=='OS'&SpC>600, NA, SpC),
-    SpC=if_else(ID=='OS'&SpC<75, NA, SpC),
-    SpC=if_else(ID=='OS'&SpC<300 & depth < 1, NA, SpC)
-  )
-
-
-# ggplot(data=master%>%filter(ID=='LF'), aes(x=Date)) +
-#   # geom_point(aes(y=DO*10),color='red')+
-#   geom_point(aes(y=depth*100),color='blue')+
-#   geom_point(aes(y=SpC))+
-#   facet_wrap(~ID)+geom_hline(yintercept=360)
-
-    
     
 
 ###Include IU####

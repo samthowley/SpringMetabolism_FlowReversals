@@ -112,6 +112,7 @@ for(i in 1:nrow(stage)) {if(stage$ID[i]=='OS') {
     stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.41/0.634))+0.515}
 
   else {stage$depth[i]<- NULL }}
+
 write_csv(stage, "02_Clean_data/Chem/PSI.csv")
 
 
@@ -166,7 +167,7 @@ elevation_diff<-data_retrieval(site_id)
 elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.79
 GB<-left_join(elevation_diff, GB)
 GB<-stage_relationship(GB)
-GB<-GB %>% mutate(ID=='GB') %>% filter(depth>0.3)%>% filter(depth<1.5)
+GB<-GB %>% mutate(ID=='GB') %>% filter(depth>0.3)%>% filter(depth<1.5)%>% filter(depth>0.35)
 GB$ID<-'GB'
 GB<-GB[,x]
 
@@ -175,7 +176,7 @@ site_id <- c('02323000','02323500')
 elevation_diff<-data_retrieval(site_id)
 elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.72
 OS<-left_join(elevation_diff,OS)
-OS<-stage_relationship(OS)
+OS<-stage_relationship(OS)%>%filter(depth>0.71)
 OS$ID<-'OS'
 OS<-OS[,x]
 
@@ -202,24 +203,30 @@ SF<-SF %>%rename('depth_gage'="Level NAVD88") %>%
   filter(Date>'2021-04-02')%>%mutate(depth_gage=conv_unit(depth_gage,'ft','m'),
                                      day=as.Date(Date)) %>%mutate(depth_gage=depth_gage-2)
 ID$day<-as.Date(ID$Date)
-ID<-ID[,-c(1)]
 SF<-SF[,c('depth_gage','day')]
-ID<-left_join(SF, ID, by='day')
+ID<-full_join(ID, SF, by='day')
 
 modInter<-lm( depth~ depth_gage, data = ID)
 cf <- coef(modInter)
-ID$depth<-ID$depth_gage*cf[2]+cf[1]
-ID<-ID %>% filter(depth>0) %>% rename("Date"='day') %>%mutate(ID= 'ID', depth=depth+0.75)
-ID<-ID[,x]
-ID <- ID %>%
-  mutate(Hour = list(0:23)) %>%  # Create a list of 24 hours for each day
-  unnest(Hour) %>%  # Expand into multiple rows
-  mutate(Date = ymd_hm(paste(Date, Hour, "00"))) %>%  # Convert to ymd_hm format
-  select(-Hour)  # Remove temporary Hour column if not needed
 
-ggplot(ID, aes(Date, depth)) + geom_line()
+test<-ID %>% mutate(
+  depthinterp=depth_gage*cf[2]+cf[1],
+  depth=if_else(Date<'2023-06-01' & Date>'2023-05-01'& depth>0.27, NA, depth),
+  depth=if_else(is.na(depth), depthinterp, depth),
+  depth=(depth+depthinterp)/2
+  )%>%filter(!is.na(Date))
+ID<-ID[,x]
 
 stage<-rbind(AM, OS, LF, GB, ID)
+
+ggplot(test, aes(x = Date)) +
+  #geom_line(aes(y=depthinterp))+
+  geom_line(aes(y=depth, color='red'))+
+  
+  facet_wrap(~ID, scales='free')
+
+
+
 
 
 write_csv(stage, "02_Clean_data/Chem/depth.csv")
