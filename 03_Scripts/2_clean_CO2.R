@@ -244,7 +244,8 @@ ggplot(OS_CO2, aes(Date, CO2)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
 ############
 CO2<-rbind(AM_CO2, GB_CO2, ID_CO2, LF_CO2, OS_CO2)%>%
-  filter(CO2>500 & CO2<15000)
+  filter(CO2>500 & CO2<15000)%>%
+  distinct(Date, ID, .keep_all=TRUE)
 ggplot(CO2, aes(Date, CO2)) + geom_line() + facet_wrap(~ ID, ncol=2)
 
 write_csv(CO2, "02_Clean_data/CO2.csv")
