@@ -6,14 +6,21 @@ library(measurements)
 library(zoo)
 library(cowplot)
 library(mmand)
+library(weathermetrics)
 
-chem <- read_csv("02_Clean_data/master_chem1.csv")%>%
+file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
+file.names<-file.names[c(1, 2, 4, 7, 10)]
+data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
+master <- reduce(data, full_join, by = c("ID", 'Date'))
+
+#master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0) %>%select(-min)
+
+chem <- master%>%
   mutate(Temp_C = fahrenheit.to.celsius(Temp),
          Temp_K=Temp_C+273.15,
          exp=2400*((1/Temp_K)-(1/298.15)),
          KH=0.034*2.178^(exp),
          CO2.mg.L=CO2/10^6*KH*44.01*10^3)
-
 
 floods <- read_csv("01_Raw_data/flood periods.csv") %>%
   mutate(
@@ -25,29 +32,64 @@ stage_flagged <- chem %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
-  mutate(flooded = !is.na(start), day=as.Date(Date)) %>%  # TRUE if matched an interval
+  mutate(
+    flooded = !is.na(start), 
+    day=as.Date(Date),
+    depthID = case_when(
+      ID=='AM' & depth<0.8 ~ "low",
+      ID=='AM' &depth>0.8 & depth<1.2 ~ "moderate",
+      ID=='AM' &depth>=1.2 ~ "high",
+      
+      ID=='GB' &depth<0.55  ~ "low",
+      ID=='GB' &depth>0.55 & depth<=0.7 ~ "moderate",
+      ID=='GB' &depth>=0.7~ "high",
+      
+      ID=='OS' &depth<0.8 ~ "low",
+      ID=='OS' & depth>0.8 & depth<1.07 ~ "moderate",
+      ID=='OS' &depth>=1.07 ~ "high",
+      
+      ID=='LF' &depth<0.35 ~ "low",
+      ID=='LF' &depth> 0.35 & depth<0.75~ "moderate",
+      ID=='LF' &depth>=0.75 ~ "high",
+      
+      ID=='ID' &depth<1.3 ~ "low",
+      ID=='ID'& depth>1.3 & depth<2.1 ~ "moderate",
+      ID=='ID' &depth>=2.1 ~ "high",
+      
+      ID=='IU' &depth<1.7 ~ "low",
+      ID=='IU'& depth>1.7 & depth<3 ~ "moderate",
+      ID=='IU' &depth>=3 ~ "high")
+    ) %>%  # TRUE if matched an interval
   select(-start, -end)%>%
   group_by(day, ID)%>%
-  mutate(CO2.daily=mean(CO2, na.rm=T), DO.daily=mean(DO, na.rm=T))
+  arrange(ID, Date)
 
 # stage_flagged_long <- stage_flagged %>%
-#   mutate(depth=depth*10)%>%
+#   mutate(depth=depth*20)%>%
 #   pivot_longer(
 #     cols =c('CO2.mg.L', 'DO', 'depth'),          # Pivot all columns except 'country'
 #     names_to = "variable",        # Name the new column with original column names 'year'
 #     values_to = "value"       # Name the new column with values 'value'
-#   )
+  #)
+
+ggplot(stage_flagged%>% filter(!is.na(flood.event), ID=='OS', depthID!='low'), 
+       aes(x = Date, y=depth*4)) +
+  geom_point(aes(y=DO), color='pink')+
+  #geom_point(aes(y=CO2/10^3), color='lightgreen')+
+  geom_point(aes(y=depth*4), color='black')+
+  geom_smooth(method='loess', color='black')+
+  facet_wrap(~flood.event, scales='free')
 
 
 
 plot_grid(
-ggplot(stage_flagged_long%>% filter(ID=='AM', !is.na(flood.event)), 
+ggplot(stage_flagged_long%>% filter(!is.na(flood.event), ID=='AM'), 
        aes(x = Date, y=value, color=variable, group=interaction(variable))) +
   geom_point()+
   geom_smooth(method='loess', aes(group=interaction(variable)), color='black')+
   scale_y_continuous(
     name = "mg/L",
-    sec.axis = sec_axis(~ . /10, name = "stage (m)"))+
+    sec.axis = sec_axis(~ . /20, name = "stage (m)"))+
   facet_wrap(~flood.event, scales='free'),
 # ,
 # 
@@ -161,17 +203,6 @@ cf_df <- as_tibble(cf) %>%
 solve.for.t.peak<-left_join(cf_df, undisturbed)%>%
   mutate(hours.return=(abs(depth.base-Intercept)/slope)/24)
 
-
-
-#%>%mutate(rise=1)%>%
-  select(Date, ID, depth, flood.event, rise)
-
-
-ggplot(locate.rise, 
-       aes(x = Date, color=rise)) +
-  geom_point(aes(y=depth), size=1)+
-  facet_wrap(~ID, scales='free')
-
 #check
 regress.chk<-locate.peak%>%mutate(regression=1)%>%
   select(Date, ID, flood.event, regression)
@@ -183,37 +214,35 @@ ggplot(check.regress,
   geom_line(aes(y=depth), size=1)+
   facet_wrap(~ID, scales='free')
 
-
-
-
-
-
-
-ggplot(locate.peak%>%filter(ID=='AM', h_count.depth>0), 
-       aes(x = Date, color=h_count.depth)) +
-  geom_point(aes(y=depth))+
-  geom_point(aes(y=depth_loess), color='black')+
+#flood water quality############
+ggplot(flood.peak%>%filter(ID=='AM'), 
+       aes(x = Date, color=peak.flood)) +
+  geom_point(aes(y=depth), size=1)+
   facet_wrap(~ID, scales='free')
 
+flood.peak<-count.hours%>%
+  mutate(peak.flood=case_when(h_count.depth > -30 & h_count.depth< 30 ~ "peak"))
 
+#time btwn events#########
 
+prep.time.btwn<-stage_flagged%>%
+  mutate(condition=case_when(
+    flooded==TRUE~"flooded",
+    flooded==FALSE~"base"
+  ))
 
+time.btwn <- prep.time.btwn %>% 
+  arrange(ID, Date) %>% 
+  group_by(ID) %>%
+  mutate(
+    group = cumsum(condition == "flooded"),  # Create a grouping variable that increments at each "baseline"
+    time.btwn = unlist(ave(condition, group, FUN = function(x) {
+      cumsum(x %in% c("base"))
+    }))) %>%ungroup()  %>%
+  fill(flood.event, .direction = "updown")%>%
+  group_by(ID, condition,flood.event)%>%
+  summarize(
+    time.btwn=max(as.numeric(time.btwn), na.rm = T)/24
+  )%>%filter(condition=='base')
+ 
 
-
-
-
-
-
-recession_stats <- all %>%
-  group_by(ID, flood.event) %>%
-  summarise(
-    peak_idx = which.max(depth_loess),
-    peak_date = Date[peak_idx],
-    peak_depth = depth_loess[peak_idx],
-    baseline_depth = min(depth_loess, na.rm = TRUE),
-    target_depth = coalesce(depth.base, baseline_depth) + 0.10,  # Use measured or loess min
-    rec_idx = peak_idx + which.max(depth_loess[peak_idx:length(depth_loess)] <= target_depth),
-    rec_date = Date[rec_idx],
-    recession_days = as.numeric(rec_date - peak_date),
-    .groups = "drop"
-  )%>% distinct(ID,flood.event, .keep_all=T)%>% filter(ID=='AM')
