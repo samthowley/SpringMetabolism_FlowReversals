@@ -1,6 +1,7 @@
 ###packages###
 library(tidyverse)
 library(readxl)
+library(plotly)
 
 ####AM CO2#######
 file.names <- list.files(path="01_Raw_data/CampbellSci/AllenMill/Everything/interpolated", pattern=".xlsx", full.names=TRUE)
@@ -72,7 +73,7 @@ AM_CO2<-rbind(AM.CO2_interpolated,AM.CO2_everything, AM.CO2_CS, AM.CO2_Sht2, AM.
   distinct(Date, ID, .keep_all = T)
 
 
-ggplot(AM_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
+#ggplot(AM_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
 
 ####GB CO2#######
 
@@ -109,15 +110,28 @@ for(fil in file.names){
   CO2$CO2<-CO2$CO2*6
   GB.CO2_dat <- rbind(GB.CO2_dat, CO2)
 }
-
++5900
 GB_CO2<-rbind(GB.CO2_everything, GB.CO2_dat, GB.CO2_everythingdat)%>%
   mutate(ID='GB',
          CO2=if_else(Date>'2023-01-01' & CO2< 4000, NA, CO2),
+         CO2=if_else(Date>'2023-09-01' & Date< '2023-10-03', NA, CO2),
+         CO2=if_else(Date> '2023-10-04', CO2/1.7+3000 , CO2),
          
+         day=as.Date(Date)
   )%>%
   distinct(Date, .keep_all = T)%>%
-  filter(CO2<8300& CO2>3700)
-ggplot(GB_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
+  filter(
+    CO2 < 8000& CO2>3700,
+    !day %in% as.Date(c(
+      "2023-11-01","2023-12-06","2023-12-19",
+      "2022-07-20","2024-01-05", "2023-12-24", "2023-12-25",
+      "2023-10-31", "2023-12-21"
+    ))
+  )%>%
+  select(-day)
+
+ggplot(GB_CO2, aes(Date, CO2)) + geom_point()
+ggplotly(ggplot(GB_CO2%>%filter(Date>'2023-07-01'), aes(Date, CO2)) + geom_point(size=0.5))
 
 ####ID CO2#######
 
@@ -164,7 +178,7 @@ ID_CO2<-rbind(ID.CO2_interpolated,ID.CO2_everything,ID.CO2_dat)%>%
   filter(CO2>500 &CO2<4500)
     
 
-ggplot(ID_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
+#ggplot(ID_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
 
 ####LF CO2#######
 file.names <- list.files(path="01_Raw_data/CampbellSci/LittleFanning/Everything/interpolated", pattern=".xlsx", full.names=TRUE)
@@ -207,14 +221,16 @@ for(fil in file.names){
 
 LF_CO2<-rbind(LF.CO2_interpolated, LF.CO2_everything, LF.CO2_Sht2, LF.CO2_dat)%>%
   mutate(ID='LF',
-         CO2=if_else(Date>'2023-12-18', CO2*15, CO2),
-         CO2=if_else(Date>'2022-08-24' & Date< '2022-09-07', CO2*6+1500, CO2),
-         CO2=if_else(Date>'2023-08-16' & Date< '2023-08-29', CO2*6+500, CO2)
+         # CO2=if_else(Date>'2023-12-18', CO2*15, CO2),
+         # CO2=if_else(Date>'2022-08-24' & Date< '2022-09-07', CO2*6+1500, CO2),
+         # CO2=if_else(Date>'2023-08-16' & Date< '2023-08-29', CO2*6+500, CO2)
          )%>%
   distinct(ID, Date, .keep_all = T)%>%
   filter(CO2<4000, CO2>500, Date<'2026-01-01')
 
-ggplot(LF_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
+#ggplotly(ggplot(LF_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2))
+
+write_csv(LF_CO2, "test.csv")
 
 ####OS CO2#######
 file.names <- list.files(path="01_Raw_data/CampbellSci/Otter/Everything/interpolated", pattern=".xlsx", full.names=TRUE)
@@ -251,13 +267,13 @@ OS_CO2<-rbind(OS.CO2_interpolated,OS.CO2_everything, OS.CO2_dat)%>%
          )%>%
   filter(CO2>500, CO2<4500)
 
-ggplot(OS_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
+#ggplot(OS_CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
 
 
 
 ############
 CO2<-rbind(AM_CO2, GB_CO2, ID_CO2, LF_CO2, OS_CO2)%>% distinct(Date, ID, .keep_all=TRUE)
-ggplot(CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
+#ggplot(CO2, aes(Date, CO2)) + geom_point() + facet_wrap(~ ID, ncol=2)
 
 write_csv(CO2, "02_Clean_data/Chem/CO2.csv")
 
