@@ -1,3 +1,13 @@
+
+library(plotly)
+library(tidyverse)
+library(readxl)
+library(measurements)
+library(cowplot)
+library(mmand)
+library(weathermetrics)
+library(lme4)
+
 smooth <- function(flagged, variable) {
   prep <- flagged %>%
     filter(!is.na(flood),!is.na({{variable}})) %>%
@@ -73,7 +83,6 @@ baseline <- function(flagged, variable) {
   
 }
 
-
 find.peak<-function(smooth, variable) {
   
   count.hours<-smooth%>%
@@ -107,26 +116,67 @@ count.min<-function(trim, variable) {
   
   count.hours<-trim%>%
     group_by(ID, flood) %>%
+    arrange(Date) %>%  # Chronological rows
     mutate(
-      max_height = which.min(replace({{variable}}, is.na({{variable}}), -Inf)), 
+      var_clean = replace({{ variable }}, is.na({{ variable }}), Inf),
+      min_val = min(var_clean, na.rm = TRUE),
+      
+      # LAST position where var == minimum
+      max_height = max(which(var_clean == min_val)),
+      
       count = case_when(
         row_number() < max_height ~ row_number() - max_height,
         row_number() == max_height ~ 0,
-        row_number() > max_height ~ row_number() - max_height))
-  
+        TRUE ~ row_number() - max_height
+      )
+    ) %>%
+    select(-var_clean, -min_val) %>%
+    ungroup()
 }
-#right now I only use this for stage
-trim <- function(recession, base, variable_loess, base.variable) {
+
+
+trim.greater.1 <- function(count, base, variable_loess, base.variable) {
   
-  normalized<-left_join(recession, base)%>%
-    fill({{base.variable}}, .direction = "down")%>%
-    mutate(normalized={{variable_loess}}/{{base.variable}})
+  df <- count %>% 
+    filter(count>0)%>%
+    left_join(base) %>%
+    fill({{base.variable}}, .direction = "down") %>%
+    mutate(
+      normalized = {{variable_loess}}/ {{base.variable}},
+      day = as_date(Date),
+      trim=case_when(
+        normalized>=0.95 ~ "trim",
+        TRUE~'keep'
+      )
+    )%>%
+    group_by(ID, flood) %>%
+    arrange(Date) %>%
+    mutate(hit = cumsum(trim == "trim")) %>%
+    ungroup() %>%
+    
+    # Type-aware NA: skip IDs/factors/dates, use typed NA per class
+    mutate(
+      Date = if_else(hit > 0, as.Date(NA), Date),
+      day = if_else(hit > 0, as.Date(NA), day),
+      across(where(is.numeric) & !hit,  # Only numerics, exclude hit
+             ~ if_else(hit > 0, NA_real_, .x))
+    ) %>%
+    select(-hit, -day, -trim)  # Keep ID/flood intact
+  
+  clean <- DO.trim %>%
+    count.min(variable = depth) %>%  # Your min var
+    group_by(ID, flood) %>%
+    filter(n() >= 160) %>%             # Keep days w/ ≥7 hours data
+    ungroup()     
+   
 }
+
 
 fit_recessions <- function(trim, base, variable, base.var) {
   
   prep <- trim %>%
-    mutate(group_ID = paste0(ID, "_", flood))
+    mutate(group_ID = paste0(ID, "_", flood))%>%
+    filter(!is.na(flood))
   
   # Build formula dynamically
   formula_str <- paste(as_label(enquo(variable)), "~ count | group_ID")
@@ -139,14 +189,12 @@ fit_recessions <- function(trim, base, variable, base.var) {
     separate(ID, into = c("ID", "flood"), sep = "_", convert = TRUE) %>%
     left_join(base, by = c("ID", "flood"))
   
-  # Calculate recovery days using joined base values
-  var_name <- as_label(enquo(base.var))
+
   recess.lm %>%
     mutate(
-      recovery.days = (.data[[var_name]] - Intercept) / slope
+      recovery.days = (.data[[base_var_name]] - Intercept) / slope
     )
 }
-
 
 flood.base_compare <- function(peak_df, base_df, variable) {
   var_name   <- as_label(enquo(variable))

@@ -1,10 +1,4 @@
-library(plotly)
-library(tidyverse)
-library(readxl)
-library(measurements)
-library(cowplot)
-library(mmand)
-library(weathermetrics)
+source("03_Scripts/disturbance isolation functions.R")
 
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
 file.names<-file.names[c(1, 2, 4, 7, 10)]
@@ -82,6 +76,11 @@ find.floods <- isolate %>%
     ) %>%
   select(-slope_pos)%>%
   fill(flood, .direction = 'down')
+
+ggplot(isolate %>% filter(ID=='AM'), 
+       aes(x = Date, y=depth, color=slope)) +
+  geom_point()+
+  facet_wrap(~ID, scales='free')
 
 
 

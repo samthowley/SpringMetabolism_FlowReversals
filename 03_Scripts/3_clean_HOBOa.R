@@ -190,13 +190,15 @@ DO_CQ<-DO_everything%>%
          DO=if_else(ID=='LF' & DO<2 |DO>10, NA, DO),
          DO=if_else(ID=='ID' & DO<2.8 |DO>10, NA, DO),
          DO=if_else(ID=='GB' & DO<3.5 |DO>8.5, NA, DO),
+         DO=if_else(ID=='AM' & Date>="2023-04-12" & Date<="2023-04-23", NA, DO),
+         
          
          Temp=if_else(ID=='LF' & Temp<60, NA, Temp),
          Temp=if_else(ID=='ID' & Temp>76, NA, Temp),
          Temp=if_else(ID=='GB' & Temp>78, NA, Temp)
          )
 
-ggplot(data=DO_CQ, aes(x=Date)) +
+ggplot(data=DO_CQ %>% filter(ID=='AM'), aes(x=Date)) +
   geom_line(aes(y=DO))+
   #geom_line(aes(y=DO), color='red')+
   facet_wrap(~ID)
