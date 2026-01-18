@@ -134,11 +134,38 @@ count.min<-function(trim, variable) {
     ungroup()
 }
 
+fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
+  y_name <- rlang::as_name(rlang::enquo(y_var))
+  x_name <- rlang::as_name(rlang::enquo(x_var))
+  g_name <- rlang::as_name(rlang::enquo(group_var))
+  
+  split_list <- split(df, df[[g_name]])
+  
+  lapply(split_list, function(.x) {
+    # Remove NAs pairwise for this group/var
+    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
+    .x_clean <- .x[complete_cases, ]
+    
+    if (nrow(.x_clean) < min_rows) {
+      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
+      return(NULL)
+    }
+    
+    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
+    
+    # Predict on full original rows (fills NA with NA)
+    .x %>%
+      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
+  }) %>%
+    compact() %>%
+    bind_rows()
+}
+
 
 trim.greater.1 <- function(count, base, variable_loess, base.variable) {
   
   df <- count %>% 
-    filter(count>0)%>%
+    #filter(count>0)%>%
     left_join(base) %>%
     fill({{base.variable}}, .direction = "down") %>%
     mutate(
@@ -161,16 +188,24 @@ trim.greater.1 <- function(count, base, variable_loess, base.variable) {
       across(where(is.numeric) & !hit,  # Only numerics, exclude hit
              ~ if_else(hit > 0, NA_real_, .x))
     ) %>%
-    select(-hit, -day, -trim)  # Keep ID/flood intact
-  
-  clean <- DO.trim %>%
-    count.min(variable = depth) %>%  # Your min var
-    group_by(ID, flood) %>%
-    filter(n() >= 160) %>%             # Keep days w/ ≥7 hours data
-    ungroup()     
+    select(-hit, -trim)  # Keep ID/flood intact
    
 }
 
+trim.greater.1 <- function(count, base, variable_loess, base.variable) {
+  
+  df <- count %>% 
+    left_join(base, by = intersect(names(count), names(base))) %>%
+    fill({{ base.variable }}, .direction = "down") %>%
+    mutate(
+      normalized = {{ variable_loess }} / {{ base.variable }},
+      day        = as_date(Date),
+      trim       = normalized >= 0.95
+    ) %>%
+    group_by(ID, flood) %>%
+    arrange(Date) %>%
+    ungroup() 
+}
 
 fit_recessions <- function(trim, base, variable, base.var) {
   
@@ -188,12 +223,7 @@ fit_recessions <- function(trim, base, variable, base.var) {
     rename(Intercept = "(Intercept)", slope = "count") %>%
     separate(ID, into = c("ID", "flood"), sep = "_", convert = TRUE) %>%
     left_join(base, by = c("ID", "flood"))
-  
 
-  recess.lm %>%
-    mutate(
-      recovery.days = (.data[[base_var_name]] - Intercept) / slope
-    )
 }
 
 flood.base_compare <- function(peak_df, base_df, variable) {
