@@ -1,8 +1,29 @@
-one <- read_csv("04_Outputs/one.station.metabolism.csv")%>%rename(Date=date)%>%mutate(method="one")
-two<- read_csv("04_Outputs/two.station.results.csv")%>%select(Date, GPP, ER, K600_1.d_daily, ID)%>%
-  rename(K600=K600_1.d_daily)%>%mutate(method="two")
+one <- read_csv("04_Outputs/one.station.metabolism.csv")%>%
+  rename(Date=date,
+         GPP1=GPP,
+         ER1=ER)%>%
+  mutate(method="one")
 
-all.met<-rbind(one, two)
+two<- read_csv("04_Outputs/two.station.results.csv")%>%
+  select(Date, GPP, ER, K600_1.d_daily, ID)%>%
+  rename(K600=K600_1.d_daily,
+         GPP2=GPP,
+         ER2=ER)%>%
+  mutate(method="two")
+
+all.met<-full_join(one, two)
+
+
+ggplot(all.met, aes(x = Date)) +
+  geom_point(aes(y = GPP1), color='gray')+
+  geom_point(aes(y = GPP2), shape=1)+
+  facet_wrap(~ID, scales='free')
+
+
+
+
+
+
 
 (file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
 file.names<-file.names[c(2, 3, 1, 4, 7, 10)]

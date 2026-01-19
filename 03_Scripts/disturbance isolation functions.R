@@ -10,7 +10,7 @@ library(lme4)
 
 smooth <- function(flagged, variable) {
   prep <- flagged %>%
-    filter(!is.na(flood),!is.na({{variable}})) %>%
+    filter(!is.na({{variable}})) %>%
     arrange(flood, Date) %>%
     group_by(flood, ID) %>%
     mutate(
@@ -20,32 +20,6 @@ smooth <- function(flagged, variable) {
   
   smooth<-fit_loess_by_group(prep, {{variable}}, t, group_ID)
   
-}
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
-  y_name <- rlang::as_name(rlang::enquo(y_var))
-  x_name <- rlang::as_name(rlang::enquo(x_var))
-  g_name <- rlang::as_name(rlang::enquo(group_var))
-  
-  split_list <- split(df, df[[g_name]])
-  
-  lapply(split_list, function(.x) {
-    # Remove NAs pairwise for this group/var
-    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
-    .x_clean <- .x[complete_cases, ]
-    
-    if (nrow(.x_clean) < min_rows) {
-      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
-      return(NULL)
-    }
-    
-    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
-    
-    # Predict on full original rows (fills NA with NA)
-    .x %>%
-      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
-  }) %>%
-    compact() %>%
-    bind_rows()
 }
 
 baseline <- function(flagged, variable) {
@@ -83,6 +57,81 @@ baseline <- function(flagged, variable) {
   
 }
 
+trim.greater.than1<-function(flagged, base.df, base.variable, variable){
+  
+  prep <- flagged %>% 
+    left_join(base.df) %>%
+    fill({{base.variable}}, .direction = "down") %>%
+    group_by(ID, day)%>%
+    mutate(
+      daily=mean({{variable}}, na.rm=T)
+    )%>% ungroup()%>%
+    group_by(flood, ID)%>%
+    mutate(
+      normalized = daily/{{base.variable}},
+      day        = as.Date(Date),
+      trim       = normalized >= 0.95,
+      min_idx = which.min(daily),
+      min_date = Date[min_idx],    
+      stage=case_when(
+        Date<min_date ~"before",
+        TRUE ~'after'),
+    )%>%select(-min_idx, -min_date)
+  
+  
+  bounds<-prep %>%
+    filter(trim==TRUE)%>%
+    group_by(ID, flood, stage)%>%
+    summarise(
+      first.day=min(Date, na.rm=T),
+      last.day=max(Date, na.rm=T)
+    )
+  
+  
+  head<-bounds%>%
+    filter(stage=='before')%>%
+    select(-first.day)
+  
+  
+  tail<-bounds%>%
+    filter(stage=='after')%>%
+    select(-last.day)
+  
+  
+  remove.head<-
+    left_join(prep, head, by=c('flood', 'ID'))%>%
+    mutate(
+      remove=
+        case_when(
+          Date>last.day | is.na(last.day) ~"keep"),
+      flood=if_else(remove!='keep', NA_real_, flood),
+    )%>%
+    select(-last.day, -remove, -stage.x, -stage.y)
+  
+  
+  remove.tail<-
+    left_join(remove.head, tail, by=c('flood', 'ID'))%>%
+    mutate(
+      remove=
+        case_when(
+          Date<first.day | is.na(first.day) ~"keep"),
+      flood=if_else(remove!='keep', NA, flood),
+    )%>%
+    select(-first.day, -remove)%>%
+    group_by(ID, flood, day)
+  
+  
+  remove.flukes <- remove.tail %>%
+    group_by(ID, flood) %>%
+    mutate(
+      remove=n_distinct(day),
+      flood=if_else(remove<7, NA, flood)
+    ) %>%
+    ungroup()
+  
+}
+
+
 find.peak<-function(smooth, variable) {
   
   count.hours<-smooth%>%
@@ -99,19 +148,6 @@ find.peak<-function(smooth, variable) {
     filter(count==0)
 }
 
-count.peak<-function(trim, variable) {
-  
-  count.hours<-trim%>%
-    group_by(ID, flood) %>%
-    mutate(
-      max_height = which.max(replace({{variable}}, is.na({{variable}}), -Inf)), 
-      count = case_when(
-        row_number() < max_height ~ row_number() - max_height,
-        row_number() == max_height ~ 0,
-        row_number() > max_height ~ row_number() - max_height))%>%
-    filter(count>0)
-  
-}
 count.min<-function(trim, variable) {
   
   count.hours<-trim%>%
@@ -134,85 +170,47 @@ count.min<-function(trim, variable) {
     ungroup()
 }
 
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
-  y_name <- rlang::as_name(rlang::enquo(y_var))
-  x_name <- rlang::as_name(rlang::enquo(x_var))
-  g_name <- rlang::as_name(rlang::enquo(group_var))
+time.btwn.and.duration<-function(df){
   
-  split_list <- split(df, df[[g_name]])
-  
-  lapply(split_list, function(.x) {
-    # Remove NAs pairwise for this group/var
-    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
-    .x_clean <- .x[complete_cases, ]
-    
-    if (nrow(.x_clean) < min_rows) {
-      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
-      return(NULL)
-    }
-    
-    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
-    
-    # Predict on full original rows (fills NA with NA)
-    .x %>%
-      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
-  }) %>%
-    compact() %>%
-    bind_rows()
-}
-
-
-trim.greater.1 <- function(count, base, variable_loess, base.variable) {
-  
-  df <- count %>% 
-    #filter(count>0)%>%
-    left_join(base) %>%
-    fill({{base.variable}}, .direction = "down") %>%
+  prep<- edit %>% 
     mutate(
-      normalized = {{variable_loess}}/ {{base.variable}},
-      day = as_date(Date),
-      trim=case_when(
-        normalized>=0.95 ~ "trim",
-        TRUE~'keep'
-      )
+      flooded=case_when(
+        !is.na(flood)~'flooded',
+        TRUE~'norm')
     )%>%
-    group_by(ID, flood) %>%
-    arrange(Date) %>%
-    mutate(hit = cumsum(trim == "trim")) %>%
-    ungroup() %>%
-    
-    # Type-aware NA: skip IDs/factors/dates, use typed NA per class
-    mutate(
-      Date = if_else(hit > 0, as.Date(NA), Date),
-      day = if_else(hit > 0, as.Date(NA), day),
-      across(where(is.numeric) & !hit,  # Only numerics, exclude hit
-             ~ if_else(hit > 0, NA_real_, .x))
-    ) %>%
-    select(-hit, -trim)  # Keep ID/flood intact
-   
-}
-
-trim.greater.1 <- function(count, base, variable_loess, base.variable) {
+    fill(flood, .direction = 'down')
   
-  df <- count %>% 
-    left_join(base, by = intersect(names(count), names(base))) %>%
-    fill({{ base.variable }}, .direction = "down") %>%
+  
+  time.btwn<- prep %>%
+    filter(flooded=='norm')%>%
+    group_by(ID, flood)%>%
     mutate(
-      normalized = {{ variable_loess }} / {{ base.variable }},
-      day        = as_date(Date),
-      trim       = normalized >= 0.95
-    ) %>%
-    group_by(ID, flood) %>%
-    arrange(Date) %>%
-    ungroup() 
+      time.btwn=n_distinct(day)
+    )%>% 
+    summarise(
+      time.btwn=max(time.btwn)
+    )
+  
+  
+  duration<- prep %>%
+    filter(flooded=='flooded')%>%
+    group_by(ID, flood)%>%
+    mutate(
+      duration=n_distinct(day)
+    )%>% 
+    summarise(
+      duration=max(duration)
+    )
+  
+  final<-full_join(time.btwn, duration, by=c('ID', 'flood'))
 }
 
 fit_recessions <- function(trim, base, variable, base.var) {
   
   prep <- trim %>%
-    mutate(group_ID = paste0(ID, "_", flood))%>%
-    filter(!is.na(flood))
-  
+    filter(!is.na(flood), count>0)%>%
+    mutate(group_ID = paste0(ID, "_", flood))
+
   # Build formula dynamically
   formula_str <- paste(as_label(enquo(variable)), "~ count | group_ID")
   rC <- lmList(as.formula(formula_str), data = prep)
@@ -249,26 +247,3 @@ flood.base_compare <- function(peak_df, base_df, variable) {
     )
 }
 
-time.btwn<-function(stage_flagged){
-  prep.time.btwn<-stage_flagged%>%
-    mutate(condition=case_when(
-      is.na(flood)~"base",
-      TRUE~'flooded'
-    ))
-  
-  time.btwn <- prep.time.btwn %>% 
-    arrange(ID, Date) %>% 
-    group_by(ID) %>%
-    mutate(
-      group = cumsum(condition == "flooded"),  # Create a grouping variable that increments at each "baseline"
-      time.btwn = unlist(ave(condition, group, FUN = function(x) {
-        cumsum(x %in% c("base"))
-      }))) %>%ungroup()  %>%
-    fill(flood, .direction = "updown")%>%
-    group_by(ID, condition,flood)%>%
-    summarize(
-      time.btwn=max(as.numeric(time.btwn), na.rm = T)/24
-    )%>%filter(condition=='base')
-  
-  
-}
