@@ -131,7 +131,6 @@ trim.greater.than1<-function(flagged, base.df, base.variable, variable){
   
 }
 
-
 find.peak<-function(smooth, variable) {
   
   count.hours<-smooth%>%
@@ -167,6 +166,27 @@ count.min<-function(trim, variable) {
       )
     ) %>%
     select(-var_clean, -min_val) %>%
+    ungroup()
+}
+count.max<-function(trim, variable) {
+  
+  count.hours<-trim%>%
+    group_by(ID, flood) %>%
+    arrange(Date) %>%  # Chronological rows
+    mutate(
+      var_clean = replace({{ variable }}, is.na({{ variable }}), Inf),
+      max_val = max(var_clean, na.rm = TRUE),
+      
+      # LAST position where var == minimum
+      max_height = max(which(var_clean == max_val)),
+      
+      count = case_when(
+        row_number() < max_height ~ row_number() - max_height,
+        row_number() == max_height ~ 0,
+        TRUE ~ row_number() - max_height
+      )
+    ) %>%
+    select(-var_clean, -max_val) %>%
     ungroup()
 }
 
