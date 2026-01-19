@@ -11,7 +11,13 @@ library(streamMetabolizer)
 library(dataRetrieval)
 
 #call in data for two station sites####
-data <- read_csv("01_Raw_data/prepped.for.one.station.csv")%>%filter(ID!='OS')
+file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
+file.names<-file.names[c(4, 2, 3, 6)]
+data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
+master <- reduce(data, full_join, by = c("ID", 'Date'))
+
+master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0) %>%select(-min)
+data <- master[!duplicated(master[c('Date','ID')]),]
 
 #split high and low periods#####
 
@@ -155,6 +161,14 @@ met_list_base <- lapply(metab_results_base, function(metab_results) {
 
 met_results_two <- bind_rows(met_list_base, .id = "ID")%>%select(date, ID, GPP_daily_mean, ER_daily_mean, K600_daily_mean, ER_Rhat, K600_daily_Rhat)
 
+write_csv(met_results_two, "04_Outputs/one station results/met_results_two.csv")
+
+ggplot(met_results_two, aes(x = date)) +
+  #geom_line(aes(y = K600))+
+  geom_line(aes(y = GPP_daily_mean), color='green')+
+  geom_hline(yintercept = 0)+
+  facet_wrap(~ID, scales='free')
+
 
 #OS########
 (file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
@@ -199,6 +213,10 @@ OS.edit<-prediction2.OS%>%
   )%>%
   select(date, ID, GPP_daily_mean, ER_daily_mean, K600_daily_mean, ER_Rhat, K600_daily_Rhat)
 
+write_csv(OS.edit, "04_Outputs/one station results/OS.csv")
+
+
+
 #IU##########
 library(dataRetrieval)
 
@@ -230,6 +248,8 @@ IU.edit<-prediction2.IU%>%
     ID='IU'
   )%>%
   select(date, ID, GPP_daily_mean, ER_daily_mean, K600_daily_mean, ER_Rhat, K600_daily_Rhat)
+
+write_csv(IU.edit, "04_Outputs/one station results/IU.csv")
 
 #organize#####
 master.met<-rbind(met_results_two, OS.edit, IU.edit)%>%
