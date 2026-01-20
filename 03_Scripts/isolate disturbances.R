@@ -77,11 +77,11 @@ find.floods <- isolate %>%
   select(-slope_pos)%>%
   fill(flood, .direction = 'down')
 
-ggplot(isolate %>% filter(ID=='AM'), 
-       aes(x = Date, y=depth, color=slope)) +
-  geom_point()+
-  facet_wrap(~ID, scales='free')
 
+ggplotly(ggplot(find.floods %>% filter(ID=='LF'), 
+                aes(x = Date, y=depth, color=as.factor(flood))) +
+           geom_point()+
+           facet_wrap(~ID, scales='free'))
 
 
 flood.periods<-find.floods%>% 
@@ -93,7 +93,170 @@ flood.periods<-find.floods%>%
 
 write_csv(flood.periods, "01_Raw_data/flood.periods.csv")
 
+#flood impacts by stage############
+source("03_Scripts/disturbance isolation functions.R")
+
+depth <- read_csv("02_Clean_data/Chem/depth.csv")
+floods <- read_csv("01_Raw_data/flood.periods.csv")
+
+stage_flagged <- depth %>%
+  full_join(
+    floods, by = join_by(ID, between(Date, start, end))
+  ) %>%
+  select(-start, -end)%>%
+  arrange(ID, Date)%>%
+  mutate(
+    flood=if_else(ID=='AM' & Date>'2024-05-12', 15, flood),
+    flood=if_else(ID=='LF' & Date>'2024-05-22', 16, flood),
+    flood=if_else(ID=='OS' & Date>'2024-05-21', 12, flood),
+  )
+
+
+depth.base<-baseline(stage_flagged, depth)
+
+h.trimmed<-trim.less.than1(stage_flagged, depth.base, base.depth, depth)
+
+
+fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
+  y_name <- rlang::as_name(rlang::enquo(y_var))
+  x_name <- rlang::as_name(rlang::enquo(x_var))
+  g_name <- rlang::as_name(rlang::enquo(group_var))
+  
+  split_list <- split(df, df[[g_name]])
+  
+  lapply(split_list, function(.x) {
+    # Remove NAs pairwise for this group/var
+    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
+    .x_clean <- .x[complete_cases, ]
+    
+    if (nrow(.x_clean) < min_rows) {
+      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
+      return(NULL)
+    }
+    
+    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
+    
+    # Predict on full original rows (fills NA with NA)
+    .x %>%
+      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
+  }) %>%
+    compact() %>%
+    bind_rows()
+}
+depth.smooth<-smooth(h.trimmed, depth)
+
+depth.count<-count.max(depth.smooth, depth_loess)
+
+depth.min<-depth.count%>% filter(count==0)
+
+depth.compare<-flood.base_compare(depth.min, depth.base, depth)
 
 
 
 
+prep<- h.trimmed %>% 
+  mutate(
+    flooded=case_when(
+      !is.na(flood)~'flooded',
+      TRUE~'norm')
+  )%>%
+  fill(flood, .direction = 'down')
+
+
+time.btwn<- prep %>%
+  filter(flooded=='norm')%>%
+  group_by(ID, flood)%>%
+  mutate(
+    time.btwn=n_distinct(day)
+  )%>% 
+  summarise(
+    time.btwn=max(time.btwn)
+  )
+
+
+duration<- prep %>%
+  filter(flooded=='flooded')%>%
+  group_by(ID, flood)%>%
+  mutate(
+    duration=n_distinct(day)
+  )%>% 
+  summarise(
+    duration=max(duration)
+  )
+
+depth.time.btwn.and.duration<-full_join(time.btwn, duration, by=c('ID', 'flood'))
+
+
+
+
+
+recession.lm<-fit_recessions.greater1(depth.count, depth.base, depth, base.depth) 
+
+rise.lm<-fit_recessions.less1(depth.count, depth.base, depth, base.depth) 
+
+stage.flood.impacts<-full_join(depth.time.btwn.and.duration, depth.compare)%>%
+  full_join(recession.lm)%>%
+  full_join(rise.lm)%>%
+  filter(!is.na(flood))%>%
+  mutate(
+    recovery.days.depth = (base.depth- recess.intercept) /recess.slope,
+    rise.days.depth = (base.depth- rise.intercept) /rise.slope
+  )
+
+#SpC and pH###################
+
+SpC <- read_csv("02_Clean_data/Chem/SpC.csv")%>%
+  full_join(
+    floods, by = join_by(ID, between(Date, start, end))
+  ) %>%
+  select(-start, -end)%>%
+  arrange(ID, Date)%>%
+  mutate(
+    flood=if_else(ID=='AM' & Date>'2024-05-12', 15, flood),
+    flood=if_else(ID=='LF' & Date>'2024-05-22', 16, flood),
+    flood=if_else(ID=='OS' & Date>'2024-05-21', 12, flood),
+    #SpC=if_else(ID=='AM' & flood==3 & SpC<350, NA, SpC),
+    #SpC=if_else(ID=='AM' & flood==3 & SpC<350, NA, SpC)
+    
+  )%>%filter(!is.na(SpC))
+
+spc.base<-baseline(SpC, SpC)
+spc.count<-count.min(SpC, SpC)
+spc.min<-spc.count%>% filter(count==0)%>%select(ID, flood, SpC)
+
+
+
+pH <- read_csv("02_Clean_data/Chem/pH.csv")%>%full_join(
+  floods, by = join_by(ID, between(Date, start, end))
+) %>%
+  select(-start, -end)%>%
+  arrange(ID, Date)%>%
+  mutate(
+    flood=if_else(ID=='AM' & Date>'2024-05-12', 15, flood),
+    flood=if_else(ID=='LF' & Date>'2024-05-22', 16, flood),
+    flood=if_else(ID=='OS' & Date>'2024-05-21', 12, flood),
+  )%>%filter(!is.na(pH))
+
+ph.base<-baseline(pH, pH)
+ph.count<-count.min(pH, pH)
+ph.min<-ph.count%>% filter(count==0)%>%select(ID, flood, pH)
+
+# (a<-ggplot(ph.count %>% filter(ID=='AM'), 
+#            aes(x = Date, y=pH, color=as.factor(flood))) +
+#     geom_point()+
+#     facet_wrap(~flood, scales='free'))
+# ggplotly(a)
+
+
+stage<-stage.flood.impacts%>%
+  full_join(spc.min)%>%
+  full_join(ph.min)%>%
+  mutate(
+    class=case_when(
+      pH<7 ~'RR',
+      SpC<100 ~ 'RR',
+      TRUE~'HI'
+    )
+  )
+
+write_csv(stage, "04_Outputs/flood impacts/stage.csv")

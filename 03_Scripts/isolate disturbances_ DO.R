@@ -72,10 +72,9 @@ DO.count<-count.min(DO.smooth, DO_loess)
 
 DO.min<-DO.count%>% filter(count==0)
 
-DO.compare<-flood.base_compare(DO.min, DO.base, DO)%>%
-  select(Date, ID, flood, percent.change.DO, DO)
+DO.compare<-flood.base_compare(DO.min, DO.base, DO)
 
-DO.time.btwn.and.duration<-time.btwn.and.duration(edit)
+#DO.time.btwn.and.duration<-time.btwn.and.duration(edit)
 
 recession.lm<-fit_recessions(DO.count, DO.base, DO, base.DO) %>%
   mutate(

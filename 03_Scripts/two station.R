@@ -115,16 +115,17 @@ all.the.data<-left_join(day.parse, NEP)
 for.two <- all.the.data %>%
   filter(
     reach.test == "passes" | is.na(reach.test),
-    ER >= -37 | is.na(ER),
-    GPP <= 37 | is.na(GPP))
+    )
 
 does.not.pass<-all.the.data%>% filter(reach.test != "passes")
 too.large<-all.the.data%>%filter(ER < -37 | GPP > 37)
 for.one<-rbind(does.not.pass, too.large)%>%distinct(ID, Date, .keep_all = T)
 
-ggplot(for.one, aes(x = Date)) +
+ggplot(for.two, aes(x = Date)) +
   geom_point(aes(y = GPP), color='darkgreen')+
   geom_point(aes(y = ER), color='red')+
+  geom_point(aes(y = depth*10), color='black')+
+  
   geom_hline(yintercept = 0)+
   facet_wrap(~ID, scales='free')
 

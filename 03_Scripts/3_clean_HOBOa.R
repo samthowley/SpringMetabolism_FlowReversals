@@ -3,112 +3,7 @@ library(tidyverse)
 library(readxl)
 library(measurements)
 library(tools)
-#function####
-pH_xl <- function(fil) {
-  pH <- read_excel(fil)
-pH<-pH[,c(1,5)]
-colnames(pH)[1] <- "Date"
-colnames(pH)[2] <- "pH"
-
-pH$pH<-as.numeric(pH$pH)
-pH$ID<-strsplit(basename(fil), '_')[[1]][1]
-
-return(pH)}
-pH_csv <- function(fil) {
-  pH <- read_csv(fil, skip=3)
-  pH<-pH[,c(1,5)]
-  colnames(pH)[1] <- "Date"
-  colnames(pH)[2] <- "pH"
-  
-  pH$pH<-as.numeric(pH$pH)
-  pH$ID<-strsplit(basename(fil), '_')[[1]][1]
-
-  return(pH)}
-pH_HOBO <- function(fil) {
-  pH <- read_excel(fil)
-  pH<-pH[,c(2,5)]
-  colnames(pH)[1] <- "Date"
-  colnames(pH)[2] <- "pH"
-  
-  pH$pH<-as.numeric(pH$pH)
-  pH<-pH[order(as.Date(pH$Date, format="%Y-%m-%d %H:%M:%S")),]
-  pH$ID<-strsplit(basename(fil), '_')[[1]][1]
-
-  return(pH)}
-DO_formatted <- function(fil) {
-  DO <- read_csv(fil)
-  DO<-DO[,c(1,2,3)]
-  colnames(DO)[1] <- "Date"
-  colnames(DO)[2] <- "DO"
-
-  DO$ID<-strsplit(basename(fil), '_')[[1]][1]
-  return(DO)}
-DO_unformatted <- function(fil) {
-  DO <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
-  colnames(DO)[1] <- "Date"
-  colnames(DO)[2] <- "DO"
-  colnames(DO)[3] <- "Temp"
-  keep<-c('Date', "DO", "Temp")
-  DO<-DO[,keep]
-  DO$Date <- mdy_hms(DO$Date)
-
-  DO$ID<-strsplit(basename(fil), '_')[[1]][1]
-  return(DO)}
-SpC_formatted <- function(fil) {
-  SpC <- read_csv(fil)
-  SpC<-SpC[,c(1,2)]
-  colnames(SpC)[1] <- "Date"
-  colnames(SpC)[2] <- "SpC"
-  SpC$ID<-strsplit(basename(fil), '_')[[1]][1]
-  return(SpC)}
-SpC_unformatted <- function(fil) {
-  SpC <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
-  SpC<-SpC[,c(1,2)]
-  colnames(SpC)[1] <- "Date"
-  colnames(SpC)[2] <- "SpC"
-  SpC$Date <- mdy_hms(SpC$Date)
-  SpC<-SpC[order(as.Date(SpC$Date, format="%Y-%m-%d %H:%M:%S")),]
-  return(SpC)}
-rename_ID<-function(site){
-  site<-site %>%
-    mutate(ID = ifelse(as.character(ID) == "AllenMillPond", "AM", as.character(ID)),
-           ID = ifelse(as.character(ID) == "AllenMill", "AM", as.character(ID)),
-           ID = ifelse(as.character(ID) == "AllenMillDO", "AM", as.character(ID)),
-           
-           ID = ifelse(as.character(ID) == "GilchristBlue", "GB", as.character(ID)),
-           ID = ifelse(as.character(ID) == "Gilichrist", "GB", as.character(ID)),
-           ID = ifelse(as.character(ID) == "GilichristBlue", "GB", as.character(ID)),
-           
-           ID = ifelse(as.character(ID) == "Ichetucknee", "ID", as.character(ID)),
-           ID = ifelse(as.character(ID) == "Ichetuckneel", "ID", as.character(ID)),
-        
-
-           ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
-           ID = ifelse(as.character(ID) == "LittleFanningSpC", "LF", as.character(ID)),
-           
-           ID = ifelse(as.character(ID) == "Otter", "OS", as.character(ID)),
-           ID = ifelse(as.character(ID) == "OtterSpC", "OS", as.character(ID)))
-return(site)}
-
-SpC_formatted <- function(fil) {
-  SpC <- read_csv(fil)
-  SpC<-SpC[,c(1,2)]
-  colnames(SpC)[1] <- "Date"
-  colnames(SpC)[2] <- "SpC"
-  SpC$ID<-strsplit(basename(fil), '_')[[1]][1]
-
-  return(SpC)}
-SpC_unformatted <- function(fil) {
-  SpC <- read_csv(fil,col_types = cols(`#` = col_skip()),skip = 1)
-  SpC<-SpC[,c(1,2)]
-  colnames(SpC)[1] <- "Date"
-  colnames(SpC)[2] <- "SpC"
-  SpC$Date <- mdy_hms(SpC$Date)
-  SpC<-SpC[order(as.Date(SpC$Date, format="%Y-%m-%d %H:%M:%S")),]
-  SpC$ID<-strsplit(basename(fil), '_')[[1]][1]
-
-  
-  return(SpC)}
+source("03_Scripts/clean functions.R")
 
 #pH#####
 pH_everything <- data.frame()
@@ -154,15 +49,18 @@ pH_everything<-rbind(GB_pH,pH_everything)
 
 pH.edit<-pH_everything %>% filter(pH<9,pH>4, ID!="RovingBox")%>%
   mutate(ID=if_else(ID=="GilBlue04272022.xlsx", "GB", ID),
-         pH=if_else(ID=='AM'& Date<'2024-01-01', pH-1, pH)
+         pH=if_else(ID=='AM'& Date<'2024-01-01', pH-1, pH),
+         pH=if_else(ID=='GB'& pH>7.55, NA, pH),
+         pH=if_else(ID=='OS'& pH>8, NA, pH),
+         pH=if_else(ID=='ID'& Date< '2023-09-23' & pH<7.3, NA, pH)
          )
 
-# ggplot(data=pH.edit, aes(x=Date, y=pH)) +
+# a<-ggplot(data=pH.edit %>% filter(ID=='ID'), aes(x=Date, y=pH)) +
 #   geom_point()+
-#   facet_wrap(~ID)#+geom_hline(yintercept=360)
+#   facet_wrap(~ID)
+# ggplotly(a)#+geom_hline(yintercept=360)
 
-
-write_csv(pH_everything, "02_Clean_data/Chem/pH.csv")
+write_csv(pH.edit, "02_Clean_data/Chem/pH.csv")
 ###DO#####
 DO_everything<-data.frame()
 file.names <- list.files(path="01_Raw_data/Hobo/DO/formatted", pattern=".csv", full.names=TRUE)
@@ -228,18 +126,24 @@ SpC.edited<-SpC_everything %>%
     Date=ymd_hms(Date),
     SpC=if_else(ID=='AM' & SpC>450, NA, SpC),
     SpC=if_else(ID=='GB' & SpC>430, NA, SpC),
-    SpC=if_else(ID=='ID' & SpC>400, NA, SpC)
+    SpC=if_else(ID=='ID' & SpC>400, NA, SpC),
+    SpC=if_else(ID=='LF' &Date<'2024-01-01' & SpC< 400, NA, SpC),
+    SpC=if_else(ID=='GB' &Date<'2023-08-01' & SpC< 350, NA, SpC),
+    SpC=if_else(ID=='ID' &Date<'2023-12-01' & SpC< 300, NA, SpC),
+    SpC=if_else(ID=='AM' &Date>='2022-08-22' & Date<='2022-08-23', NA, SpC),
+    SpC=if_else(ID=='AM' &Date=='2023-07-19', NA, SpC),
+    SpC=if_else(ID=='OS' &Date=='2022-05-15', NA, SpC),
+    
     )%>%
-  filter(SpC<575)
+  filter(SpC<575, SpC>50)
   
 
-ggplot(data=SpC.edited, aes(x=Date, y=SpC)) +
+ggplot(data=SpC.edited %>% filter(ID=='ID'), aes(x=Date, y=SpC)) +
   geom_point()+
   facet_wrap(~ID)#+geom_hline(yintercept=360)
 
 
-
-write_csv(SpC_everything, "02_Clean_data/Chem/SpC.csv")
+write_csv(SpC.edited, "02_Clean_data/Chem/SpC.csv")
 
 ###compile####
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
