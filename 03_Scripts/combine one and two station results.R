@@ -22,34 +22,29 @@ two<- read_csv("04_Outputs/two.station.results.csv")%>%
   mutate(method="two")
 
 all.met<-full_join(onestation, two)%>%
-  mutate(GPP=(GPP1+GPP2)/2,
+  mutate(
+         GPP2=if_else(is.na(GPP2), GPP1, GPP2),
+         ER2=if_else(is.na(ER2), GPP1, ER2),
+         GPP=(GPP1+GPP2)/2,
          ER=(ER1+ER2)/2,
-         GPP=if_else(is.na(GPP), GPP1, GPP),
-         ER=if_else(is.na(ER), GPP1, ER)
-         
+         GPP=if_else(GPP<0, 0, GPP)
          )
 
 
 ggplot(all.met, aes(x = Date)) +
   geom_point(aes(y = GPP1), color='gray')+
   geom_point(aes(y = GPP2), shape=1)+
-  geom_point(aes(y = GPP), shape=1, color='red')+
+  #geom_point(aes(y = GPP), shape=1, color='red')+
   facet_wrap(~ID, scales='free')+
   theme_minimal()
 
-ggplot(all.met, aes(x = depth)) +
+ggplot(all.met, aes(x = Date)) +
   geom_point(aes(y = GPP), shape=1)+
   facet_wrap(~ID, scales='free')+
   theme_minimal()
 
 
-
-
-
-
-
-
-write_csv(all, "04_Outputs/master.metabolism.csv")
+write_csv(all.met, "04_Outputs/master.metabolism.csv")
 
 
 

@@ -115,7 +115,8 @@ all.the.data<-left_join(day.parse, NEP)
 for.two <- all.the.data %>%
   filter(
     reach.test == "passes" | is.na(reach.test),
-    )
+    )%>%
+  filter(GPP<40, ER>-40)
 
 does.not.pass<-all.the.data%>% filter(reach.test != "passes")
 too.large<-all.the.data%>%filter(ER < -37 | GPP > 37)

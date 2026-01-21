@@ -129,7 +129,7 @@ trim.greater.than1<-function(flagged, base.df, base.variable, variable){
       flood=if_else(remove<7, NA, flood)
     ) %>%
     ungroup()
-  
+  #
 }
 trim.less.than1<-function(flagged, base.df, base.variable, variable){
   
@@ -316,8 +316,7 @@ fit_recessions.greater1 <- function(trim, base, variable, base.var) {
     rename(Intercept = "(Intercept)", slope = "count") %>%
     separate(ID, into = c("ID", "flood"), sep = "_", convert = TRUE) %>%
     left_join(base, by = c("ID", "flood"))%>%
-    rename(recess.intercept=Intercept, recess.slope=slope)%>%
-    select(-base.depth)
+    rename(recess.intercept=Intercept, recess.slope=slope)
 
 }
 fit_recessions.less1 <- function(trim, base, variable, base.var) {
@@ -336,8 +335,7 @@ fit_recessions.less1 <- function(trim, base, variable, base.var) {
     rename(Intercept = "(Intercept)", slope = "count") %>%
     separate(ID, into = c("ID", "flood"), sep = "_", convert = TRUE) %>%
     left_join(base, by = c("ID", "flood"))%>%
-    rename(rise.intercept=Intercept, rise.slope=slope)%>%
-    select(-base.depth)
+    rename(rise.intercept=Intercept, rise.slope=slope)
   
 }
 
