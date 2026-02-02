@@ -116,7 +116,12 @@ for.two <- all.the.data %>%
   filter(
     reach.test == "passes" | is.na(reach.test),
     )%>%
-  filter(GPP<40, ER>-40)
+  mutate(Date=if_else(ID=='GB' & GPP>30, NA, Date),
+         Date=if_else(ID=='GB' & Date<'2022-12-25', NA, Date))
+
+
+#%>%
+  #filter(GPP<40, ER>-40)
 
 does.not.pass<-all.the.data%>% filter(reach.test != "passes")
 too.large<-all.the.data%>%filter(ER < -37 | GPP > 37)
@@ -125,9 +130,15 @@ for.one<-rbind(does.not.pass, too.large)%>%distinct(ID, Date, .keep_all = T)
 ggplot(for.two, aes(x = Date)) +
   geom_point(aes(y = GPP), color='darkgreen')+
   geom_point(aes(y = ER), color='red')+
-  geom_point(aes(y = depth*10), color='black')+
+  #geom_point(aes(y = depth*10), color='black')+
   
   geom_hline(yintercept = 0)+
+  facet_wrap(~ID, scales='free')
+
+ggplot(for.two, aes(x = Date)) +
+  geom_point(aes(y = DO, colour = "Station two DO"))+
+  geom_point(aes(y = VentDO, color='Vent DO'))+
+  
   facet_wrap(~ID, scales='free')
 
 #write_csv(all.the.data%>%filter(ID=='AM'), "check.csv")

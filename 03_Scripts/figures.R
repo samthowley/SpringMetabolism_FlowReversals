@@ -1,54 +1,40 @@
-file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
-file.names<-file.names[c(1, 2, 4, 7, 10)]
-data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
-master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
-  filter(Date> '2022-01-01', ID %in% c('GB', 'AM', 'LF', 'OS', 'ID'))
+library(tools)
 
 
-floods <- read_csv("01_Raw_data/flood.periods.csv")
+file.names <- list.files("04_Outputs/flood impacts", pattern = "\\.csv$", full.names = TRUE)
 
-
-flagged <- master %>%
-  full_join(
-    floods, by = join_by(ID, between(Date, start, end))
-  ) %>%
-  select(-start, -end)%>%
-  arrange(ID, Date)%>%
-  mutate(
-    flood=if_else(ID=='AM' & Date>'2024-05-12', 15, flood),
-    flood=if_else(ID=='LF' & Date>'2024-05-22', 16, flood),
-    flood=if_else(ID=='OS' & Date>'2024-05-21', 12, flood),
-  )
-
-
-
-ggplot(flagged%>% filter(!is.na(flood), ID=='AM'), 
-       aes(x = Date, y=depth)) +
-  geom_point(aes(y=CO2/10^3), color='black', alpha=0.3)+
-  geom_point(aes(y=DO), color='red', alpha=0.3)+
+data_list <- map(file.names, ~ {
+  df <- read_csv(.x)
+  stub <- file_path_sans_ext(basename(.x))   # e.g. "DO"
   
-  geom_smooth(aes(y=CO2/10^3),method='loess', color='black')+
-  geom_smooth(aes(y=DO),method='loess', color='red')+
+  # Keep ID, Date, flood unprefixed:
+  keep <- c("ID", "flood")
+  cols_to_change <- setdiff(names(df), keep)
   
-  scale_y_continuous(
-    name = "DO mg/L",
-    sec.axis = sec_axis(~ . * 10^3, name = "CO2 ppm")) +
-
-  theme_minimal()+
-  facet_wrap(~flood, scales='free')
-
-
-ggplot(flagged%>% filter(!is.na(flood), ID=='AM'), 
-       aes(x = Date, y=depth)) +
-  geom_point(aes(y=depth), color='blue', alpha=0.3)+
-  geom_point(aes(y=SpC/100), color='purple', alpha=0.3)+
-
-  geom_smooth(aes(y=depth),method='loess', color='blue')+
-  geom_smooth(aes(y=SpC/100),method='loess', color='purple')+
+  names(df)[names(df) %in% cols_to_change] <-
+    paste(stub, names(df)[names(df) %in% cols_to_change], sep = "_")
   
-  scale_y_continuous(
-    name = "depth (m)",
-    sec.axis = sec_axis(~ . * 100, name = "SpC")) +
-  
-  facet_wrap(~flood, scales='free')
+  df
+})
 
+
+impacts <- data_list %>%
+  reduce(left_join, by = c("ID", "flood"))%>% 
+  filter(!is.na(flood))%>%
+  mutate(stage_difference=depth_maximum-depth_base)
+
+(a<-impacts %>%
+    # filter(ID=='AM', 
+    #        !is.na(flood), 
+    #        #flood %in% c()
+    # ) %>%
+    ggplot(aes(x = stage_difference, y = DO_percent.change)) +
+    geom_point()+
+    geom_smooth(method = 'lm')+
+    facet_wrap(~ ID, scales = "free")+theme_minimal())
+
+
+ggplotly(a)
+
+
+write_csv(impacts, "test.csv")

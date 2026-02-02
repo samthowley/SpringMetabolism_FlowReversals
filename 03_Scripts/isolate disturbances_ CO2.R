@@ -19,10 +19,6 @@ CO2_flagged <- co2 %>%
 
 CO2.base<-baseline(CO2_flagged, CO2)
 
-#function(flagged, base.df, base.variable, variable)
-CO2.trimmed<-trim.less.than1(CO2_flagged, CO2.base, base.CO2, CO2)
-
-
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))
   x_name <- rlang::as_name(rlang::enquo(x_var))
@@ -49,38 +45,36 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
     compact() %>%
     bind_rows()
 }
-CO2.smooth<-smooth(CO2.trimmed, CO2)
+CO2.smooth<-smooth(CO2_flagged, CO2)
+
+#function(flagged, base.df, base.variable, variable)
+CO2.trimmed<-trim.increases(CO2.smooth, CO2_loess)%>%
+  mutate(
+    flood=if_else(ID=='AM' & flood==5 & Date> '2023-03-15', NA, flood),
+    flood=if_else(ID=='ID' & flood==3 & Date> '2023-04-28', NA, flood),
+    flood=if_else(ID=='LF' & flood==2 & Date> '2022-08-22', NA, flood),
+    flood=if_else(ID=='OS' & flood==4 & Date> '2023-03-21', NA, flood),
+    flood=if_else(ID=='OS' & flood==6, NA, flood)
+  )
+
+CO2.duration<-duration(CO2.trimmed)
 
 CO2.count<-count.max(CO2.smooth, CO2_loess)
 
-CO2.max<-CO2.count%>% filter(count==0)
+CO2.max<-maximum(CO2.trimmed, CO2)
 
-CO2.compare<-flood.base_compare(CO2.max, CO2.base, CO2)%>%
-  select(Date, ID, flood, percent.change.CO2, CO2)
+CO2.compare<-flood.base_compare(CO2.max, CO2.base, maximum)
 
+recession.lm<-fit_recessions(CO2.count, CO2.base, CO2, base) 
+rise.lm<-fit_rise(CO2.count, CO2.base, CO2, base) 
 
-recession.lm<-fit_recessions(CO2.count, CO2.base, CO2, base.CO2) %>%
-  mutate(
-    recovery.days.CO2 = (base.CO2- Intercept) / slope
-  )
 
 flood.impacts.CO2<-
-  full_join(recession.lm)%>%
-  full_join(CO2.compare, by=c('ID', 'flood'))
+  full_join(recession.lm,CO2.duration)%>%
+  full_join(CO2.compare, by=c('ID', 'flood'))%>%
+  full_join(rise.lm, by=c('ID', 'flood'))%>%
+  full_join(CO2.max, by=c('ID', 'flood'))%>%
+  full_join(CO2.base, by=c('ID', 'flood'))
 
-
-
-ggplot(CO2_flagged%>% filter(!is.na(flood), ID=='OS'), 
-       aes(x = Date, y=CO2)) +
-  geom_point(aes(y=CO2), color='black')+
-  #geom_point(aes(y=CO2_loess), color='red', size=0.4)+
-  facet_wrap(~flood, scales='free')
-
-ggplot(CO2.count%>% filter(!is.na(flood), ID=='OS', count>0), 
-       aes(x = Date, y=CO2)) +
-  geom_point(aes(y=CO2), color='black')+
-  geom_smooth(method='lm')+
-  facet_wrap(~flood, scales='free')
-
-
+write_csv(flood.impacts.CO2, "04_Outputs/flood impacts/CO2.csv")
 

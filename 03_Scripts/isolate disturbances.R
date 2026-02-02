@@ -1,10 +1,13 @@
+#call in data########
+
 source("03_Scripts/disturbance isolation functions.R")
 
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
 file.names<-file.names[c(1, 2, 4, 7, 10)]
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
 master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
-  filter(Date> '2022-01-01', ID %in% c('GB', 'AM', 'LF', 'OS', 'ID'))
+  filter(Date> '2022-01-01', ID %in% c('GB', 'AM', 'LF', 'OS', 'ID'))%>%
+  mutate(min=minute(Date))%>%filter(min==0)%>%select(-min)
 
 
 chem <- master %>%
@@ -31,9 +34,9 @@ slopes <- chem %>%
   mutate(
     norm=depth_smooth/mean(depth_smooth, na.rm=T),
     date      = as.Date(Date),
-    day_index = as.numeric(date - min(date)) + 1,
-    block3    = ((day_index - 1) %/% 3) + 1   # 3‑day group index
-  ) %>%ungroup()%>%
+    # 3-day index starting at the first date in your data
+    day_index = as.integer(date - min(date)),
+    block3    = day_index %/% 7) %>%ungroup()%>%
   group_by(block3, ID) %>%
   summarise(
     start_date = min(date),
@@ -54,10 +57,6 @@ isolate <- chem %>%
   ) %>%
   mutate(
     abs.slope=abs(slope),
-    slope=slope,
-    flooded=case_when(
-      slope>8.9*10^-3~'Y',
-      TRUE~'N')
     )%>%
   select(-start_date, -end_date, -day)%>%
   arrange(ID, Date)%>%filter(abs.slope>0.01)
@@ -72,16 +71,12 @@ find.floods <- isolate %>%
   ) %>%
   ungroup() %>%
   mutate(
-    flood = if_else(slope_pos, pos_id, NA_integer_)
+    flood = if_else(slope_pos, pos_id, NA_integer_),
+    flood=as.factor(flood),
+    Date=if_else(Date<'2022-07-01'& ID=='OS', NA, Date)
     ) %>%
   select(-slope_pos)%>%
   fill(flood, .direction = 'down')
-
-
-ggplotly(ggplot(find.floods %>% filter(ID=='LF'), 
-                aes(x = Date, y=depth, color=as.factor(flood))) +
-           geom_point()+
-           facet_wrap(~ID, scales='free'))
 
 
 flood.periods<-find.floods%>% 
@@ -91,15 +86,20 @@ flood.periods<-find.floods%>%
     end=max(Date, na.rm=T)
   )
 
+
+ggplot(find.floods %>% filter(ID=='OS'), 
+       aes(x = Date, y=depth, color=flood)) +
+  geom_point()+
+  facet_wrap(~ID, scales='free')
+
 write_csv(flood.periods, "01_Raw_data/flood.periods.csv")
 
 #flood impacts by stage############
 source("03_Scripts/disturbance isolation functions.R")
 
-depth <- read_csv("02_Clean_data/Chem/depth.csv")
 floods <- read_csv("01_Raw_data/flood.periods.csv")
 
-stage_flagged <- depth %>%
+stage_flagged <- master %>%
   full_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
@@ -111,10 +111,8 @@ stage_flagged <- depth %>%
     flood=if_else(ID=='OS' & Date>'2024-05-21', 12, flood),
   )
 
-
 depth.base<-baseline(stage_flagged, depth)
 
-h.trimmed<-trim.less.than1(stage_flagged, depth.base, base.depth, depth)
 
 
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
@@ -143,16 +141,15 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
     compact() %>%
     bind_rows()
 }
-depth.smooth<-smooth(h.trimmed, depth)
+depth.smooth<-smooth(stage_flagged, depth)
 
-depth.count<-count.max(depth.smooth, depth_loess)
+h.trimmed<-trim.increases(depth.smooth,depth_loess)
 
-depth.min<-depth.count%>% filter(count==0)
+depth.count<-count.max(h.trimmed, depth_loess)
 
-depth.compare<-flood.base_compare(depth.min, depth.base, depth)
+depth.max<-maximum(h.trimmed, depth)
 
-
-
+depth.compare<-flood.base_compare(depth.max, depth.base, maximum)
 
 prep<- h.trimmed %>% 
   mutate(
@@ -174,34 +171,20 @@ time.btwn<- prep %>%
   )
 
 
-duration<- prep %>%
-  filter(flooded=='flooded')%>%
-  group_by(ID, flood)%>%
-  mutate(
-    duration=n_distinct(day)
-  )%>% 
-  summarise(
-    duration=max(duration)
-  )
-
-depth.time.btwn.and.duration<-full_join(time.btwn, duration, by=c('ID', 'flood'))
+depth.duration<- duration(h.trimmed)
 
 
+recession.lm<-fit_recessions(depth.count, depth.base, depth, base.depth) 
+rise.lm<-fit_rise(depth.count, depth.base, depth, base.depth) 
 
+flood.impacts.depth<-
+  full_join(recession.lm,depth.duration)%>%
+  full_join(depth.compare, by=c('ID', 'flood'))%>%
+  full_join(rise.lm, by=c('ID', 'flood'))%>%
+  full_join(depth.max, by=c('ID', 'flood'))%>%
+  full_join(depth.base, by=c('ID', 'flood'))%>%
+  full_join(time.btwn, by=c('ID', 'flood'))
 
-
-recession.lm<-fit_recessions.greater1(depth.count, depth.base, depth, base.depth) 
-
-rise.lm<-fit_recessions.less1(depth.count, depth.base, depth, base.depth) 
-
-stage.flood.impacts<-full_join(depth.time.btwn.and.duration, depth.compare)%>%
-  full_join(recession.lm)%>%
-  full_join(rise.lm)%>%
-  filter(!is.na(flood))%>%
-  mutate(
-    recovery.days.depth = (base.depth- recess.intercept) /recess.slope,
-    rise.days.depth = (base.depth- rise.intercept) /rise.slope
-  )
 
 #SpC and pH###################
 
@@ -223,8 +206,6 @@ SpC <- read_csv("02_Clean_data/Chem/SpC.csv")%>%
 spc.base<-baseline(SpC, SpC)
 spc.count<-count.min(SpC, SpC)
 spc.min<-spc.count%>% filter(count==0)%>%select(ID, flood, SpC)
-
-
 
 pH <- read_csv("02_Clean_data/Chem/pH.csv")%>%full_join(
   floods, by = join_by(ID, between(Date, start, end))
@@ -248,7 +229,7 @@ ph.min<-ph.count%>% filter(count==0)%>%select(ID, flood, pH)
 # ggplotly(a)
 
 
-stage<-stage.flood.impacts%>%
+stage<-flood.impacts.depth%>%
   full_join(spc.min)%>%
   full_join(ph.min)%>%
   mutate(
@@ -259,4 +240,111 @@ stage<-stage.flood.impacts%>%
     )
   )
 
-write_csv(stage, "04_Outputs/flood impacts/stage.csv")
+write_csv(stage, "04_Outputs/flood impacts/depth.csv")
+
+#figures##########
+
+
+floods.day <- read_csv("01_Raw_data/flood.periods.csv")%>%
+  mutate(
+    start=as.Date(start), end =as.Date(end)
+  )
+
+one <- read_csv("04_Outputs/one.station.metabolism.csv")%>%
+  full_join(
+    floods.day, by = join_by(ID, between(date, start, end))
+  ) 
+  
+
+p1 <- stage_flagged %>%
+  filter(ID == 'OS', flood==2) %>%
+  ggplot(aes(x = Date)) +
+  geom_point(aes(y = DO), color = 'red', alpha = 0.3) +
+  geom_point(aes(y = CO2/10^3), color = 'black', alpha = 0.3) +
+  # geom_smooth(aes(y = DO), method = 'loess', color = 'red') +
+  # geom_smooth(aes(y = CO2/10^3), method = 'loess', color = 'black') +
+  scale_y_continuous(
+    name = "DO mg/L",
+    sec.axis = sec_axis(~ . * 10^3, name = "CO2 ppm")
+  ) +
+  facet_wrap(~ID+flood, scales = 'free') +
+  theme_minimal()+
+  theme(legend.position = 'right')
+
+p2 <- stage_flagged %>%
+  filter(ID == 'OS', flood==2) %>%
+  ggplot(aes(x = Date)) +
+  geom_point(aes(y = depth), color = 'blue', alpha = 0.3) +
+  geom_point(aes(y = SpC/300), color = 'purple', alpha = 0.3) +
+  # geom_smooth(aes(y = depth), method = 'loess', color = 'blue') +
+  # geom_smooth(aes(y = SpC/100), method = 'loess', color = 'purple') +
+  scale_y_continuous(
+    name = "depth (m)",
+    sec.axis = sec_axis(~ . * 300, name = "SpC")
+  ) +
+  facet_wrap(~ID+flood, scales = 'free') +
+  theme_minimal()+
+  theme(legend.position = 'right')
+
+p3 <- one %>%
+  filter(ID == 'OS', flood==2) %>%
+  ggplot(aes(x = date)) +
+  geom_point(aes(y = ER/-2), color = 'darkred') +
+  geom_point(aes(y = GPP), color = 'darkgreen') +
+  geom_smooth(aes(y = ER/-2), method = 'loess', color = 'darkred', alpha = 0.3, se=F) +
+  geom_smooth(aes(y = GPP), method = 'loess',color = 'darkgreen', alpha = 0.3, se=F) +
+  
+  scale_y_continuous(
+    name = "GPP",
+    sec.axis = sec_axis(~ . * -2, name = "ER")
+  ) +
+  facet_wrap(~ID+flood, scales = 'free') +
+  theme_minimal()+
+  theme(legend.position = 'right')
+
+p4 <- stage_flagged %>%
+  filter(ID == 'OS', flood==2) %>%
+  ggplot(aes(x = Date)) +
+  geom_point(aes(y = pH), color = 'orange', alpha = 0.3) +
+  ylab('pH')+
+  # geom_smooth(aes(y = depth), method = 'loess', color = 'blue') +
+  # geom_smooth(aes(y = SpC/100), method = 'loess', color = 'purple') +
+  facet_wrap(~ID+flood, scales = 'free') +
+  theme_minimal()+
+  theme(legend.position = 'right')
+
+plot_grid(p1, p2, p4,ncol = 1)
+library(cowplot)
+
+
+
+stage_flagged %>%
+  filter(ID == 'OS') %>%
+  ggplot(aes(x = Date)) +
+  geom_point(aes(y = depth), color = 'blue', alpha = 0.3) +
+  geom_point(aes(y = SpC/300), color = 'purple', alpha = 0.3) +
+  # geom_smooth(aes(y = depth), method = 'loess', color = 'blue') +
+  # geom_smooth(aes(y = SpC/100), method = 'loess', color = 'purple') +
+  scale_y_continuous(
+    name = "depth (m)",
+    sec.axis = sec_axis(~ . * 300, name = "SpC")
+  ) +
+  facet_wrap(~ID+flood, scales = 'free') +
+  theme_minimal()+
+  theme(legend.position = 'right')
+
+
+stage_flagged %>%
+  filter(ID == 'OS', flood==2) %>%
+  ggplot(aes(x = Date)) +
+  geom_point(aes(y = DO), color = 'red', alpha = 0.3) +
+  geom_point(aes(y = CO2/10^3), color = 'black', alpha = 0.3) +
+  # geom_smooth(aes(y = DO), method = 'loess', color = 'red') +
+  # geom_smooth(aes(y = CO2/10^3), method = 'loess', color = 'black') +
+  scale_y_continuous(
+    name = "DO mg/L",
+    sec.axis = sec_axis(~ . * 10^3, name = "CO2 ppm")
+  ) +
+  facet_wrap(~ID+flood, scales = 'free') +
+  theme_minimal()+
+  theme(legend.position = 'right')

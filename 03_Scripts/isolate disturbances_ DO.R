@@ -20,27 +20,16 @@ DO_flagged <- DO %>%
     flood=if_else(ID=='AM' & Date>'2024-05-12', 15, flood),
     flood=if_else(ID=='LF' & Date>'2024-05-13', 16, flood),
     flood=if_else(ID=='OS' & Date>'2024-06-05', 12, flood),
+    flood=if_else(ID=='GB' & Date>'2023-11-12', 5, flood),
     day=as.Date(Date),
     DO=if_else(ID=='AM'& flood==7& DO>7, NA, DO)
   )
 
 
 DO.base<-baseline(DO_flagged, DO)%>%
-  mutate(base.DO=if_else(ID=="AM" & flood==1, 5.387887, base.DO))
+  mutate(base=if_else(ID=="AM" & flood==1, 5.387887, base))
 
-
-#function(flagged, base.df, base.variable, variable)
-DO.trimmed<-trim.greater.than1(DO_flagged, DO.base, base.DO, DO)
-
-
-edit<-DO.trimmed%>%
-  mutate(
-    #flood=if_else(ID== & flood== & count>, NA, flood),
-    flood=if_else(ID=='LF'& flood==12 & Date>'2024-01-04', NA, flood)
-  )
-
-
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
+fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.5, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))
   x_name <- rlang::as_name(rlang::enquo(x_var))
   g_name <- rlang::as_name(rlang::enquo(group_var))
@@ -66,21 +55,44 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
     compact() %>%
     bind_rows()
 }
-DO.smooth<-smooth(edit, DO)
+DO.smooth<-smooth(DO_flagged, DO)
 
-DO.count<-count.min(DO.smooth, DO_loess)
-
-DO.min<-DO.count%>% filter(count==0)
-
-DO.compare<-flood.base_compare(DO.min, DO.base, DO)
-
-#DO.time.btwn.and.duration<-time.btwn.and.duration(edit)
-
-recession.lm<-fit_recessions(DO.count, DO.base, DO, base.DO) %>%
+DO.trimmed<-trim.declines(DO.smooth, DO_loess)%>%
   mutate(
-    recovery.days.DO = (base.DO- Intercept) / slope
+    flood=if_else(ID=='ID' & flood==11 & Date> '2024-06-02', NA, flood),
+    flood=if_else(ID=='OS' & flood==6 & Date> '2023-07-27', NA, flood)
   )
 
+(a<-DO.trimmed %>%
+    filter(ID=='OS', 
+    #        !is.na(flood), 
+    #        #flood %in% c()
+     ) %>%
+    ggplot(aes(x = Date, y = DO)) +
+    geom_point()+
+    geom_smooth(method = 'lm')+
+    facet_wrap(~ flood, scales = "free")+theme_minimal())
+
+
+DO.count<-count.min(DO.trimmed, DO_loess)
+
+DO.min<-minimum(DO.trimmed,  DO)
+
+DO.compare<-flood.base_compare(DO.min, DO.base, minimum)
+DO.duration<-duration(DO.trimmed)
+
+recession.lm<-fit_recessions(DO.count, DO.base, DO, base.DO) 
+rise.lm<-fit_rise(DO.count, DO.base, DO, base.DO) 
+
+
 flood.impacts.DO<-
-  full_join(recession.lm,DO.time.btwn.and.duration)%>%
-              full_join(DO.compare, by=c('ID', 'flood'))
+  full_join(recession.lm,DO.duration)%>%
+              full_join(DO.compare, by=c('ID', 'flood'))%>%
+  full_join(rise.lm, by=c('ID', 'flood'))%>%
+  full_join(DO.min, by=c('ID', 'flood'))%>%
+  full_join(DO.base, by=c('ID', 'flood'))
+  
+write_csv(flood.impacts.DO, "04_Outputs/flood impacts/DO")
+
+
+

@@ -1,3 +1,5 @@
+source("03_Scripts/disturbance isolation functions.R")
+
 floods <- read_csv("01_Raw_data/flood.periods.csv")%>%
   mutate(
     start=as.Date(start), end =as.Date(end)
@@ -111,33 +113,13 @@ GPP.RR.impacts<-full_join(GPP.compare.RR, recession.lm.RR)%>%
 
 
 
-ggplotly(GPP.count.RR %>%
-           filter(ID == "OS", !is.na(flood)) %>%
-           mutate(flood = as.factor(flood)) %>%
-           ggplot(aes(x = count, y = GPP)) +
-           geom_point(color = "black") +
-           geom_point(aes(y=depth*3),color='pink')+
-           geom_point(aes(y=GPP_loess),color='red', size=2, shape=1)+
-           
-           facet_wrap(~ flood, scales = "free"))
-
-
-ggplotly(GPP.count.RR %>%
-           filter(ID == "OS", !is.na(Date), count>0) %>%
-           mutate(flood = as.factor(flood)) %>%
-           ggplot(aes(x = Date, y = GPP)) +
-           geom_point(color = "black") +
-           #geom_point(aes(y=depth*3),color='pink')+
-           geom_point(aes(y=GPP_loess),color='red', size=2, shape=1)+
-           geom_smooth(method='lm', color='blue', alpha=0.3)+
-           theme_minimal()+
-           facet_wrap(~ flood, scales = "free"))
 
 
 # ER############
 
 ER<-met%>%select(Date, day, ID, ER, depth, flood, class)
 ER.base<-baseline(ER, ER)
+
 
 ER.HI<-ER%>% filter(class=='HI', !is.na(ER))
 ER.RR<-ER%>% filter(class=='RR', !is.na(ER))
@@ -146,7 +128,6 @@ ER.RR<-ER%>% filter(class=='RR', !is.na(ER))
 
 ER.smooth.HI<-smooth(ER.HI, ER)
 ER.count.HI<-count.min(ER.smooth.HI, ER_loess)
-
 
 ER.max<-ER.count.HI%>% filter(count==0)
 
@@ -163,7 +144,42 @@ ER.HI.impacts<-full_join(ER.compare.HI, recession.lm.HI)%>%
 
 #ER.trimmed.RR<-trim.less.than1(ER.RR, ER.base, base.ER, ER)
 ER.smooth.RR<-smooth(ER.RR, ER)
-ER.count.RR<-count.min(ER.smooth.RR, ER_loess)
+ER.count.RR<-count.max(ER.smooth.RR, ER_loess)
+
+ER %>%
+  filter(ID=='AM') %>%
+  #mutate(flood = as.factor(flood)) %>%
+  ggplot(aes(x = Date, y = ER)) +
+  geom_point(color = "black") +
+  geom_point(aes(y=depth*-5),color='pink')+
+  #geom_line(aes(y=ER_loess),color='red', size=2, alpha=0.3)+
+  
+  facet_wrap(~ flood+class, scales = "free")
+
+ggplotly(ER.count.HI %>%
+           filter(ID == "GB", !is.na(flood)) %>%
+           mutate(flood = as.factor(flood)) %>%
+           ggplot(aes(x = count, y = ER)) +
+           geom_point(color = "black") +
+           geom_point(aes(y=depth*1),color='pink')+
+           geom_point(aes(y=ER_loess),color='red', size=2, shape=1)+
+           
+           facet_wrap(~ flood, scales = "free"))
+
+
+ggplotly(ER.count.HI %>%
+           filter(ID == "AM", !is.na(Date), count>0) %>%
+           mutate(flood = as.factor(flood)) %>%
+           ggplot(aes(x = Date, y = GPP)) +
+           geom_point(color = "black") +
+           #geom_point(aes(y=depth*3),color='pink')+
+           geom_point(aes(y=GPP_loess),color='red', size=2, shape=1)+
+           geom_smooth(method='lm', color='blue', alpha=0.3)+
+           theme_minimal()+
+           facet_wrap(~ flood, scales = "free"))
+
+
+
 
 ER.max<-ER.count.RR%>% filter(count==0)
 
