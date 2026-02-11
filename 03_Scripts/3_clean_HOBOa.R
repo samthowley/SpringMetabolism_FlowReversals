@@ -66,6 +66,8 @@ DO_everything<-data.frame()
 file.names <- list.files(path="01_Raw_data/Hobo/DO/formatted", pattern=".csv", full.names=TRUE)
 for(fil in file.names){
   DO <- DO_formatted(fil)
+  DO$source_file <- basename(fil)
+
   DO_everything<-rbind(DO_everything,DO)
   DO_everything <- DO_everything[!duplicated(DO_everything[c('Date','ID')]),]
 }
@@ -73,32 +75,57 @@ for(fil in file.names){
 file.names <- list.files(path="01_Raw_data/HOBO/DO/unformated", pattern=".csv", full.names=TRUE)
 for(fil in file.names){
   DO <- DO_unformatted(fil)
+  DO$source_file <- basename(fil)
+  
   DO_everything<-rbind(DO_everything,DO)
   DO_everything <- DO_everything[!duplicated(DO_everything[c('Date','ID')]),]
 }
 
-DO_everything<-rename_ID(DO_everything) %>% filter(Date>"2022-01-01")%>%mutate(DO=abs(DO))%>%
-  distinct(Date, ID, .keep_all = T)
+DO_everything<-rename_ID(DO_everything) %>% 
+  filter(Date>"2022-01-01")%>%
+  mutate(DO=abs(DO))#%>%
+  #distinct(Date, ID, .keep_all = T)
 
 DO_CQ<-DO_everything%>%
-  filter(DO<11.5,
-         Temp<80,
-         Temp>50)%>%
-  mutate(DO=if_else(ID=='LF'& Date<'2022-07-01'& DO>6, NA, DO),
-         DO=if_else(ID=='LF' & DO<2 |DO>10, NA, DO),
-         DO=if_else(ID=='ID' & DO<2.8 |DO>10, NA, DO),
-         DO=if_else(ID=='GB' & DO<3.5 |DO>8.5, NA, DO),
-         DO=if_else(ID=='AM' & Date>="2023-04-12" & Date<="2023-04-23", NA, DO),
-         
-         
-         Temp=if_else(ID=='LF' & Temp<60, NA, Temp),
-         Temp=if_else(ID=='ID' & Temp>76, NA, Temp),
-         Temp=if_else(ID=='GB' & Temp>78, NA, Temp)
-         )
-
-ggplot(data=DO_CQ %>% filter(ID=='AM'), aes(x=Date)) +
-  geom_line(aes(y=DO))+
-  #geom_line(aes(y=DO), color='red')+
+  filter(
+    DO<12,
+    !source_file %in% c('AllenMill_DO_11302023.csv', 'GB_DO_12142023.csv')
+         # Temp<80,
+         # Temp>50
+    )%>%
+  mutate(
+    remove=case_when(
+      ID=='AM' & Date<="2022-06-01" & DO>7~ 'a',
+      ID=='AM' & Date>'2024-01-01' & Date<'2024-04-01' & DO>8~ 'a',
+      
+      ID=='GB' & Date<="2022-06-01" & DO>7.5~ 'a',
+      ID=='GB' & Date>'2022-08-01' & Date< '2022-10-01' & DO<4~ 'a',
+      ID=='GB' & Date>'2022-08-01' & Date< '2022-10-01' & DO>6.9~ 'a',
+      ID=='GB' & Date>'2022-12-01' & Date< '2023-10-01' & DO<3.6~ 'a',
+      ID=='GB' & Date>'2024-01-01' & Date< '2024-04-01' & DO>8.8~ 'a',
+      ID=='GB' & Date>'2024-07-01' & DO>8~ 'a',
+      
+      ID=='LF' & Date<'2022-06-01' & DO>6~ 'a',
+      ID=='LF' & Date> '2022-06-20' & Date<'2022-07-01' & DO<3~'a',
+      ID=='LF' & Date> '2023-11-01' & Date<'2024-01-01' & DO<2~'a',
+      ID=='LF' & Date> '2023-11-01' & DO>6.4~'a',
+      ID=='ID' & Date<'2023-02-03' & DO>8.7~'a',
+      ID=='ID' & Date<'2023-02-03' & DO<3.5~'a',
+      ID=='ID' & Date>'2023-05-03' & Date<'2023-06-03' & DO<5.6~'a',
+      ID=='ID' & Date>'2023-06-03' & Date<'2023-08-03' & DO<3.6~'a',
+      ID=='ID' & Date>'2023-08-03' & Date<'2023-12-03' & DO<3.7~'a',
+      ID=='ID' & Date>'2023-12-03' & Date<'2024-04-03' & DO<3~'a'
+    ))%>%
+  filter(is.na(remove))%>%
+  select(Date, DO, Temp, ID)
+    
+ 
+ggplot(data=DO_CQ %>% 
+         filter(ID=='GB',
+         #Date>'2023-07-20'
+         ), 
+       aes(x=Date)) +
+  geom_point(aes(y=DO, color=source_file))+
   facet_wrap(~ID)
 
 

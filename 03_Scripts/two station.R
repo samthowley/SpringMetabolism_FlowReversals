@@ -6,33 +6,38 @@ library('StreamMetabolism')
 library(streamMetabolizer)
 library(readxl)
 
-#call in variables ###########
+#call in variables #if I make changes, here##########
 width <- read_excel("01_Raw_data/Depth_length_velocity_width/length width.xlsx",sheet = "width ")
 length <- read_excel("01_Raw_data/Depth_length_velocity_width/length width.xlsx", sheet = "length ")
-area<-left_join(width, length)%>% mutate(area=w*m)
+area<-left_join(width, length)%>% mutate(area=w*m)%>%
+  mutate(
+    m=if_else(ID=='AM', 800, m))
 
 
 (file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
 file.names<-file.names[c(2,4,6,11)]
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
+
 master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
-  left_join(area)#%>%
-  #left_join(lat.lon)
+  left_join(area)
 
 VentDO <- read_csv("04_Outputs/VentDO.csv")
 
-master<-full_join(master, VentDO)%>%
+master<-
+full_join(master, VentDO, by=c('ID', 'Date'))%>%
+  arrange(ID, Date)%>%
+  group_by(ID)%>%
   fill(VentDO, VentTemp, K600_1.d_daily, .direction= "downup")%>%
   filter(!ID %in% c('OS', 'IU'))%>%
-  distinct(ID, Date, .keep_all = T)
-
-ggplot(master%>%filter(ID=='AM'), aes(x = Date, y = DO)) +
-  geom_line()+
-  facet_wrap(~ID, scales='free')
+  distinct(ID, Date, .keep_all = T)%>%
+  mutate(
+    depth=if_else(ID=='AM', depth-0.5, depth)
+    )
 
 #1. interpolate Q####
 discharge<-master%>%
-  mutate(discharge=w*depth*velocity*86400)
+  mutate(
+    discharge=w*depth*velocity*86400)
 
 prepped.for.one<-discharge%>% select(ID, Date, DO, discharge, depth, Temp)
 write_csv(prepped.for.one, "01_Raw_data/prepped.for.one.station.csv")
@@ -53,8 +58,15 @@ DO.deficit<-change.DO.flux%>%  mutate(
   DO.deficit.from.sat=((Vent.DO.sat-VentDO)+(stat2.DO.sat-DO))/2,
 )
 
-#4. K rearation####
-K.rearation<-DO.deficit%>%
+#4. K rearation###make K changes############
+
+AM.K<-DO.deficit%>%
+  mutate(
+    K600_1.d_daily=if_else(ID=='AM', K600_1.d_daily+4, K600_1.d_daily),
+    K600_1.d_daily=if_else(ID=='AM' & K600_1.d_daily<15 , 15, K600_1.d_daily)
+    )
+
+K.rearation<-AM.K%>%
   mutate(K.flux=(K600_1.d_daily)*depth*DO.deficit.from.sat)
 
 #5. air-water gas exchange####
@@ -70,16 +82,17 @@ active.reach <- air.water.xchange %>%
          reach.test=if_else(reach.km<0.4*km, 'below', reach.test),
          reach.test=if_else(velocity<0, 'below', reach.test)
   )%>%
-  #filter(reach.test=='passes')%>%
+  filter(reach.test=='passes')%>%
   mutate(date = as_date(Date)) %>%  # extract calendar day
   group_by(date) %>%
   filter(n() >= 20) %>%                 # keep only days with ≥ 20 hours
   ungroup()%>%select(-date)
 
-# ggplot(active.reach%>%filter(ID=='AM'), aes(x = Date, y = depth, color=reach.test)) +
-#   geom_line()+
-#   geom_hline(yintercept = 0)+
-#   facet_wrap(~ID, scales='free')
+ggplot(active.reach%>%filter(ID=='LF'), 
+       aes(x = Date, y = depth, color=reach.test)) +
+  geom_line()+
+  geom_hline(yintercept = 0)+
+  facet_wrap(~ID, scales='free')
 
 
 #6.parse day from night####
@@ -88,7 +101,7 @@ lat.lon <- data.frame(
   lat = c(30.155, 29.585, 29.83, 29.93),
   lon = c(-83.238, -82.93, -82.68, -82.8))
 
- day.parse <- left_join(active.reach, lat.lon) %>%
+day.parse <- left_join(active.reach, lat.lon) %>%
    ungroup()%>%
    mutate(time=case_when(not.air.water.xchange>0~ 'day',
                          not.air.water.xchange<0~ 'night'))%>%
@@ -109,42 +122,22 @@ ER<-isolate%>%filter(time=='night')%>%rename(ER=avg)%>%select(-time)
 GPP<-isolate%>%filter(time=='day')%>%rename(GPP=avg)%>%select(-time)
 NEP<-left_join(GPP, ER)
 
-all.the.data<-left_join(day.parse, NEP)
+
 #8. Create datasets####
 
-for.two <- all.the.data %>%
-  filter(
-    reach.test == "passes" | is.na(reach.test),
-    )%>%
-  mutate(Date=if_else(ID=='GB' & GPP>30, NA, Date),
-         Date=if_else(ID=='GB' & Date<'2022-12-25', NA, Date))
+check<-left_join(day.parse, NEP)
 
-
-#%>%
-  #filter(GPP<40, ER>-40)
-
-does.not.pass<-all.the.data%>% filter(reach.test != "passes")
-too.large<-all.the.data%>%filter(ER < -37 | GPP > 37)
-for.one<-rbind(does.not.pass, too.large)%>%distinct(ID, Date, .keep_all = T)
-
-ggplot(for.two, aes(x = Date)) +
-  geom_point(aes(y = GPP), color='darkgreen')+
-  geom_point(aes(y = ER), color='red')+
-  #geom_point(aes(y = depth*10), color='black')+
-  
-  geom_hline(yintercept = 0)+
+ggplot(check, aes(x = Date)) +
+  geom_point(aes(y = GPP, color=K600_1.d_daily))+
+  geom_point(aes(y = ER, color=K600_1.d_daily))+
+  geom_hline(yintercept = 34)+
+  geom_hline(yintercept = -34)+
+  geom_hline(yintercept = 0, color='gray')+
+  scale_color_viridis_c(name = "K600") +
   facet_wrap(~ID, scales='free')
 
-ggplot(for.two, aes(x = Date)) +
-  geom_point(aes(y = DO, colour = "Station two DO"))+
-  geom_point(aes(y = VentDO, color='Vent DO'))+
-  
-  facet_wrap(~ID, scales='free')
 
-#write_csv(all.the.data%>%filter(ID=='AM'), "check.csv")
-write_csv(for.two, "04_Outputs/two.station.results.csv")
-#prepare data for one station######
+write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34), 
+          "04_Outputs/two.station.results.csv")
 
-prepped.for.one<-for.one%>% select(ID, Date, DO, discharge, depth, Temp)
-
-write_csv(prepped.for.one, "01_Raw_data/prepped.for.one.station.csv")
+write_csv(left_join(day.parse, NEP)%>%filter(ID=='LF'), "test.csv")

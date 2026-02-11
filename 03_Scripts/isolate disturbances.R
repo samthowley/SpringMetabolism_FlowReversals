@@ -104,13 +104,7 @@ stage_flagged <- master %>%
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
   select(-start, -end)%>%
-  arrange(ID, Date)%>%
-  mutate(
-    flood=if_else(ID=='AM' & Date>'2024-05-12', 15, flood),
-    flood=if_else(ID=='LF' & Date>'2024-05-22', 16, flood),
-    flood=if_else(ID=='OS' & Date>'2024-05-21', 12, flood),
-  )
-
+  arrange(ID, Date)
 depth.base<-baseline(stage_flagged, depth)
 
 
@@ -222,7 +216,7 @@ ph.base<-baseline(pH, pH)
 ph.count<-count.min(pH, pH)
 ph.min<-ph.count%>% filter(count==0)%>%select(ID, flood, pH)
 
-# (a<-ggplot(ph.count %>% filter(ID=='AM'), 
+# (a<-ggplot(ph.count %>% filter(ID=='AM'),
 #            aes(x = Date, y=pH, color=as.factor(flood))) +
 #     geom_point()+
 #     facet_wrap(~flood, scales='free'))

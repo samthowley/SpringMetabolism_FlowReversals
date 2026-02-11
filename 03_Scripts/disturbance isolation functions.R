@@ -50,6 +50,8 @@ baseline <- function(flagged, variable) {
     fill(base, .direction = 'down')
 }
 
+
+
 trim.declines<-function(df,  variable){
   
   prep <- df%>%
@@ -97,6 +99,7 @@ trim.declines<-function(df,  variable){
   
   
 }
+
 trim.increases<-function(df,  variable){
   
   prep <- df%>%
@@ -147,6 +150,7 @@ trim.increases<-function(df,  variable){
 }
 
  
+
 minimum<-function(df, variable){
   minimum<-df%>%
     group_by(ID, flood) %>%

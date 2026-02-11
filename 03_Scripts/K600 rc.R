@@ -28,18 +28,19 @@ for (sheet in sheet_names) {
   list_of_ks[[sheet]] <- df
 }
 
-k600s <- bind_rows(list_of_ks, .id = "ID")%>%
+k600s.raw <- bind_rows(list_of_ks, .id = "ID")%>%
   distinct(k600_1.day, .keep_all = T)%>% filter(ID != 'Vent DO')%>%
   mutate(Date=mdy(Date))
 
-rC <- lmList(k600_1.day ~ depth | ID, data=k600s)
+rC <- lmList(k600_1.day ~ depth | ID, data=k600s.raw)
 (cf <- coef(rC))
 
 depth <- read_csv("02_Clean_data/Chem/depth.csv")
 u <- read_csv("02_Clean_data/Chem/velocity.csv")%>%
   mutate(Date=as.Date(Date))%>%rename(velocity.interpolated=velocity)
 
-k600s<-depth%>%mutate(
+k600s<-
+  depth%>%mutate(
   k600_1d=case_when(
     ID=='AM'~depth*cf[1,2]+cf[1,1],
     ID=='GB'~depth*cf[2,2]+cf[2,1],
@@ -47,8 +48,8 @@ k600s<-depth%>%mutate(
     ID=='LF'~depth*cf[4,2]+cf[4,1],
     ID=='OS'~depth*cf[5,2]+cf[5,1]
   )
-)%>%select(Date, ID, k600_1d)
-
+)
+  
 K600.daily<-k600s%>%mutate(Date=as.Date(Date))%>%
   group_by(ID, Date)%>%
   summarise(
@@ -59,8 +60,6 @@ Work<-K600.daily%>%
   mutate(Date=paste(Date, "00:00:00"))
 
 write_csv(Work, "02_Clean_data/Chem/K600.csv")
-
-
 
 #check #######
 

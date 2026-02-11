@@ -14,22 +14,14 @@ DO_flagged <- DO %>%
     floods, by = join_by(ID, between(Date, start, end))
   )%>%  # TRUE if matched an interval
   select(-start, -end)%>%
-  arrange(ID, Date)%>%
-  mutate(
-    flood=if_else(ID=='OS'& flood==6 & Date>'2023-09-01', NA, flood),
-    flood=if_else(ID=='AM' & Date>'2024-05-12', 15, flood),
-    flood=if_else(ID=='LF' & Date>'2024-05-13', 16, flood),
-    flood=if_else(ID=='OS' & Date>'2024-06-05', 12, flood),
-    flood=if_else(ID=='GB' & Date>'2023-11-12', 5, flood),
-    day=as.Date(Date),
-    DO=if_else(ID=='AM'& flood==7& DO>7, NA, DO)
-  )
+  arrange(ID, Date)
 
 
 DO.base<-baseline(DO_flagged, DO)%>%
   mutate(base=if_else(ID=="AM" & flood==1, 5.387887, base))
 
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.5, min_rows = 5) {
+fit_loess_by_group <- 
+  function(df, y_var, x_var = "t", group_var, span = 0.5, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))
   x_name <- rlang::as_name(rlang::enquo(x_var))
   g_name <- rlang::as_name(rlang::enquo(group_var))
@@ -57,24 +49,32 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.5, mi
 }
 DO.smooth<-smooth(DO_flagged, DO)
 
-DO.trimmed<-trim.declines(DO.smooth, DO_loess)%>%
-  mutate(
-    flood=if_else(ID=='ID' & flood==11 & Date> '2024-06-02', NA, flood),
-    flood=if_else(ID=='OS' & flood==6 & Date> '2023-07-27', NA, flood)
-  )
+DO.count<-count.min(DO.smooth, DO_loess)
 
-(a<-DO.trimmed %>%
-    filter(ID=='OS', 
-    #        !is.na(flood), 
-    #        #flood %in% c()
+
+
+
+DO.smooth%>%
+  filter(ID=='AM')%>%
+ggplot(aes(x = Date, y = depth, color=as.factor(flood))) +
+  geom_point()+
+  geom_smooth(method = 'lm')+
+  theme_minimal()
+
+(a<-DO.smooth %>%
+    filter(ID=='AM', 
+           !is.na(flood),
+           flood %in% c(7)
      ) %>%
     ggplot(aes(x = Date, y = DO)) +
     geom_point()+
     geom_smooth(method = 'lm')+
     facet_wrap(~ flood, scales = "free")+theme_minimal())
 
+ggplotly(a)
 
-DO.count<-count.min(DO.trimmed, DO_loess)
+
+
 
 DO.min<-minimum(DO.trimmed,  DO)
 

@@ -1,8 +1,11 @@
+library(plotly)
+
 file.names <- list.files(path="04_Outputs/one station results", pattern=".csv", full.names=TRUE)
 onestation.df <- data.frame()
 for(fil in file.names){
   df <- read_csv(fil)
   onestation.df <- rbind(onestation.df, df)}
+
 
 onestation<-onestation.df%>%
   rename(GPP1=GPP_daily_mean,
@@ -11,43 +14,79 @@ onestation<-onestation.df%>%
          Date=date)%>%
   separate(ID,into = c('ID', 'stage'),sep='_')%>%
   select(-ER_Rhat, -K600_daily_Rhat,-stage)%>%
-  arrange(ID, Date)
-unique(onestation$ID)
+  arrange(ID, Date)%>%
+  drop_na()
+
 
 two<- read_csv("04_Outputs/two.station.results.csv")%>%
+  mutate(Date=as.Date(Date))%>%
   select(Date, GPP, ER, K600_1.d_daily, ID)%>%
   rename(K600=K600_1.d_daily,
          GPP2=GPP,
          ER2=ER)%>%
-  mutate(method="two")
+  group_by(ID, Date) %>%
+  summarise(
+    across(
+      c(ER2, GPP2, K600),
+      ~ mean(.x, na.rm = TRUE)
+    ),
+    .groups = "drop"
+  )
+
+
+read_csv("04_Outputs/two.station.results.csv")%>%
+  mutate(Date=as.Date(Date))%>%
+  select(Date, GPP, ER, K600_1.d_daily, depth, ID)%>%
+  group_by(ID, Date)%>%
+  summarise(
+    across(
+      c(GPP, ER, K600_1.d_daily, depth),
+      ~ mean(.x, na.rm = TRUE)
+    ),
+    .groups = "drop"
+  )%>%
+ggplot(aes(x = depth)) +
+  geom_point(aes(y = GPP, color=K600_1.d_daily), shape=1) +
+  geom_hline(yintercept = 15)+
+  facet_wrap(~ID, scales = "free") +
+  scale_color_viridis_c(name = "K600") +
+  theme_minimal()
 
 depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
-  mutate(day=as.Date(Date))%>%
-  group_by(ID, day)%>%
-  mutate(depth.daily=mean(depth, na.rm=T))
-daily.depth<-depth %>% distinct(day, ID, .keep_all = T)
-
+  mutate(Date=as.Date(Date))%>%
+  group_by(ID, Date)%>%
+  summarise(
+    across(
+      c(depth),
+      ~ mean(.x, na.rm = TRUE)
+    ),
+    .groups = "drop"
+  )
 
 all.met<-full_join(onestation, two)%>%
+  left_join(depth)%>%
   mutate(
-         GPP2=if_else(is.na(GPP2), GPP1, GPP2),
-         ER2=if_else(is.na(ER2), GPP1, ER2),
-         GPP=(GPP1+GPP2)/2,
-         ER=(ER1+ER2)/2,
-         GPP=if_else(GPP<0, 0, GPP)
-         )%>%left_join(daily.depth)
+    GPP = rowMeans(
+      select(., GPP1, GPP2),
+      na.rm = TRUE))%>%
+  mutate(
+    ER = rowMeans(
+      select(., ER1, ER2),na.rm = TRUE))
 
-
-p1<-ggplot(all.met, aes(x = Date)) +
-  geom_point(aes(y = GPP1,color='GPP1'),)+
-  geom_point(aes(y = GPP2,color='GPP2'), shape=1)+
-  #geom_point(aes(y = GPP), shape=1, color='red')+
-  facet_wrap(~ID, scales='free')+
+#p1<-
+  ggplot(all.met, aes(x = Date)) +
+  geom_point(aes(y = GPP1, color='GPP1')) +
+  geom_point(aes(y = GPP2, color='GPP2')) +
+    geom_point(aes(y = GPP, color='GPP')) +
+  geom_hline(yintercept = 15)+
+  facet_wrap(~ID, scales = "free") +
+  #scale_color_viridis_c(name = "K600") +
   theme_minimal()
+
 
 p2<-ggplot(all.met, aes(x = depth.daily)) +
   geom_point(aes(y = GPP1,color='GPP1'),)+
-  geom_point(aes(y = GPP2,color='GPP2'), shape=1)+
+  geom_point(aes(y = GPP2,color=), shape=1)+
   #geom_point(aes(y = GPP), shape=1, color='red')+
   facet_wrap(~ID, scales='free')+
   theme_minimal()

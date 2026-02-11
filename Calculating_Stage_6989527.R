@@ -3,8 +3,6 @@ library(tidyverse)
 library(readxl)
 library(measurements)
 library(dataRetrieval)
-source("03_Scripts/disturbance isolation functions.R")
-
 ###function####
 PT_formatted <- function(fil) {
   PT <- read_csv(fil)
@@ -111,65 +109,11 @@ for(i in 1:nrow(stage)) {if(stage$ID[i]=='OS') {
 
   else if(stage$ID[i]=='AM'){
 
-    stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.41/0.634))+0.515} #was 0.515
+    stage$depth[i]<-((stage$PT[i]-stage$PSI[i])/(1.41/0.634))+0.515}
 
   else {stage$depth[i]<- NULL }}
 
-stage<-stage%>%
-  mutate(
-    depth=if_else(ID=='ID', depth+0.7, depth),
-    depth=if_else(ID=='LF', depth-0.65, depth)
-  )
-
-write_csv(stage, "02_Clean_data/Chem/depth.csv")
-
-
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.03, min_rows = 5) {
-  y_name <- rlang::as_name(rlang::enquo(y_var))
-  x_name <- rlang::as_name(rlang::enquo(x_var))
-  g_name <- rlang::as_name(rlang::enquo(group_var))
-  
-  split_list <- split(df, df[[g_name]])
-  
-  lapply(split_list, function(.x) {
-    # Remove NAs pairwise for this group/var
-    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
-    .x_clean <- .x[complete_cases, ]
-    
-    if (nrow(.x_clean) < min_rows) {
-      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
-      return(NULL)
-    }
-    
-    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
-    
-    # Predict on full original rows (fills NA with NA)
-    .x %>%
-      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
-  }) %>%
-    compact() %>%
-    bind_rows()
-}
-stage<-stage%>%
-  group_by(ID) %>%
-  mutate(
-    t = as.numeric(Date - min(Date))) %>%
-  ungroup()
-
-stage.smooth<-fit_loess_by_group(stage, depth, t, ID)
-
-ggplot(stage.smooth%>%filter(ID=='AM'), aes(x = Date)) +
-  geom_point(aes(y = depth), shape=1)+
-  geom_point(aes(y = depth_loess), shape=1, color='blue')+
-  facet_wrap(~ID, scales='free')+
-  theme_minimal()
-
-
-#check##########
-
-ggplot(stage%>%filter(ID=='AM'), aes(x = Date, y = depth)) +
-  geom_point()+
-  facet_wrap(~ID, scales='free')
+write_csv(stage, "02_Clean_data/Chem/PSI.csv")
 
 
 ###Interpolation####
@@ -178,31 +122,31 @@ data_retrieval <- function(site_id) {
   parameterCd <- c('00065')
   startDate <- "2022-05-12"
   endDate <- "2024-07-25"
-  
+
   river <- readNWISuv(site_id,parameterCd, startDate, endDate)
   split<-split(river, river$site_no)
-  
+
   down <-split(river, river$site_no)[[2]]
   down<-down[,c(3,4)]
   down<-rename(down, 'Date'='dateTime', 'stage_down'='X_00065_00000')
-  
+
   up <-split(river, river$site_no)[[1]]
   up<-up[,c(3,4)]
   up<-rename(up, 'Date'='dateTime', 'stage_up'='X_00065_00000')
-  
+
   elevation_diff<-left_join(up,down, by='Date')
-  
+
   elevation_diff<- elevation_diff %>% mutate(minute = minute(Date))
   elevation_diff<-filter(elevation_diff, minute==0)
-  
+
   return(elevation_diff)}
 stage_relationship <- function(site) {
   summary(modInter<-lm( depth~ elevation, data = site))
   cf <- coef(modInter)
   site$interpolated<-site$elevation*cf[2]+cf[1]
-  
+
   site$depth <- ifelse(is.na(site$depth), site$interpolated, site$depth)
-  
+
   return(site)}
 
 PSI<-read_csv("02_Clean_data/Chem/PSI.csv")
@@ -270,9 +214,20 @@ test<-ID %>% mutate(
   depth=if_else(Date<'2023-06-01' & Date>'2023-05-01'& depth>0.27, NA, depth),
   depth=if_else(is.na(depth), depthinterp, depth),
   depth=(depth+depthinterp)/2
-)%>%filter(!is.na(Date))
+  )%>%filter(!is.na(Date))
 ID<-ID[,x]
 
+stage<-rbind(AM, OS, LF, GB, ID)
+
+ggplot(test, aes(x = Date)) +
+  #geom_line(aes(y=depthinterp))+
+  geom_line(aes(y=depth, color='red'))+
+  
+  facet_wrap(~ID, scales='free')
 
 
+
+
+
+write_csv(stage, "02_Clean_data/Chem/depth.csv")
 
