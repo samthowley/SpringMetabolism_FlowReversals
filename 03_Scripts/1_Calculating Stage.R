@@ -121,7 +121,6 @@ stage<-stage%>%
     depth=if_else(ID=='LF', depth-0.65, depth)
   )
 
-write_csv(stage, "02_Clean_data/Chem/depth.csv")
 
 
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.03, min_rows = 5) {
@@ -165,19 +164,12 @@ ggplot(stage.smooth%>%filter(ID=='AM'), aes(x = Date)) +
   theme_minimal()
 
 
-#check##########
-
-ggplot(stage%>%filter(ID=='AM'), aes(x = Date, y = depth)) +
-  geom_point()+
-  facet_wrap(~ID, scales='free')
-
-
-###Interpolation####
+###Interpolation###depth###Interpolation####
 
 data_retrieval <- function(site_id) {
   parameterCd <- c('00065')
-  startDate <- "2022-05-12"
-  endDate <- "2024-07-25"
+  startDate <- "2022-04-01"
+  endDate <- "2024-10-04"
   
   river <- readNWISuv(site_id,parameterCd, startDate, endDate)
   split<-split(river, river$site_no)
@@ -206,73 +198,108 @@ stage_relationship <- function(site) {
   return(site)}
 
 PSI<-read_csv("02_Clean_data/Chem/PSI.csv")
-x<-c('Date','depth','ID')
+x<-c('Date','elevation','ID')
+
 
 AM<-filter(PSI, ID=='AM')
 site_id <- c('02319800','02320000')
-elevation_diff<-data_retrieval(site_id)
-elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.501
-AM<-left_join(elevation_diff,AM)
-AM<-stage_relationship(AM)
-AM$ID<-'AM'
-AM<-AM[,x]
+AMinterp<-data_retrieval(site_id)%>%
+  mutate(elevation= (stage_up-stage_down)*0.501)%>%
+  select(Date, elevation)%>%
+  filter(Date<= "2023-02-01")%>%
+    mutate(ID='AM'
+         )%>%
+  select(x)
+
 
 GB<-filter(PSI, ID=='GB')
 site_id <- c('02321958','02322500')
-elevation_diff<-data_retrieval(site_id)
-elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.79
-GB<-left_join(elevation_diff, GB)
-GB<-stage_relationship(GB)
-GB<-GB %>% mutate(ID=='GB') %>% filter(depth>0.3)%>% filter(depth<1.5)%>% filter(depth>0.35)
-GB$ID<-'GB'
-GB<-GB[,x]
+GBinterp<-data_retrieval(site_id)%>%
+  mutate(elevation= (stage_up-stage_down)*0.79)%>%
+  select(Date, elevation)%>%
+  filter(Date<= "2022-10-10")%>%
+  mutate(ID='GB'
+  )%>%
+  select(x)
+
 
 OS<-filter(PSI, ID=='OS')
 site_id <- c('02323000','02323500')
-elevation_diff<-data_retrieval(site_id)
-elevation_diff$elevation<-(elevation_diff$stage_up-elevation_diff$stage_down)*0.72
-OS<-left_join(elevation_diff,OS)
-OS<-stage_relationship(OS)%>%filter(depth>0.71)
-OS$ID<-'OS'
-OS<-OS[,x]
+OSinterp<-data_retrieval(site_id)%>%
+  mutate(elevation= (stage_up-stage_down)*0.72)%>%
+  select(Date, elevation)%>%
+  filter(Date<= "2022-10-06")%>%
+  mutate(ID='OS'
+  )%>%
+  select(x)
+
 
 LF<-filter(PSI, ID=='LF')
 site_id <- '02323500'
 parameterCd <- c('00065')
-startDate <- "2022-04-12"
-endDate <- "2024-06-18"
+startDate <- "2022-04-01"
+endDate <- "2024-10-04"
 riverLF <- readNWISuv(site_id,parameterCd, startDate, endDate)
 riverLF<-riverLF[,c(1,3,2,4)]
 riverLF<-rename(riverLF, 'Date'='dateTime', 'elevation'='X_00065_00000')
 riverLF<- riverLF %>% mutate(minute = minute(Date))
-riverLF<-filter(riverLF, minute==0)
-riverLF<-riverLF[,c(2,1,3,5,4)]
-LF<-LF %>% mutate(depth=depth-0.6)
-LF<-left_join(riverLF, LF)
-LF<-stage_relationship(LF)
-LF$ID<-'LF'
-LF<-LF[,x]
-
-ID<-filter(PSI, ID=='ID')
-SF<- read_xlsx("01_Raw_data/Hobo/PT/02322703_Level.xlsx",skip = 25)
-SF<-SF %>%rename('depth_gage'="Level NAVD88") %>%
-  filter(Date>'2021-04-02')%>%mutate(depth_gage=conv_unit(depth_gage,'ft','m'),
-                                     day=as.Date(Date)) %>%mutate(depth_gage=depth_gage-2)
-ID$day<-as.Date(ID$Date)
-SF<-SF[,c('depth_gage','day')]
-ID<-full_join(ID, SF, by='day')
-
-modInter<-lm( depth~ depth_gage, data = ID)
-cf <- coef(modInter)
-
-test<-ID %>% mutate(
-  depthinterp=depth_gage*cf[2]+cf[1],
-  depth=if_else(Date<'2023-06-01' & Date>'2023-05-01'& depth>0.27, NA, depth),
-  depth=if_else(is.na(depth), depthinterp, depth),
-  depth=(depth+depthinterp)/2
-)%>%filter(!is.na(Date))
-ID<-ID[,x]
+riverLF<-filter(riverLF, minute==0)%>%
+  select(Date, elevation)%>%
+  mutate(ID='LF'
+  )%>%
+  select(x)
 
 
+SF<- read_xlsx("01_Raw_data/Hobo/PT/02322703_Level.xlsx",skip = 25)%>%
+  rename('depth_gage'="Level NAVD88") %>%
+  filter(Date>'2022-04-01', Date<'2022-09-30')%>%
+  mutate(
+    elevation=conv_unit(depth_gage,'ft','m'),
+    ID='ID'
+    )%>%select(x)
+
+confluence<-rbind(AMinterp, GBinterp, OSinterp, riverLF, SF)
+
+#edit##########
+
+
+stage.edit<-stage %>%
+  mutate(
+    remove=
+      case_when(
+        ID=='GB' & depth>2 ~'a',
+        ID=='GB' & depth<0.35 ~'a',
+        ID=='GB' &  Date>'2023-05-01'&Date<'2023-06-15'& depth>0.44 ~'a',
+        ID=='LF' &  Date>'2023-08-20'&Date<'2023-09-04'& depth>0.53 ~'a',
+        ID=='ID' &  Date>'2023-05-10'&Date<'2023-06-15'& depth>0.92 ~'a',
+        ID=='OS' &  Date>'2023-08-20'&Date<'2023-09-03'& depth>1 ~'a'
+        
+      ))%>%
+  filter(is.na(remove))%>%
+  full_join(confluence)%>%
+  mutate(
+    elevation=if_else(ID=='OS', (elevation/3)-0.1, elevation),
+    elevation=if_else(ID=='AM', elevation-1.5, elevation),
+    elevation=if_else(ID=='GB', elevation/3-0.05, elevation),
+    elevation=if_else(ID=='ID', elevation/3, elevation),
+    elevation=if_else(ID=='LF', elevation/7-0.3, elevation),
+    depth=if_else(is.na(depth), elevation, depth)
+  )%>%
+distinct(Date, ID, depth)
+  
+
+stage.edit%>%
+  filter(
+    ID=='ID',
+  )%>%
+  ggplot(aes(x = Date, y = depth)) +
+  #geom_point(aes(y=(elevation/7)-0.3), color='pink')+
+  geom_point()+
+  facet_wrap(~ID, scales='free')
+
+
+write_csv(stage.edit, "02_Clean_data/Chem/depth.csv")
+
+  
 
 

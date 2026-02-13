@@ -1,7 +1,6 @@
 source("03_Scripts/disturbance isolation functions.R")
 
-DO <- read_csv("02_Clean_data/Chem/DO.csv")%>%
-  mutate(DO=if_else(DO<0.25, DO==0.1, DO))
+DO <- read_csv("02_Clean_data/Chem/DO.csv")
 h <- read_csv("02_Clean_data/Chem/depth.csv")
 
 DO<-full_join(DO, h)%>%
@@ -12,9 +11,24 @@ floods <- read_csv("01_Raw_data/flood.periods.csv")
 DO_flagged <- DO %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
-  )%>%  # TRUE if matched an interval
+  )%>%  
   select(-start, -end)%>%
   arrange(ID, Date)
+
+
+plot_grid(
+  ggplot(DO_flagged %>% filter(ID=='ID'), 
+         aes(x = Date, y=DO, color=as.factor(flood))) +
+    geom_point()+
+    facet_wrap(~ID, scales='free')
+  ,
+  ggplot(DO_flagged %>% filter(ID=='ID'), 
+         aes(x = Date, y=depth, color=as.factor(flood))) +
+    geom_point()+
+    facet_wrap(~ID, scales='free')
+  ,
+  ncol=1
+)
 
 
 DO.base<-baseline(DO_flagged, DO)%>%

@@ -1,13 +1,22 @@
 #call in data########
 
+#might be worth seeing if GB has anymore DO data
 source("03_Scripts/disturbance isolation functions.R")
 
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
 file.names<-file.names[c(1, 2, 4, 7, 10)]
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
 master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
-  filter(Date> '2022-01-01', ID %in% c('GB', 'AM', 'LF', 'OS', 'ID'))%>%
-  mutate(min=minute(Date))%>%filter(min==0)%>%select(-min)
+  mutate(
+    min=minute(Date),
+    depth=if_else(ID=='GB' & Date>'2024-07-01', NA, depth)
+    )%>%
+  filter(
+    Date> '2022-01-01', 
+    ID %in% c('GB', 'AM', 'LF', 'OS', 'ID'),
+    min==0
+    )%>%
+  select(-min)
 
 
 chem <- master %>%
@@ -36,7 +45,7 @@ slopes <- chem %>%
     date      = as.Date(Date),
     # 3-day index starting at the first date in your data
     day_index = as.integer(date - min(date)),
-    block3    = day_index %/% 7) %>%ungroup()%>%
+    block3    = day_index %/% 4) %>%ungroup()%>%
   group_by(block3, ID) %>%
   summarise(
     start_date = min(date),
@@ -46,8 +55,7 @@ slopes <- chem %>%
       y <- norm
       coef(lm(y ~ x))[2] * 86400     # convert to units per day
     },
-    .groups = "drop"
-  )
+    .groups = "drop")
 
 
 isolate <- chem %>%
@@ -59,38 +67,49 @@ isolate <- chem %>%
     abs.slope=abs(slope),
     )%>%
   select(-start_date, -end_date, -day)%>%
-  arrange(ID, Date)%>%filter(abs.slope>0.01)
+  arrange(ID, Date)%>%filter(abs.slope>0.01)#%>%filter(abs.slope>0.01)
 
 
-find.floods <- isolate %>%
+iso_flagged <- isolate %>%
   arrange(ID, Date) %>%
-  mutate(slope_pos = slope > 0) %>%
   group_by(ID) %>%
   mutate(
-    pos_id = consecutive_id(slope_pos)  # Positional only!
+    slope_pos = slope > 0,
+    run_id    = consecutive_id(slope_pos)
   ) %>%
-  ungroup() %>%
-  mutate(
-    flood = if_else(slope_pos, pos_id, NA_integer_),
-    flood=as.factor(flood),
-    Date=if_else(Date<'2022-07-01'& ID=='OS', NA, Date)
-    ) %>%
-  select(-slope_pos)%>%
-  fill(flood, .direction = 'down')
+  ungroup()
 
 
-flood.periods<-find.floods%>% 
-  group_by(ID, flood)%>%
+# summarize each run
+runs <- iso_flagged %>%
+  group_by(ID, run_id, slope_pos) %>%
   summarise(
-    start=min(Date, na.rm=T),
-    end=max(Date, na.rm=T)
+    run_start = min(Date),
+    run_end   = max(Date),
+    .groups = "drop"
+  ) %>%
+  arrange(ID, run_start) %>%
+  group_by(ID) %>%
+  mutate(
+    next_pos   = lead(slope_pos),
+    next_end   = lead(run_end),
+    next_runid = lead(run_id)
+  ) %>%
+  ungroup()
+
+
+# define flood periods: positive run followed immediately by negative run
+flood.periods <- runs %>%
+  filter(slope_pos == TRUE, next_pos == FALSE) %>%
+  group_by(ID) %>%
+  mutate(flood = row_number()) %>%   # flood event number per ID
+  ungroup() %>%
+  transmute(
+    ID,
+    flood,
+    start = run_start,
+    end   = next_end
   )
-
-
-ggplot(find.floods %>% filter(ID=='OS'), 
-       aes(x = Date, y=depth, color=flood)) +
-  geom_point()+
-  facet_wrap(~ID, scales='free')
 
 write_csv(flood.periods, "01_Raw_data/flood.periods.csv")
 
@@ -105,9 +124,9 @@ stage_flagged <- master %>%
   ) %>%
   select(-start, -end)%>%
   arrange(ID, Date)
+
+
 depth.base<-baseline(stage_flagged, depth)
-
-
 
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))

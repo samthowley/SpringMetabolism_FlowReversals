@@ -1,4 +1,5 @@
 
+#trim########
 slopes <- DO.count %>%
   filter(!is.na(DO_loess), !is.na(Date))%>%
   arrange(ID, Date) %>%
@@ -34,7 +35,8 @@ remove<-DO.count %>%
     abs.slope=abs(slope),
     remove=case_when(
       count<0 & slope>0 ~'remove',
-      count>=0 & slope<0 ~'remove'      
+      count>=0 & slope<=0 ~'remove',
+      TRUE~"keep"
       ),
     stage=case_when(
       count<0  ~'pre',
@@ -42,27 +44,49 @@ remove<-DO.count %>%
     )
     )%>%
   select(-start_date, -end_date, -day)%>%
-  arrange(ID, Date)%>%
-  filter(is.na(remove))
+  arrange(ID, Date)#%>%
+  #filter(is.na(remove))
 
-
-
+#DO.count%>%
 
 remove%>%
   mutate(
     date= as.Date(Date)
   )%>%
   filter(
-    ID=='AM',
+    ID=='OS',
     !is.na(flood), 
-    flood==7
-    )%>%
-  ggplot(aes(x = count, y = DO, group=stage)) +
+    flood==10
+  )%>%
+  ggplot(aes(x = Date, y = DO, color=remove)) +
   geom_point()+
-  geom_point(aes(y=DO_loess, color=date))+
-  geom_smooth(method='lm')+
+  geom_point(aes(y = depth+3), color='black')+
+  geom_point(aes(y=DO_loess), color='pink')+
+  #geom_smooth(method='lm', aes(group=stage))+
   #scale_color_viridis_c(name = "slopes") +
-    theme_minimal()+
+  theme_minimal()+
   facet_wrap(~flood)
+
+remove%>%filter(ID=='OS', flood==6)
+
+ggplotly(
+  
+  remove%>%
+    mutate(
+      date= as.Date(Date)
+    )%>%
+    filter(
+      ID=='AM',
+      !is.na(flood), 
+      #flood==1
+    )%>%
+    ggplot(aes(x = date, y = DO, color=remove)) +
+    geom_point()+
+    geom_point(aes(y=DO_loess), color='pink')+
+    #geom_smooth(method='lm', aes(group=stage))+
+    #scale_color_viridis_c(name = "slopes") +
+    theme_minimal()+
+    facet_wrap(~flood)
+)
 
 

@@ -1,4 +1,4 @@
-###packages###
+###packages####
 library(tidyverse)
 library(readxl)
 library(measurements)
@@ -94,9 +94,11 @@ DO_CQ<-DO_everything%>%
          # Temp>50
     )%>%
   mutate(
+    DO=abs(DO),
     remove=case_when(
       ID=='AM' & Date<="2022-06-01" & DO>7~ 'a',
       ID=='AM' & Date>'2024-01-01' & Date<'2024-04-01' & DO>8~ 'a',
+      ID=='AM' & Date>'2023-04-04' & Date<'2023-05-15' & DO<2~ 'a',
       
       ID=='GB' & Date<="2022-06-01" & DO>7.5~ 'a',
       ID=='GB' & Date>'2022-08-01' & Date< '2022-10-01' & DO<4~ 'a',
@@ -114,19 +116,32 @@ DO_CQ<-DO_everything%>%
       ID=='ID' & Date>'2023-05-03' & Date<'2023-06-03' & DO<5.6~'a',
       ID=='ID' & Date>'2023-06-03' & Date<'2023-08-03' & DO<3.6~'a',
       ID=='ID' & Date>'2023-08-03' & Date<'2023-12-03' & DO<3.7~'a',
-      ID=='ID' & Date>'2023-12-03' & Date<'2024-04-03' & DO<3~'a'
+      ID=='ID' & Date>'2023-12-03' & Date<'2024-04-03' & DO<3~'a',
+      
+      ID=='OS' & Date<'2022-08-03' & DO>9~'a',
+      ID=='OS' & Date<'2022-10-15' & Date>'2022-09-01'& DO>6.5~'a',
+      ID=='OS' & Date<'2023-07-01' & Date>'2023-05-15' & DO<2~'a',
+      ID=='OS' & Date<'2023-08-15' & Date>'2023-07-15' & DO<0.2~'a',
+      ID=='OS' & Date<'2023-08-15' & Date>'2023-07-15' & DO<0.2~'a',
+      ID=='OS' & Date<'2023-12-30' & Date>'2023-11-15' & DO<0.2~'a'
+      
+      
     ))%>%
-  filter(is.na(remove))%>%
-  select(Date, DO, Temp, ID)
-    
+  distinct(Date, ID, .keep_all = T)%>%
+  filter(is.na(remove))#%>%
+  #select(Date, DO, Temp, ID)
  
-ggplot(data=DO_CQ %>% 
-         filter(ID=='GB',
-         #Date>'2023-07-20'
+
+  ggplot(data=DO_CQ %>% 
+         filter(ID=='AM',
+         Date>'2023-04-04',
+         Date<'2023-05-15'
          ), 
        aes(x=Date)) +
-  geom_point(aes(y=DO, color=source_file))+
+  geom_point(aes(y=DO))+
   facet_wrap(~ID)
+  ggplotly(
+)
 
 
 write_csv(DO_CQ, "02_Clean_data/Chem/DO.csv")
