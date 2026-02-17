@@ -8,6 +8,35 @@ library(mmand)
 library(weathermetrics)
 library(lme4)
 library(zoo)
+library(strucchange)
+
+
+fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.4, min_rows = 5) {
+  y_name <- rlang::as_name(rlang::enquo(y_var))
+  x_name <- rlang::as_name(rlang::enquo(x_var))
+  g_name <- rlang::as_name(rlang::enquo(group_var))
+  
+  split_list <- split(df, df[[g_name]])
+  
+  lapply(split_list, function(.x) {
+    # Remove NAs pairwise for this group/var
+    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
+    .x_clean <- .x[complete_cases, ]
+    
+    if (nrow(.x_clean) < min_rows) {
+      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
+      return(NULL)
+    }
+    
+    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
+    
+    # Predict on full original rows (fills NA with NA)
+    .x %>%
+      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
+  }) %>%
+    compact() %>%
+    bind_rows()
+}
 
 smooth <- function(flagged, variable) {
   prep <- flagged %>%
@@ -45,111 +74,114 @@ baseline <- function(flagged, variable) {
     ) %>%
     arrange(ID, flood)
   
-  base_tbl<-left_join(flood.IDs, base_tbl)%>%
-    filter(!is.na(flood))%>%distinct(ID, flood, .keep_all = T)%>%
-    fill(base, .direction = 'down')
+  # base_tbl<-left_join(flood.IDs, base_tbl)%>%
+  #   filter(!is.na(flood))%>%distinct(ID, flood, .keep_all = T)%>%
+  #   fill(base, .direction = 'down')
 }
 
 
-
-trim.declines<-function(df,  variable){
-  
-  prep <- df%>%
-    group_by(ID, flood)%>%
+prep.by.slope_increases<-function(df, variable){
+  slopes <- df %>%
+    filter(!is.na({{variable}}), !is.na(Date))%>%
+    arrange(ID, Date) %>%
+    group_by(ID)%>%
     mutate(
-      normalized={{variable}}/max({{variable}}, na.rm = T),
-      day        = as.Date(Date),
-      trim       = case_when(
-        normalized >= 0.95~'remove',
-        TRUE~ NA
-      ),
-      min_idx = which.min({{variable}}),
-      min_date = Date[min_idx],    
-      stage=case_when(
-        Date<min_date ~"before",
-        TRUE ~'after'),
-    )%>%select(-min_idx, -min_date)
-  head<-prep %>%
-    arrange(ID, Date)%>%
-    group_by(ID, flood)%>%
-    filter(stage=='before')%>%
-    fill(trim, .direction='up')%>%
-    mutate(
-      flood=if_else(!is.na(trim), NA, flood)
-    )
-  
-  tail<-prep %>%
-    arrange(ID, Date)%>%
-    group_by(ID, flood)%>%
-    filter(stage=='after')%>%
-    fill(trim, .direction='down')%>%
-    mutate(
-      flood=if_else(!is.na(trim), NA, flood)
-    )
-  
-  trimmed<-rbind(head, tail)%>%arrange(ID, Date)
-  
-  remove.flukes <- trimmed %>%
-    group_by(ID, flood) %>%
-    mutate(
-      remove=n_distinct(day),
-      flood=if_else(remove<7, NA, flood)
-    ) %>%
+      norm={{variable}}, #/mean(depth_smooth, na.rm=T),
+      date      = as.Date(Date),
+      # 3-day index starting at the first date in your data
+      day_index = as.integer(date - min(date)),
+      block3    = day_index %/% 4) %>%ungroup()%>%
+    group_by(block3, ID) %>%
+    summarise(
+      start_date = min(date),
+      end_date   = max(date),
+      slope      = {
+        x <- as.numeric(Date)      # seconds since origin
+        y <- norm
+        coef(lm(y ~ x))[2] * 86400     # convert to units per day
+      },
+      .groups = "drop"
+    )%>% group_by(ID) %>%
     ungroup()
   
-  
-}
-
-trim.increases<-function(df,  variable){
-  
-  prep <- df%>%
-    group_by(ID, flood)%>%
-    mutate(
-      normalized={{variable}}/min({{variable}}, na.rm = T),
-      day        = as.Date(Date),
-      trim       = case_when(
-        normalized <= 1.05~'remove',
-        TRUE~ NA
-      ),
-      min_idx = which.max({{variable}}),
-      min_date = Date[min_idx],    
-      stage=case_when(
-        Date<min_date ~"before",
-        TRUE ~'after'),
-    )%>%select(-min_idx, -min_date)
-  
-  head<-prep %>%
-    arrange(ID, Date)%>%
-    group_by(ID, flood)%>%
-    filter(stage=='before')%>%
-    fill(trim, .direction='up')%>%
-    mutate(
-      flood=if_else(!is.na(trim), NA, flood)
-    )
-
-  tail<-prep %>%
-    arrange(ID, Date)%>%
-    group_by(ID, flood)%>%
-    filter(stage=='after')%>%
-    fill(trim, .direction='down')%>%
-    mutate(
-      flood=if_else(!is.na(trim), NA, flood)
-    )
-
-  trimmed<-rbind(head, tail)%>%arrange(ID, Date)
-
-  remove.flukes <- trimmed %>%
+  out_filtered <- 
+    df %>%
+    filter(!is.na(flood))%>%
+    mutate(day = as.Date(Date)) %>%
+    left_join(slopes, by = join_by(ID, between(day, start_date, end_date))) %>%
     group_by(ID, flood) %>%
     mutate(
-      remove=n_distinct(day),
-      flood=if_else(remove<7, NA, flood)
-    ) %>%
+      abs.slope = abs(slope),
+      remove = case_when(
+        count < 0  & slope < 0  ~ "remove",
+        count >= 0 & slope >= 0 ~ "remove",
+        TRUE ~ "keep"),
+      stage = if_else(count < 0, "pre", "post")
+    )
+}
+prep.by.slope_decreases<-function(df, variable){
+  slopes <- df %>%
+    filter(!is.na({{variable}}), !is.na(Date))%>%
+    arrange(ID, Date) %>%
+    group_by(ID)%>%
+    mutate(
+      norm={{variable}}, #/mean(depth_smooth, na.rm=T),
+      date      = as.Date(Date),
+      # 3-day index starting at the first date in your data
+      day_index = as.integer(date - min(date)),
+      block3    = day_index %/% 4) %>%ungroup()%>%
+    group_by(block3, ID) %>%
+    summarise(
+      start_date = min(date),
+      end_date   = max(date),
+      slope      = {
+        x <- as.numeric(Date)      # seconds since origin
+        y <- norm
+        coef(lm(y ~ x))[2] * 86400     # convert to units per day
+      },
+      .groups = "drop"
+    )%>% group_by(ID) %>%
     ungroup()
   
+  out_filtered <- 
+    df %>%
+    filter(!is.na(flood))%>%
+    mutate(day = as.Date(Date)) %>%
+    left_join(slopes, by = join_by(ID, between(day, start_date, end_date))) %>%
+    group_by(ID, flood) %>%
+    mutate(
+      abs.slope = abs(slope),
+      remove = case_when(
+        count < 0  & slope > 0  ~ "remove",
+        count >= 0 & slope <= 0 ~ "remove",
+        TRUE ~ "keep"),
+      stage = if_else(count < 0, "pre", "post")
+    )
+}
+
+trim<-function(prep){
+  
+  trim<-prep %>%
+    group_by(ID, flood, stage) %>%
+    mutate(
+      stage = if_else(count < 0, "pre", "post"),
+      last_remove_day_pre  = if (stage[1] == "pre")  max(day[remove == "remove"], na.rm = TRUE) else as.Date(NA),
+      first_remove_day_post = if (stage[1] == "post") min(day[remove == "remove"], na.rm = TRUE) else as.Date(NA),
+      last_remove_day_pre  = if_else(is.infinite(last_remove_day_pre),  as.Date(NA), last_remove_day_pre),
+      first_remove_day_post = if_else(is.infinite(first_remove_day_post), as.Date(NA), first_remove_day_post),
+      keep_window = case_when(
+        stage == "pre"  & !is.na(last_remove_day_pre)   ~ day >= last_remove_day_pre,
+        stage == "post" & !is.na(first_remove_day_post) ~ day <= first_remove_day_post,
+        TRUE ~ TRUE
+      )
+    ) %>%
+    filter(keep_window) %>%
+    ungroup() %>%
+    select(-start_date, -end_date, -day,
+           -last_remove_day_pre, -first_remove_day_post, -keep_window)
   
 }
 
- 
 
 minimum<-function(df, variable){
   minimum<-df%>%
@@ -181,7 +213,7 @@ duration<-function(df){
     filter(!is.na(flood))%>%
     group_by(ID, flood)%>%
     mutate(
-      duration=n_distinct(day)
+      duration=n_distinct(date)
     )%>% 
     summarise(
       duration=max(duration)
@@ -249,7 +281,13 @@ fit_recessions <- function(trim, base, variable, base.var) {
     left_join(base, by = c("ID", "flood"))%>%
     rename(recess.intercept=Intercept, recess.slope=slope)%>%
     select(-base)
-
+  
+  table<-recess.lm%>%
+    group_by(ID, flood)%>%
+    summarise(
+      recess.intercept=mean(recess.intercept, na.rm=T),
+      recess.slope=mean(recess.slope, na.rm=T)
+  )
 }
 fit_rise <- function(trim, base, variable, base.var) {
   
@@ -270,6 +308,15 @@ fit_rise <- function(trim, base, variable, base.var) {
     rename(rise.intercept=Intercept, rise.slope=slope)%>%
     select(-base)
   
+  
+  table<-recess.lm%>%
+    group_by(ID, flood)%>%
+    summarise(
+      rise.intercept=mean(rise.intercept, na.rm=T),
+      rise.slope=mean(rise.slope, na.rm=T)
+    )
+  
+  
 }
 
 flood.base_compare <- function(peak_df, base_df, variable) {
@@ -287,3 +334,88 @@ flood.base_compare <- function(peak_df, base_df, variable) {
     )
 }
 
+get_bp_slopes <- function(data, y, x, breaks = 2) {
+  y <- enquo(y)
+  x <- enquo(x)
+  y_name <- quo_name(y)
+  x_name <- quo_name(x)
+  
+  df <- data %>%
+    select(!!y, !!x) %>%
+    filter(!is.na(!!y), !is.na(!!x)) %>%
+    arrange(!!x)
+  
+  if (nrow(df) < 5) {
+    return(list(
+      breakpoints = tibble(breakpoint_number = integer(), breakpoint_x = numeric()),
+      segments = tibble(seg_id=integer(), segment=character(), seg_start=numeric(),
+                        seg_end=numeric(), n=integer(), slope=numeric(), intercept=numeric()),
+      data_segmented = df,
+      bp_fit = NULL
+    ))
+  }
+  
+  fml <- as.formula(paste0(y_name, " ~ ", x_name))
+  bp  <- breakpoints(fml, data = df, breaks = breaks)
+  
+  idx <- bp$breakpoints
+  idx <- idx[!is.na(idx)]
+  x_bp <- sort(as.numeric(df[[x_name]][idx]))
+  
+  cuts <- c(-Inf, x_bp, Inf)
+  df <- df %>%
+    mutate(
+      segment = cut(.data[[x_name]], breaks = cuts, include.lowest = TRUE),
+      seg_id  = as.integer(segment)
+    )
+  
+  seg_tbl <- df %>%
+    filter(!is.na(segment)) %>%
+    group_by(seg_id, segment) %>%
+    summarise(
+      seg_start = min(.data[[x_name]], na.rm = TRUE),
+      seg_end   = max(.data[[x_name]], na.rm = TRUE),
+      n         = n(),
+      slope     = coef(lm(fml, data = cur_data()))[[x_name]],
+      intercept = coef(lm(fml, data = cur_data()))[["(Intercept)"]],
+      .groups = "drop"
+    ) %>%
+    arrange(seg_id)
+  
+  bp_tbl <- tibble(
+    breakpoint_number = seq_along(x_bp),
+    breakpoint_x      = x_bp
+  )
+  
+  list(
+    bp_fit = bp,
+    breakpoints = bp_tbl,
+    segments = seg_tbl,
+    data_segmented = df
+  )
+}
+
+run_bp_all_sites <- function(data, site_col = ID, y = ER, x = depth, breaks = 2) {
+  site_col <- enquo(site_col)
+  
+  results <- data %>%
+    group_by(!!site_col) %>%
+    group_nest() %>%
+    mutate(res = map(data, ~ get_bp_slopes(.x, y = {{ y }}, x = {{ x }}, breaks = breaks)))
+  
+  # tidy outputs you can immediately use
+  breakpoints_tbl <- results %>%
+    transmute(!!site_col, breakpoints = map(res, "breakpoints")) %>%
+    unnest(breakpoints)
+  
+  segments_tbl <- results %>%
+    transmute(!!site_col, segments = map(res, "segments")) %>%
+    unnest(segments)
+  
+  # keep raw objects (bp_fit etc.) if you want to plot per site later
+  list(
+    results = results,                 # nested list-column per site
+    breakpoints = breakpoints_tbl,     # long table: site + breakpoint depths
+    segments = segments_tbl            # long table: site + segment slopes + interval
+  )
+}

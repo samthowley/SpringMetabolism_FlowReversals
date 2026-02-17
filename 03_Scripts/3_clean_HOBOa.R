@@ -117,13 +117,16 @@ DO_CQ<-DO_everything%>%
       ID=='ID' & Date>'2023-06-03' & Date<'2023-08-03' & DO<3.6~'a',
       ID=='ID' & Date>'2023-08-03' & Date<'2023-12-03' & DO<3.7~'a',
       ID=='ID' & Date>'2023-12-03' & Date<'2024-04-03' & DO<3~'a',
+      ID=='ID' & Date>'2023-09-18' & Date<'2023-10-04' & DO<4.2~'a',
       
       ID=='OS' & Date<'2022-08-03' & DO>9~'a',
       ID=='OS' & Date<'2022-10-15' & Date>'2022-09-01'& DO>6.5~'a',
       ID=='OS' & Date<'2023-07-01' & Date>'2023-05-15' & DO<2~'a',
       ID=='OS' & Date<'2023-08-15' & Date>'2023-07-15' & DO<0.2~'a',
       ID=='OS' & Date<'2023-08-15' & Date>'2023-07-15' & DO<0.2~'a',
-      ID=='OS' & Date<'2023-12-30' & Date>'2023-11-15' & DO<0.2~'a'
+      ID=='OS' & Date<'2023-12-30' & Date>'2023-11-15' & DO<0.2~'a',
+      ID=='LF' & Date>'2023-04-03' & Date<'2023-04-17' & DO<1.7~'a',
+      ID=='LF' & Date>'2023-04-03' & Date<'2023-04-17' & DO>8~'a'
       
       
     ))%>%
@@ -133,15 +136,14 @@ DO_CQ<-DO_everything%>%
  
 
   ggplot(data=DO_CQ %>% 
-         filter(ID=='AM',
-         Date>'2023-04-04',
-         Date<'2023-05-15'
+         filter(ID=='LF',
+         Date>'2023-04-03',
+         Date<'2023-04-17'
          ), 
        aes(x=Date)) +
   geom_point(aes(y=DO))+
   facet_wrap(~ID)
-  ggplotly(
-)
+  
 
 
 write_csv(DO_CQ, "02_Clean_data/Chem/DO.csv")

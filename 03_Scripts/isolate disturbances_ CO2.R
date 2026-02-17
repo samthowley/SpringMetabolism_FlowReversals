@@ -13,8 +13,11 @@ CO2_flagged <- co2 %>%
   select(-start, -end)%>%
   arrange(ID, Date)%>%
   mutate(
-    day=as.Date(Date)
-  )%>%filter(!is.na(CO2))
+    date=as.Date(Date)
+  )%>%
+  filter(!is.na(CO2))%>%
+  group_by(ID, date)%>%
+  mutate(CO2.daily.min=min(CO2, na.rm=T))
 
 
 CO2.base<-baseline(CO2_flagged, CO2)
@@ -45,25 +48,38 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
     compact() %>%
     bind_rows()
 }
-CO2.smooth<-smooth(CO2_flagged, CO2)
 
-#function(flagged, base.df, base.variable, variable)
-CO2.trimmed<-trim.increases(CO2.smooth, CO2_loess)%>%
-  mutate(
-    flood=if_else(ID=='AM' & flood==5 & Date> '2023-03-15', NA, flood),
-    flood=if_else(ID=='ID' & flood==3 & Date> '2023-04-28', NA, flood),
-    flood=if_else(ID=='LF' & flood==2 & Date> '2022-08-22', NA, flood),
-    flood=if_else(ID=='OS' & flood==4 & Date> '2023-03-21', NA, flood),
-    flood=if_else(ID=='OS' & flood==6, NA, flood)
-  )
-
-CO2.duration<-duration(CO2.trimmed)
+CO2.smooth<-smooth(CO2_flagged, CO2.daily.min)%>%
+  rename(CO2_loess=CO2.daily.min_loess)
 
 CO2.count<-count.max(CO2.smooth, CO2_loess)
 
-CO2.max<-maximum(CO2.trimmed, CO2)
+CO2.prep<-prep.by.slope_increases(CO2.count, CO2_loess)%>%
+  mutate(
+    remove = if_else(abs(count)<100, "keep", remove),
+    remove = if_else(ID=='OS' & abs(count)<200, "keep", remove)
+    )
 
-CO2.compare<-flood.base_compare(CO2.max, CO2.base, maximum)
+CO2.trim<-trim(CO2.prep)
+
+
+CO2.trim%>%
+    filter(
+      ID=='OS',
+    )%>%
+    ggplot(aes(x=count, y=CO2))+
+    geom_point()+
+    geom_smooth(aes(group = stage, y=CO2.daily.min), method='lm')+
+    facet_wrap(~flood, scales='free')
+  ggplotly(
+
+)
+
+
+CO2.duration<-duration(CO2.trim)
+
+CO2.max<-maximum(CO2.trim, CO2)
+
 
 recession.lm<-fit_recessions(CO2.count, CO2.base, CO2, base) 
 rise.lm<-fit_rise(CO2.count, CO2.base, CO2, base) 
@@ -71,7 +87,6 @@ rise.lm<-fit_rise(CO2.count, CO2.base, CO2, base)
 
 flood.impacts.CO2<-
   full_join(recession.lm,CO2.duration)%>%
-  full_join(CO2.compare, by=c('ID', 'flood'))%>%
   full_join(rise.lm, by=c('ID', 'flood'))%>%
   full_join(CO2.max, by=c('ID', 'flood'))%>%
   full_join(CO2.base, by=c('ID', 'flood'))

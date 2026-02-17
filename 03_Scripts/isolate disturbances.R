@@ -156,16 +156,20 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
 }
 depth.smooth<-smooth(stage_flagged, depth)
 
-h.trimmed<-trim.increases(depth.smooth,depth_loess)
+depth.count<-count.max(depth.smooth, depth_loess)
 
-depth.count<-count.max(h.trimmed, depth_loess)
+ggplot(depth.count%>%filter(ID=='LF'), aes(x=count, y=depth))+
+  geom_point()+
+  facet_wrap(~flood, scales='free')
 
-depth.max<-maximum(h.trimmed, depth)
+
+depth.max<-maximum(depth.count, depth)
 
 depth.compare<-flood.base_compare(depth.max, depth.base, maximum)
 
-prep<- h.trimmed %>% 
+prep<- depth.smooth %>% 
   mutate(
+    date=as.Date(Date),
     flooded=case_when(
       !is.na(flood)~'flooded',
       TRUE~'norm')
@@ -177,14 +181,14 @@ time.btwn<- prep %>%
   filter(flooded=='norm')%>%
   group_by(ID, flood)%>%
   mutate(
-    time.btwn=n_distinct(day)
+    date=as.Date(Date),
+    time.btwn=n_distinct(date)
   )%>% 
   summarise(
     time.btwn=max(time.btwn)
   )
 
-
-depth.duration<- duration(h.trimmed)
+depth.duration<- duration(prep)
 
 
 recession.lm<-fit_recessions(depth.count, depth.base, depth, base.depth) 

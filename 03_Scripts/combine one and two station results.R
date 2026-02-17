@@ -13,9 +13,12 @@ onestation<-onestation.df%>%
          K6001=K600_daily_mean,
          Date=date)%>%
   separate(ID,into = c('ID', 'stage'),sep='_')%>%
+  mutate(GPP1=if_else(GPP1<0, 0, GPP1))%>%
   select(-ER_Rhat, -K600_daily_Rhat,-stage)%>%
   arrange(ID, Date)%>%
   drop_na()
+
+range(onestation$GPP1)
 
 
 two<- read_csv("04_Outputs/two.station.results.csv")%>%
@@ -32,6 +35,10 @@ two<- read_csv("04_Outputs/two.station.results.csv")%>%
     ),
     .groups = "drop"
   )
+
+range(two$GPP2)
+
+
 
 
 read_csv("04_Outputs/two.station.results.csv")%>%
@@ -71,7 +78,15 @@ all.met<-full_join(onestation, two)%>%
       na.rm = TRUE))%>%
   mutate(
     ER = rowMeans(
-      select(., ER1, ER2),na.rm = TRUE))
+      select(., ER1, ER2),na.rm = TRUE),
+    GPP=if_else(ID=='GB'& Date>='2022-09-09' & Date<='2022-10-08' & GPP< 1, NA, GPP),
+    GPP=if_else(ID=='LF'& Date>='2023-11-30' & Date<='2023-12-05' & GPP< 1, NA, GPP),
+    GPP=if_else(ID=='OS'& Date=='2024-03-19' & GPP< 1, NA, GPP),
+    
+    )
+
+
+write_csv(all.met, "04_Outputs/master.metabolism.csv")
 
 #p1<-
   ggplot(all.met, aes(x = Date)) +
@@ -127,7 +142,6 @@ ggplot(all.met, aes(x = Date)) +
   theme_minimal()
 
 
-write_csv(all.met, "04_Outputs/master.metabolism.csv")
 
 
 
