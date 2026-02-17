@@ -60,13 +60,19 @@ DO.deficit<-change.DO.flux%>%  mutate(
 
 #4. K rearation###make K changes############
 
-AM.K<-DO.deficit%>%
+edit.K<-DO.deficit%>%
   mutate(
     K600_1.d_daily=if_else(ID=='AM', K600_1.d_daily+4, K600_1.d_daily),
-    K600_1.d_daily=if_else(ID=='AM' & K600_1.d_daily<15 , 15, K600_1.d_daily)
+    K600_1.d_daily=if_else(ID=='AM' & K600_1.d_daily<15 , 15, K600_1.d_daily),
+    K600_1.d_daily=if_else(ID=='GB' & K600_1.d_daily<16 , 16, K600_1.d_daily),
+    K600_1.d_daily=if_else(ID=='GB' & K600_1.d_daily>23 , 23, K600_1.d_daily),
+    K600_1.d_daily=if_else(ID=='LF' & K600_1.d_daily<15 , 15, K600_1.d_daily),
+    K600_1.d_daily=if_else(
+      ID=='LF' &  depth<0.25 & depth<0.1 &
+        K600_1.d_daily>35, 35, K600_1.d_daily)
     )
 
-K.rearation<-AM.K%>%
+K.rearation<-edit.K%>%
   mutate(K.flux=(K600_1.d_daily)*depth*DO.deficit.from.sat)
 
 #5. air-water gas exchange####
@@ -88,11 +94,11 @@ active.reach <- air.water.xchange %>%
   filter(n() >= 20) %>%                 # keep only days with ≥ 20 hours
   ungroup()%>%select(-date)
 
-ggplot(active.reach%>%filter(ID=='LF'), 
-       aes(x = Date, y = depth, color=reach.test)) +
-  geom_line()+
-  geom_hline(yintercept = 0)+
-  facet_wrap(~ID, scales='free')
+# ggplot(active.reach%>%filter(ID=='LF'), 
+#        aes(x = Date, y = depth, color=reach.test)) +
+#   geom_line()+
+#   geom_hline(yintercept = 0)+
+#   facet_wrap(~ID, scales='free')
 
 
 #6.parse day from night####
@@ -124,20 +130,26 @@ NEP<-left_join(GPP, ER)
 
 
 #8. Create datasets####
+write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34), 
+          "04_Outputs/two.station.results.csv")
 
-check<-left_join(day.parse, NEP)
 
-ggplot(check, aes(x = Date)) +
-  geom_point(aes(y = GPP, color=K600_1.d_daily))+
+left_join(day.parse, NEP)%>%
+  filter(ID=='LF',
+         depth<0.35
+         )%>%
+  ggplot(aes(x = depth)) +
+  #geom_point(aes(y = GPP))+
   geom_point(aes(y = ER, color=K600_1.d_daily))+
+  scale_color_viridis_b()+
   geom_hline(yintercept = 34)+
   geom_hline(yintercept = -34)+
   geom_hline(yintercept = 0, color='gray')+
   scale_color_viridis_c(name = "K600") +
   facet_wrap(~ID, scales='free')
 
+ggplotly(
+)
 
-write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34), 
-          "04_Outputs/two.station.results.csv")
 
-write_csv(left_join(day.parse, NEP)%>%filter(ID=='LF'), "test.csv")
+#write_csv(left_join(day.parse, NEP)%>%filter(ID=='LF'), "test.csv")

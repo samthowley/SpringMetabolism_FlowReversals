@@ -18,8 +18,7 @@ onestation<-onestation.df%>%
   arrange(ID, Date)%>%
   drop_na()
 
-range(onestation$GPP1)
-
+#check#######
 
 two<- read_csv("04_Outputs/two.station.results.csv")%>%
   mutate(Date=as.Date(Date))%>%
@@ -36,28 +35,6 @@ two<- read_csv("04_Outputs/two.station.results.csv")%>%
     .groups = "drop"
   )
 
-range(two$GPP2)
-
-
-
-
-read_csv("04_Outputs/two.station.results.csv")%>%
-  mutate(Date=as.Date(Date))%>%
-  select(Date, GPP, ER, K600_1.d_daily, depth, ID)%>%
-  group_by(ID, Date)%>%
-  summarise(
-    across(
-      c(GPP, ER, K600_1.d_daily, depth),
-      ~ mean(.x, na.rm = TRUE)
-    ),
-    .groups = "drop"
-  )%>%
-ggplot(aes(x = depth)) +
-  geom_point(aes(y = GPP, color=K600_1.d_daily), shape=1) +
-  geom_hline(yintercept = 15)+
-  facet_wrap(~ID, scales = "free") +
-  scale_color_viridis_c(name = "K600") +
-  theme_minimal()
 
 depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
   mutate(Date=as.Date(Date))%>%
@@ -70,7 +47,8 @@ depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
     .groups = "drop"
   )
 
-all.met<-full_join(onestation, two)%>%
+#all.met<-
+full_join(onestation, two)%>%
   left_join(depth)%>%
   mutate(
     GPP = rowMeans(
@@ -83,68 +61,54 @@ all.met<-full_join(onestation, two)%>%
     GPP=if_else(ID=='LF'& Date>='2023-11-30' & Date<='2023-12-05' & GPP< 1, NA, GPP),
     GPP=if_else(ID=='OS'& Date=='2024-03-19' & GPP< 1, NA, GPP),
     
-    )
-
-
-write_csv(all.met, "04_Outputs/master.metabolism.csv")
-
-#p1<-
-  ggplot(all.met, aes(x = Date)) +
-  geom_point(aes(y = GPP1, color='GPP1')) +
-  geom_point(aes(y = GPP2, color='GPP2')) +
-    geom_point(aes(y = GPP, color='GPP')) +
+    )%>%
+  filter(
+    depth<1,
+    ID=='LF'
+    )%>%
+  ggplot(aes(x = depth)) +
+  geom_point(aes(y = ER2, color='ER2'),) +
+  geom_point(aes(y = ER1, color='ER1'), shape=1) +
   geom_hline(yintercept = 15)+
+  ggtitle('ER')+
   facet_wrap(~ID, scales = "free") +
-  #scale_color_viridis_c(name = "K600") +
   theme_minimal()
 
 
-p2<-ggplot(all.met, aes(x = depth.daily)) +
-  geom_point(aes(y = GPP1,color='GPP1'),)+
-  geom_point(aes(y = GPP2,color=), shape=1)+
-  #geom_point(aes(y = GPP), shape=1, color='red')+
-  facet_wrap(~ID, scales='free')+
+##########
+#write_csv(all.met, "04_Outputs/master.metabolism.csv")
+
+all.met%>%
+  filter(depth<1)%>%
+  ggplot(aes(x = depth)) +
+    geom_point(aes(y = GPP2, color='GPP2'),) +
+    geom_point(aes(y = GPP1, color='GPP1'), shape=1) +
+  ggtitle('GPP')+
+    facet_wrap(~ID, scales = "free") +
+    theme_minimal()
+
+
+
+
+
+
+all.met%>%
+  ggplot(aes(x = Date)) +
+  
+  geom_point(aes(y = ER2, color='ER2'), color='black') +
+  geom_point(aes(y = ER1, color='ER1', color='gray'), shape=1) +
+  geom_point(aes(y = ER, color='ER2'), color='darkred') +
+
+  geom_point(aes(y = GPP2, color='GPP2'), color='black') +
+  geom_point(aes(y = GPP1, color='GPP1', color='gray'), shape=1) +
+  geom_point(aes(y = GPP, color='GPP'), color='darkgreen') +
+  
+  geom_point(aes(y = GPP+ER, color='NEP'), color='purple') +
+  
+  
+  ggtitle('NEP')+
+  facet_wrap(~ID, scales = "free") +
   theme_minimal()
-
-
-p3<-ggplot(all.met, aes(x = Date)) +
-  #geom_point(aes(y = GPP1,color='GPP1'),)+
-  #geom_point(aes(y = GPP2,color='GPP2'), shape=1)+
-  geom_point(aes(y = GPP), shape=1, color='red')+
-  facet_wrap(~ID, scales='free')+
-  ggtitle('GPP Averaged')+
-  theme_minimal()
-
-p4<-ggplot(all.met, aes(x = depth.daily)) +
-  #geom_point(aes(y = GPP1,color='GPP1'),)+
-  #geom_point(aes(y = GPP2,color='GPP2'), shape=1)+
-  geom_point(aes(y = GPP), shape=1, color='red')+
-  facet_wrap(~ID, scales='free')+
-  ggtitle('GPP Averaged')+
-  theme_minimal()
-
-plot_grid(p3, p4, ncol=1)
-library(cowplot)
-
-ggplot(all.met, aes(x = Date)) +
-  #geom_point(aes(y = GPP1,color='GPP1'),)+
-  #geom_point(aes(y = GPP2,color='GPP2'), shape=1)+
-  geom_point(aes(y = GPP), shape=1, color='red')+
-  facet_wrap(~ID, scales='free')+
-  ggtitle('GPP Averaged')+
-  theme_minimal()
-
-
-
-ggplot(all.met, aes(x = Date)) +
-  geom_point(aes(y = GPP), shape=1)+
-  facet_wrap(~ID, scales='free')+
-  theme_minimal()
-
-
-
-
-
 
 
 

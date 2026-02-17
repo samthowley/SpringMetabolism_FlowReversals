@@ -54,12 +54,12 @@ ER.impact <- ER.smooth %>%
   select(Date, ID, flood, impact)%>%
   rename(impact.sum=impact)%>%select(-Date)
 
-
 ER.parse<-left_join(ER.smooth, ER.impact, by=c('flood', 'ID'))
 
 #RR periods########
 
-ER.dec<-ER.parse%>%filter(impact.sum=='dec')
+ER.dec<-ER.parse%>%filter(impact.sum=='dec')%>%
+  mutate(flood=if_else(ID=='OS' & flood==3 & Date>'2023-07-19', NA, flood))
 
 ER.dec.count<-count.min(ER.dec, ER_loess)
 
@@ -68,22 +68,24 @@ ER.dec.prep<-prep.by.slope_decreases(ER.dec.count, ER_loess)%>%
     remove = if_else(abs(count)<5, "keep", remove),
     ID.flood=paste0(ID, ".", flood),
     remove = if_else(ER_loess< -20, "keep", remove),
-    # remove = if_else(ID=='OS' & flood==1, "keep", remove)
+    # remove = if_else(ID=='LF' & flood==3, "keep", remove),
+    # remove = if_else(ID=='OS' & flood==3, "keep", remove)
+    
     )
 
-unique(ER.dec.prep$ID.flood)
+#requires trimming:
 
-site<-'LF'
-flood.num<-2
+site<-'OS'
+flood.num<-1
 plot_grid(
   
   ER.dec.prep%>% 
-    filter(ID==site, flood==flood.num)%>%
+    #filter(ID==site, flood==flood.num)%>%
     ggplot(aes(x=count, y=ER))+
     geom_point(aes(y=ER_loess, color=remove), size=3)+
     geom_point(color='red')+
     geom_smooth(method = lm, aes(group=stage, y=ER))+
-    facet_wrap(~flood, scales='free', nrow=1)+
+    facet_wrap(~ID.flood, scales='free')+
     theme(legend.position = 'bottom')
   
   ,
