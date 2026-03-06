@@ -66,11 +66,9 @@ edit.K<-DO.deficit%>%
     K600_1.d_daily=if_else(ID=='AM' & K600_1.d_daily<15 , 15, K600_1.d_daily),
     K600_1.d_daily=if_else(ID=='GB' & K600_1.d_daily<16 , 16, K600_1.d_daily),
     K600_1.d_daily=if_else(ID=='GB' & K600_1.d_daily>23 , 23, K600_1.d_daily),
-    K600_1.d_daily=if_else(ID=='LF' & K600_1.d_daily<15 , 15, K600_1.d_daily),
-    K600_1.d_daily=if_else(
-      ID=='LF' &  depth<0.25 & depth<0.1 &
-        K600_1.d_daily>35, 35, K600_1.d_daily)
+    K600_1.d_daily=if_else(ID=='LF' & K600_1.d_daily>51 , 62, K600_1.d_daily),
     )
+
 
 K.rearation<-edit.K%>%
   mutate(K.flux=(K600_1.d_daily)*depth*DO.deficit.from.sat)
@@ -130,16 +128,15 @@ NEP<-left_join(GPP, ER)
 
 
 #8. Create datasets####
-write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34), 
+write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34),
           "04_Outputs/two.station.results.csv")
-
 
 left_join(day.parse, NEP)%>%
   filter(ID=='LF',
-         depth<0.35
+         #depth<0.35
          )%>%
   ggplot(aes(x = depth)) +
-  #geom_point(aes(y = GPP))+
+  #geom_point(aes(y = GPP, color=K600_1.d_daily))+
   geom_point(aes(y = ER, color=K600_1.d_daily))+
   scale_color_viridis_b()+
   geom_hline(yintercept = 34)+

@@ -22,6 +22,7 @@ DO_flagged <- DO %>%
   select(-start, -end)%>%
   arrange(ID, Date)
 
+
 DO.base<-baseline(DO_flagged, DO)
 
 fit_loess_by_group <- 
@@ -58,6 +59,7 @@ DO.smooth<-smooth(DO_flagged, DO.daily.min)%>%
 
 DO.count<-count.min(DO.smooth, DO.daily.min)
 
+
 DO.prep<-prep.by.slope_decreases(DO.count, DO.daily.min)%>%
   mutate(
     remove=if_else(ID %in% c('ID', 'GB') & DO_loess<5, 'keep', remove),
@@ -70,9 +72,8 @@ DO.prep<-prep.by.slope_decreases(DO.count, DO.daily.min)%>%
 
 DO.trim<-trim(DO.prep)
 
-DO.trim%>% filter(ID=='ID')%>%
+DO.trim%>% filter(ID=='AM')%>%
   ggplot(aes(x=date, y=DO))+
-  geom_point(aes(y=DO_loess), size=3)+
   geom_point()+
   geom_smooth(method = lm, aes(group=stage, y=DO))+
   facet_wrap(~flood, scales='free')+

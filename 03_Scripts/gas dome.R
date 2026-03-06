@@ -1,13 +1,3 @@
-rm(list=ls())
-
-library(tidyverse)
-library(readxl)
-library(writexl)
-library(openxlsx)
-library(weathermetrics)
-library(lme4)
-
-#k600 calculation constants######
 dome_length<-0.38
 dome_width<-0.22
 dome_height<-0.185
@@ -21,56 +11,23 @@ library(tools)
 
 
 (file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
-file.names<-file.names[c(1,2,4)]
+file.names<-file.names[c(1,4,10)]
 
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
+
 stream <- reduce(data, full_join, by = c("ID", 'Date'))%>%
   fill(CO2, .direction = "updown") %>%
-  fill(depth, .direction = "updown")
-GasDome <- function(gas,stream) {
-  stream<-stream %>%  rename("CO2_enviro"='CO2')%>% mutate(day=day(Date), hour=hour(Date), month=month(Date),yr=year(Date))%>%
-    select(CO2_enviro,Temp,depth, day, hour,month,yr,ID)
+  fill(depth, .direction = "updown")%>%  
+  rename("CO2_enviro"='CO2')%>% 
+  mutate(day=as.Date(Date), hour=hour(Date))%>%
+  select(CO2_enviro,Temp,depth,ID, day, hour)
 
-  gas<-gas %>% mutate(day=day(Date), hour=hour(Date), month=month(Date),yr=year(Date))
-  gas<-left_join(gas,stream, by=c('hour', 'day', 'month', 'yr', 'ID'), relationship = "many-to-many")
 
-  gas<-gas%>%mutate(Temp_F=mean(Temp, na.rm=T))%>% mutate(Temp_C=fahrenheit.to.celsius(Temp_F))%>%
-    mutate(Temp_K=Temp_C+273.15,SchmidtO2hi=1568-86.04*Temp_C+2.142*Temp_C^2-0.0216*Temp_C^3,
-           SchmidtCO2hi=1742-91.24*Temp_C+2.208*Temp_C^2-0.0219*Temp_C^3)
+ggplot(stream%>%filter(ID=='ID'), aes(x = Date)) +
+  geom_point(aes(y = CO2))+
+  facet_wrap(~ID, scales='free')
+
   
-  gas<-gas %>%
-    mutate(pCO2_water=CO2_enviro/1000000, day=as.Date(Date),
-           pCO2_air=max(gas$CO2, na.rm=T)/1000000, sec=second(Date))%>%mutate( 
-    sec_cumulative=cumsum(sec))
-  
-  diffuse<-lm(CO2~ sec_cumulative, data = gas) #CO2 ppm/sec
-  gas$slope<-coef(diffuse)[2]
-  
-  gas$deltaCO2_atm<- (abs(gas$slope)/1000000) #change in CO2 during float
-  
-  gas$n<-(gas$deltaCO2_atm*15.466)/0.085/gas$Temp_K #CO2 mol/sec
-  
-
-  gas$FCO2<-(gas$n/domeFoot_m2)*60*60 #mol/m^2/h
-  gas$KH<-0.034*exp(2400*((1/gas$Temp_K)-(1/298.15)))
-  gas$KH_1000<-gas$KH*1000 #mol/m^3/atm
-
-  gas$KCO2_m.day<-gas$FCO2/gas$KH_1000/(gas$pCO2_air-gas$pCO2_water)#m/h
-  gas$kO2_m.day<-gas$KCO2_m.day*(gas$SchmidtCO2hi/gas$SchmidtO2hi)^(-2/3)#m/h
-  gas$k600_m.day<- gas$KCO2_m.day*(600/gas$SchmidtCO2hi)^(-2/3) #m/h
-  
-  gas$KO2_1.day<-(gas$kO2_m.day/gas$depth)*24
-  gas$KCO2_1.day<-(gas$KCO2_m.day/gas$depth)*24
-  gas$k600_1.day<- (gas$k600_m.day/gas$depth)*24
-  
-  gas<-gas%>% select(day,ID,rep,CO2,CO2_enviro,depth,k600_1.day)
-
-
-  return(gas)
-}
-
-
-#compile Gas Dome####
 
 gasdome<-data.frame()
 file.names <- list.files(path="01_Raw_data/CampbellSci/GasDome",pattern=".csv", full.names=TRUE)
@@ -86,14 +43,59 @@ for(fil in file.names){
            ID = ifelse(as.character(ID) == "LittleFanning", "LF", as.character(ID)),
            ID = ifelse(as.character(ID) == "Otter", "OS", as.character(ID)))
   
-  gas<-GasDome(site, stream)
-  gasdome<-rbind(gasdome,gas)
+  gasdome<-rbind(gasdome,site)
 }
 
-k600 <- gasdome%>%
-  distinct(k600_1.day,ID,day, .keep_all = T)
+gas.reps<-gasdome%>%mutate(day=as.Date(Date), hour=hour(Date))
 
-k600<-k600 %>% rename(Date=day)%>%select(Date,depth,ID,k600_1.day)
+gas.stream<-left_join(gas.reps,stream, by=c('ID', 'day', 'hour'), relationship = "many-to-many")
+  
+gas<-gas.stream%>%
+  group_by(ID, day)%>%
+  mutate(Temp_C=fahrenheit.to.celsius(mean(Temp, na.rm=T)))%>%
+  mutate(Temp_K=Temp_C+273.15,SchmidtO2hi=1568-86.04*Temp_C+2.142*Temp_C^2-0.0216*Temp_C^3,
+           SchmidtCO2hi=1742-91.24*Temp_C+2.208*Temp_C^2-0.0219*Temp_C^3)
+  
+
+gas<-gas %>%
+    mutate(pCO2_water=CO2_enviro/1000000,
+           pCO2_air=max(CO2, na.rm=T)/1000000, 
+           sec=second(Date),
+           sec_cumulative=cumsum(sec))
+
+
+diffuse <- gas %>%
+  group_by(ID, day) %>%
+  summarise(
+    slope = lm(CO2 ~ sec_cumulative)$coefficients[2],  # slope (ppm/sec)
+    .groups = "drop"
+  )
+
+
+gas.slope<-left_join(diffuse,gas, by=c('ID', 'day'))%>%
+  distinct(ID, day, rep, .keep_all = T)%>%
+  mutate(
+    deltaCO2_atm=abs(slope)/1000000, #change in CO2 during float
+    n=(deltaCO2_atm*15.466)/0.085/Temp_K,
+    FCO2=(n/domeFoot_m2)*60*60, #mol/m^2/h
+    KH=0.034*exp(2400*((1/ Temp_K)-(1/298.15))),
+    KH_1000=KH*1000,#mol/m^3/atm
+
+    KCO2_m.day= FCO2/ KH_1000/( pCO2_air- pCO2_water),#m/h
+    kO2_m.day= KCO2_m.day*( SchmidtCO2hi/ SchmidtO2hi)^(-2/3),#m/h
+    k600_m.day=  KCO2_m.day*(600/ SchmidtCO2hi)^(-2/3), #m/h
+
+    KO2_1.day=(kO2_m.day/ depth)*24,
+    KCO2_1.day= (KCO2_m.day/depth)*24,
+    k600_1.day=(k600_m.day/depth)*24)%>% 
+  select(day,ID,rep,CO2,CO2_enviro,depth,k600_1.day)%>% 
+  rename(Date=day)
+
+ggplot(gas.slope%>%filter(ID=='AM'), aes(x = depth)) +
+  geom_point(aes(y = k600_1.day))+
+  facet_wrap(~ID, scales='free')
+
 
 split<-k600 %>% split(k600$ID)
 write.xlsx(split, file = '04_Outputs/rC_k600.xlsx')
+

@@ -47,7 +47,7 @@ depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
     .groups = "drop"
   )
 
-#all.met<-
+all.met<-
 full_join(onestation, two)%>%
   left_join(depth)%>%
   mutate(
@@ -60,23 +60,22 @@ full_join(onestation, two)%>%
     GPP=if_else(ID=='GB'& Date>='2022-09-09' & Date<='2022-10-08' & GPP< 1, NA, GPP),
     GPP=if_else(ID=='LF'& Date>='2023-11-30' & Date<='2023-12-05' & GPP< 1, NA, GPP),
     GPP=if_else(ID=='OS'& Date=='2024-03-19' & GPP< 1, NA, GPP),
-    
-    )%>%
-  filter(
-    depth<1,
-    ID=='LF'
-    )%>%
-  ggplot(aes(x = depth)) +
-  geom_point(aes(y = ER2, color='ER2'),) +
-  geom_point(aes(y = ER1, color='ER1'), shape=1) +
-  geom_hline(yintercept = 15)+
-  ggtitle('ER')+
-  facet_wrap(~ID, scales = "free") +
-  theme_minimal()
+    )#%>%
+  # filter(
+  #   #ID=='LF',
+  #   depth<1,
+  #   )%>%
+  # ggplot(aes(x = depth)) +
+  # geom_point(aes(y = GPP2, color='GPP2'),) +
+  # geom_point(aes(y = GPP1, color='GPP1'), shape=1) +
+  # geom_hline(yintercept = 15)+
+  # ggtitle('GPP')+
+  # facet_wrap(~ID, scales = "free") +
+  # theme_minimal()
 
 
 ##########
-#write_csv(all.met, "04_Outputs/master.metabolism.csv")
+write_csv(all.met, "04_Outputs/master.metabolism.csv")
 
 all.met%>%
   filter(depth<1)%>%
@@ -89,22 +88,12 @@ all.met%>%
 
 
 
-
-
-
 all.met%>%
-  ggplot(aes(x = Date)) +
+  ggplot(aes(x = depth)) +
   
   geom_point(aes(y = ER2, color='ER2'), color='black') +
-  geom_point(aes(y = ER1, color='ER1', color='gray'), shape=1) +
-  geom_point(aes(y = ER, color='ER2'), color='darkred') +
-
-  geom_point(aes(y = GPP2, color='GPP2'), color='black') +
-  geom_point(aes(y = GPP1, color='GPP1', color='gray'), shape=1) +
-  geom_point(aes(y = GPP, color='GPP'), color='darkgreen') +
-  
-  geom_point(aes(y = GPP+ER, color='NEP'), color='purple') +
-  
+  geom_point(aes(y = ER1, color='ER1'), color='gray') +
+  geom_point(aes(y = ER, color='ER'), color='darkred', shape=1) +
   
   ggtitle('NEP')+
   facet_wrap(~ID, scales = "free") +
@@ -115,6 +104,16 @@ all.met%>%
 
 
 
+all.met%>%
+  ggplot(aes(x = depth)) +
+  
+  geom_point(aes(y = GPP2, color='GPP2'), color='black') +
+  geom_point(aes(y = GPP1, color='GPP1'), color='gray') +
+  geom_point(aes(y = GPP, color='GPP'), color='darkgreen') +
+  
+  ggtitle('NEP')+
+  facet_wrap(~ID, scales = "free") +
+  theme_minimal()
 
 
 

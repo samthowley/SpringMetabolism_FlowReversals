@@ -115,54 +115,20 @@ for(i in 1:nrow(stage)) {if(stage$ID[i]=='OS') {
 
   else {stage$depth[i]<- NULL }}
 
-stage<-stage%>%
+stage.m<-stage%>%
   mutate(
     depth=if_else(ID=='ID', depth+0.7, depth),
-    depth=if_else(ID=='LF', depth-0.65, depth)
+    depth=if_else(ID=='LF', depth-0.65, depth),
+    depth=if_else(ID=='AM', depth-0.4, depth)
   )
 
-
-
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.03, min_rows = 5) {
-  y_name <- rlang::as_name(rlang::enquo(y_var))
-  x_name <- rlang::as_name(rlang::enquo(x_var))
-  g_name <- rlang::as_name(rlang::enquo(group_var))
-  
-  split_list <- split(df, df[[g_name]])
-  
-  lapply(split_list, function(.x) {
-    # Remove NAs pairwise for this group/var
-    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
-    .x_clean <- .x[complete_cases, ]
-    
-    if (nrow(.x_clean) < min_rows) {
-      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
-      return(NULL)
-    }
-    
-    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
-    
-    # Predict on full original rows (fills NA with NA)
-    .x %>%
-      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
-  }) %>%
-    compact() %>%
-    bind_rows()
-}
-stage<-stage%>%
-  group_by(ID) %>%
-  mutate(
-    t = as.numeric(Date - min(Date))) %>%
-  ungroup()
-
-stage.smooth<-fit_loess_by_group(stage, depth, t, ID)
-
-ggplot(stage.smooth%>%filter(ID=='AM'), aes(x = Date)) +
-  geom_point(aes(y = depth), shape=1)+
-  geom_point(aes(y = depth_loess), shape=1, color='blue')+
+ggplot(stage.m%>%filter(ID=='LF'), aes(x = Date)) +
+  geom_point(aes(y = depth))+
   facet_wrap(~ID, scales='free')+
   theme_minimal()
 
+write_csv(stage.m, 
+          "02_Clean_data/Chem/raw.depth.csv")
 
 ###Interpolation###depth###Interpolation####
 
@@ -286,19 +252,59 @@ stage.edit<-stage %>%
     depth=if_else(is.na(depth), elevation, depth)
   )%>%
 distinct(Date, ID, depth)
+
+
+
+
+fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.01, min_rows = 5) {
+  y_name <- rlang::as_name(rlang::enquo(y_var))
+  x_name <- rlang::as_name(rlang::enquo(x_var))
+  g_name <- rlang::as_name(rlang::enquo(group_var))
   
+  split_list <- split(df, df[[g_name]])
+  
+  lapply(split_list, function(.x) {
+    # Remove NAs pairwise for this group/var
+    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
+    .x_clean <- .x[complete_cases, ]
+    
+    if (nrow(.x_clean) < min_rows) {
+      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
+      return(NULL)
+    }
+    
+    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
+    
+    # Predict on full original rows (fills NA with NA)
+    .x %>%
+      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
+  }) %>%
+    compact() %>%
+    bind_rows()
+}
 
-stage.edit%>%
-  filter(
-    ID=='ID',
-  )%>%
-  ggplot(aes(x = Date, y = depth)) +
-  #geom_point(aes(y=(elevation/7)-0.3), color='pink')+
-  geom_point()+
-  facet_wrap(~ID, scales='free')
+stage.edit<-stage.edit%>%
+  group_by(ID) %>%
+  mutate(
+    t = as.numeric(Date - min(Date))) %>%
+  ungroup()
+
+stage.smooth<-fit_loess_by_group(stage.edit, depth, t, ID)
+
+ggplot(stage.smooth, aes(x = Date)) +
+  geom_point(aes(y = depth))+
+  geom_point(aes(y = depth_loess),color='blue', alpha=0.1)+
+  facet_wrap(~ID, scales='free')+
+  theme_minimal()
 
 
-write_csv(stage.edit, "02_Clean_data/Chem/depth.csv")
+write_csv(stage.smooth%>%
+            select(ID, Date, depth_loess)%>%
+            rename(depth=depth_loess)%>%
+            mutate(
+            )
+          , 
+          "02_Clean_data/Chem/depth.csv")
 
   
 
