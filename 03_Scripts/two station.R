@@ -36,7 +36,7 @@ discharge<-master%>%
   mutate(
     discharge=w*depth*velocity*86400)
 
-prepped.for.one<-discharge%>% select(ID, Date, DO, discharge, depth, Temp)
+#prepped.for.one<-discharge%>% select(ID, Date, DO, discharge, depth, Temp)
 #write_csv(prepped.for.one, "01_Raw_data/prepped.for.one.station.csv")
 
 # discharge<-discharge%>%select(Date, ID, discharge)
@@ -57,16 +57,6 @@ DO.deficit<-change.DO.flux%>%  mutate(
 
 #4. K rearation###make K changes############
 
-edit.K<-DO.deficit%>%
-  mutate(
-    K600_1.d_daily=if_else(ID=='AM', K600_1.d_daily+4, K600_1.d_daily),
-    K600_1.d_daily=if_else(ID=='AM' & K600_1.d_daily<15 , 15, K600_1.d_daily),
-    K600_1.d_daily=if_else(ID=='GB' & K600_1.d_daily<16 , 16, K600_1.d_daily),
-    K600_1.d_daily=if_else(ID=='GB' & K600_1.d_daily>23 , 23, K600_1.d_daily),
-    K600_1.d_daily=if_else(ID=='LF' & K600_1.d_daily>51 , 62, K600_1.d_daily),
-    )
-
-
 K.rearation<-DO.deficit%>%
   mutate(K.flux=(K600_1.d_daily)*depth*DO.deficit.from.sat)
 
@@ -86,17 +76,25 @@ air.water.xchange<-K.rearation%>%
 
 #5.5 filter: estimating reach#####
 
-active.reach <- air.water.xchange %>% 
+active.reach <- 
+  air.water.xchange %>% 
   mutate(reach.km=( (velocity*86400) /K600_1.d_daily)/10^3,
          reach.test=if_else(reach.km>3*km, 'above', 'passes'),
          reach.test=if_else(reach.km<0.4*km, 'below', reach.test),
          reach.test=if_else(velocity<0, 'below', reach.test)
   )%>%
-  filter(reach.test=='passes')%>%
+  filter(reach.test %in% c('passes', 'above'))%>%
   mutate(date = as_date(Date)) %>%  # extract calendar day
   group_by(date) %>%
   filter(n() >= 20) %>%                 # keep only days with ≥ 20 hours
   ungroup()%>%select(-date)
+
+# %>%
+#   ggplot(aes(x = Date)) +
+#   geom_point(aes(y = depth, color=reach.test))+
+#   #scale_color_viridis_c(name = "K600") +
+#   facet_wrap(~ID, scales='free')
+
 
 #6.parse day from night####
 lat.lon <- data.frame(
@@ -127,13 +125,17 @@ NEP<-left_join(GPP, ER)
 
 
 #8. Create datasets####
-# write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34),
-#           "04_Outputs/two.station.results.csv")
+
+write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34),
+          "04_Outputs/two.station.results.csv")
+
 
 left_join(day.parse, NEP)%>%
-  # filter(ID=='AM',
-  #        #depth<0.35
-  #        )%>%
+  filter(
+    #ID=='LF',
+         reach.test %in% c('passes', 'above'),
+         GPP<=34, ER>= -34
+         )%>%
   ggplot(aes(x = Date)) +
   geom_point(aes(y = GPP, color=K600_1.d_daily))+
   geom_point(aes(y = ER, color=K600_1.d_daily))+
@@ -144,8 +146,9 @@ left_join(day.parse, NEP)%>%
   scale_color_viridis_c(name = "K600") +
   facet_wrap(~ID, scales='free')
 
-ggplotly(
-)
+# library(plotly)
+# ggplotly(
+# )
 
 
 #write_csv(left_join(day.parse, NEP)%>%filter(ID=='LF'), "test.csv")

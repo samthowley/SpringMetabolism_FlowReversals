@@ -15,59 +15,6 @@ theme_set(theme(    strip.text = element_text(size = 12),
                     axis.line.y = element_line(size = 0.5, linetype = "solid", colour = "gray")))
 
 
-#rating curve#####
-
-sheet_names <- excel_sheets("04_Outputs/rC_K600_edited.xlsx")
-
-list_of_ks <- list()
-for (sheet in sheet_names) {
-  df <- read_excel("04_Outputs/rC_K600_edited.xlsx", sheet = sheet)
-  list_of_ks[[sheet]] <- df
-}
-
-k600s.raw <- bind_rows(list_of_ks, .id = "ID")%>%
-  distinct(k600_1.day, .keep_all = T)%>% filter(ID != 'Vent DO')%>%
-  mutate(Date=mdy(Date))
-
-rC <- lmList(k600_1.day ~ depth | ID, data=k600s.raw)
-(cf <- coef(rC))
-
-depth <- read_csv("02_Clean_data/Chem/depth.csv")
-u <- read_csv("02_Clean_data/Chem/velocity.csv")%>%
-  mutate(Date=as.Date(Date))%>%rename(velocity.interpolated=velocity)
-
-k600s<-
-  depth%>%mutate(
-  k600_1d=case_when(
-    ID=='AM'~depth*cf[1,2]+cf[1,1],
-    ID=='GB'~depth*cf[2,2]+cf[2,1],
-    ID=='ID'~depth*cf[3,2]+cf[3,1],
-    ID=='LF'~depth*cf[4,2]+cf[4,1],
-    ID=='OS'~depth*cf[5,2]+cf[5,1]
-  )
-)
-  
-K600.daily<-k600s%>%mutate(Date=as.Date(Date))%>%
-  group_by(ID, Date)%>%
-  summarise(
-    K600_1.d_daily=mean(k600_1d, na.rm=T))%>%
-  ungroup()
-
-
-k600s%>%filter(ID=='LF')%>%
-  mutate(Date=as.Date(Date))%>%
-  group_by(ID, Date)%>%
-  mutate(
-    K600_1.d_daily=mean(k600_1d, na.rm=T))%>%
-  ggplot(aes(x=Date, y=K600_1.d_daily))+geom_point()
-
-
-
-Work<-K600.daily%>%
-  mutate(Date=paste(Date, "00:00:00"))
-
-write_csv(Work, "02_Clean_data/Chem/K600.csv")
-
 # trying the power function#############
 sheet_names <- excel_sheets("04_Outputs/rC_K600.xlsx")
 list_of_ks <- list()
@@ -78,19 +25,20 @@ for (sheet in sheet_names) {
 
 
 k600s.raw <- bind_rows(list_of_ks, .id = "ID") %>%
-  mutate(Date = mdy(Date))
+  mutate(Date = mdy(Date),
+         k600_1.day=if_else(ID=='AM', depth< 1, NA))
 
-power_sites <- c("AM", "LF", 'ID')  # Specify your linear sites
-linear_sites <- c("GB")   # Specify your power sites
+#power_sites <- c("AM", "LF")  # Specify your linear sites
+linear_sites <- c("GB", "ID", "AM", "LF")   # Specify your power sites
 
 linear_data <- k600s.raw %>% filter(ID %in% linear_sites)
 rC_linear <- lmList(k600_1.day ~ depth | ID, data = linear_data)
 cf_linear <- coef(rC_linear)
 
-power_data <- k600s.raw %>% 
-  filter(ID %in% power_sites, k600_1.day > 0, depth > 0)  # Remove zeros/negatives for log
-rC_power <- lmList(log(k600_1.day) ~ log(depth) | ID, data = power_data)
-cf_power <- coef(rC_power)
+# power_data <- k600s.raw %>% 
+#   filter(ID %in% power_sites, k600_1.day > 0, depth > 0)  # Remove zeros/negatives for log
+# rC_power <- lmList(log(k600_1.day) ~ log(depth) | ID, data = power_data)
+# cf_power <- coef(rC_power)
 
 # Apply the appropriate model to each site
 depth <- read_csv("02_Clean_data/Chem/depth.csv")
@@ -100,12 +48,14 @@ k600s <- depth %>%
     k600_1d = case_when(
       # Linear relationships: k600 = a + b*depth
       ID == "GB" ~ depth * cf_linear["GB", "depth"] + cf_linear["GB", "(Intercept)"],
+      ID == "ID" ~ depth * cf_linear["ID", "depth"] + cf_linear["ID", "(Intercept)"],
+      ID == "AM" ~ depth * cf_linear["AM", "depth"] + cf_linear["AM", "(Intercept)"],
+      ID == "LF" ~ depth * cf_linear["LF", "depth"] + cf_linear["LF", "(Intercept)"],
       
       # Power relationships: k600 = a * depth^b (from log(k600) = log(a) + b*log(depth))
-      ID == "AM" ~ exp(cf_power["AM", "(Intercept)"]) * depth^cf_power["AM", "log(depth)"],
-      ID == "LF" ~ exp(cf_power["LF", "(Intercept)"]) * depth^cf_power["LF", "log(depth)"],
-      ID == "ID" ~ exp(cf_power["ID", "(Intercept)"]) * depth^cf_power["ID", "log(depth)"],
-      
+      # ID == "AM" ~ exp(cf_power["AM", "(Intercept)"]) * depth^cf_power["AM", "log(depth)"],
+      # ID == "LF" ~ exp(cf_power["LF", "(Intercept)"]) * depth^cf_power["LF", "log(depth)"],
+
       # Keep the linear model for OS if needed
       ID == "OS" ~ depth * cf_linear["OS", "depth"] + cf_linear["OS", "(Intercept)"]
     )
@@ -115,17 +65,25 @@ k600s <- depth %>%
 K600.daily <- k600s %>%
   mutate(Date = as.Date(Date)) %>%
   group_by(ID, Date) %>%
-  summarise(K600_1.d_daily = mean(k600_1d, na.rm = T), .groups = "drop")
+  summarise(K600_1.d_daily = max(k600_1d, na.rm = T), .groups = "drop")%>%
+  mutate(
+    # K600_1.d_daily=if_else(ID=='LF', 6.4, K600_1.d_daily),
+    # K600_1.d_daily=if_else(ID=='AM', 15.7, K600_1.d_daily),
+    # K600_1.d_daily=if_else(ID=='GB', 9.2, K600_1.d_daily),
+    # K600_1.d_daily=if_else(ID=='ID', 4.45, K600_1.d_daily),
+         )
+
+ggplot(K600.daily, aes(x = Date)) +
+  geom_point(aes(y = K600_1.d_daily))+
+  facet_wrap(~ID, scales='free')
 
 Work <- K600.daily %>%
   mutate(Date = ymd_hms(paste(Date, "00:00:00")))
 write_csv(Work, "02_Clean_data/Chem/K600.csv")
 
 
-ggplot(Work, aes(x = Date)) +
-  geom_point(aes(y = K600_1.d_daily))+
+ggplot(k600s.raw, aes(x = depth)) +
+  geom_point(aes(y = k600_1.day))+
   facet_wrap(~ID, scales='free')
-
-
 
 

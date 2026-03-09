@@ -1,3 +1,9 @@
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+library(weathermetrics)
+library(lme4)
+
 dome_length<-0.38
 dome_width<-0.22
 dome_height<-0.185
@@ -93,12 +99,12 @@ gas.slope<-left_join(diffuse,gas, by=c('ID', 'day', 'rep'))%>%
   distinct(ID, k600_1.day, .keep_all = T)
 
 
-gas.slope%>%
-  drop_na(depth)%>%
-  filter(ID=='LF')%>%
-ggplot(aes(x = depth)) +
-  geom_point(aes(y = k600_1.day))+
-  facet_wrap(~ID, scales='free')
+# gas.slope%>%
+#   drop_na(depth)%>%
+#   filter(ID=='GB')%>%
+# ggplot(aes(x = depth)) +
+#   geom_point(aes(y = k600_1.day))+
+#   facet_wrap(~ID, scales='free')
 
 
 split<-gas.slope %>% split(gas.slope$ID)

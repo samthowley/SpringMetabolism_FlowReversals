@@ -1,5 +1,7 @@
 library(plotly)
 
+
+######
 file.names <- list.files(path="04_Outputs/one station results", pattern=".csv", full.names=TRUE)
 onestation.df <- data.frame()
 for(fil in file.names){
@@ -13,12 +15,12 @@ onestation<-onestation.df%>%
          K6001=K600_daily_mean,
          Date=date)%>%
   separate(ID,into = c('ID', 'stage'),sep='_')%>%
-  mutate(GPP1=if_else(GPP1<0, 0, GPP1))%>%
-  select(-ER_Rhat, -K600_daily_Rhat,-stage)%>%
+  mutate(GPP1=if_else(GPP1<0, 0, GPP1),
+         model="1")%>%
+  #select(-ER_Rhat, -K600_daily_Rhat,-stage)%>%
   arrange(ID, Date)%>%
   drop_na()
 
-#check#######
 
 two<- read_csv("04_Outputs/two.station.results.csv")%>%
   mutate(Date=as.Date(Date))%>%
@@ -33,7 +35,8 @@ two<- read_csv("04_Outputs/two.station.results.csv")%>%
       ~ mean(.x, na.rm = TRUE)
     ),
     .groups = "drop"
-  )
+  )%>%mutate(model='2')
+
 
 
 depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
@@ -47,73 +50,60 @@ depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
     .groups = "drop"
   )
 
-all.met<-
-full_join(onestation, two)%>%
-  left_join(depth)%>%
-  mutate(
-    GPP = rowMeans(
-      select(., GPP1, GPP2),
-      na.rm = TRUE))%>%
-  mutate(
-    ER = rowMeans(
-      select(., ER1, ER2),na.rm = TRUE),
-    GPP=if_else(ID=='GB'& Date>='2022-09-09' & Date<='2022-10-08' & GPP< 1, NA, GPP),
-    GPP=if_else(ID=='LF'& Date>='2023-11-30' & Date<='2023-12-05' & GPP< 1, NA, GPP),
-    GPP=if_else(ID=='OS'& Date=='2024-03-19' & GPP< 1, NA, GPP),
-    )#%>%
-  # filter(
-  #   #ID=='LF',
-  #   depth<1,
-  #   )%>%
-  # ggplot(aes(x = depth)) +
-  # geom_point(aes(y = GPP2, color='GPP2'),) +
-  # geom_point(aes(y = GPP1, color='GPP1'), shape=1) +
-  # geom_hline(yintercept = 15)+
-  # ggtitle('GPP')+
-  # facet_wrap(~ID, scales = "free") +
-  # theme_minimal()
+
+  all.met <- onestation %>%
+    full_join(two, by = c("Date", "ID"), suffix = c("_onestation", "_two")) %>%
+    mutate(
+      # Prioritize "two" over "onestation"
+      GPP = coalesce(GPP2, GPP1),
+      ER = coalesce(ER2, ER1),
+      
+      # Track which dataset was used
+      source = case_when(
+        !is.na(GPP2) ~ "two",
+        !is.na(GPP1) ~ "one", 
+        TRUE ~ "neither"
+      )
+    ) %>%
+    arrange(ID, Date)%>%
+    left_join(depth)
 
 
-##########
-write_csv(all.met, "04_Outputs/master.metabolism.csv")
-
-all.met%>%
-  filter(depth<1)%>%
-  ggplot(aes(x = depth)) +
-    geom_point(aes(y = GPP2, color='GPP2'),) +
-    geom_point(aes(y = GPP1, color='GPP1'), shape=1) +
-  ggtitle('GPP')+
+  all.met%>%
+    ggplot(aes(x = depth, color=source)) +
+    geom_point(aes(y = GPP, shape='GPP'),) +
+    geom_point(aes(y = ER, shape='ER'), shape=1) +
+    ggtitle('Two Station: Subset')+
     facet_wrap(~ID, scales = "free") +
     theme_minimal()
+  
+  #######
+   write_csv(all.met, "04_Outputs/master.metabolism.csv")
 
-
+plot_grid(
+all.met%>%
+  ggplot(aes(x = depth)) +
+    geom_point(aes(y = GPP1, color='GPP1')) +
+    geom_point(aes(y = ER1, color='ER1'), shape=1) +
+  ggtitle('One Station')+
+    facet_wrap(~ID, scales = "free") +
+    theme_minimal()
+,
 
 all.met%>%
   ggplot(aes(x = depth)) +
-  
-  geom_point(aes(y = ER2, color='ER2'), color='black') +
-  geom_point(aes(y = ER1, color='ER1'), color='gray') +
-  geom_point(aes(y = ER, color='ER'), color='darkred', shape=1) +
-  
-  ggtitle('NEP')+
+  geom_point(aes(y = GPP2, color='GPP2'),) +
+  geom_point(aes(y = ER2, color='ER2'), shape=1) +
+  geom_smooth(aes(y = GPP2), method = 'loess', se=F)+
+  geom_smooth(aes(y = ER2), method = 'loess', se=F)+
+  ggtitle('Two Station')+
   facet_wrap(~ID, scales = "free") +
-  theme_minimal()
+  theme_minimal(),
+nrow=1
+)
 
 
 
-
-
-
-all.met%>%
-  ggplot(aes(x = depth)) +
-  
-  geom_point(aes(y = GPP2, color='GPP2'), color='black') +
-  geom_point(aes(y = GPP1, color='GPP1'), color='gray') +
-  geom_point(aes(y = GPP, color='GPP'), color='darkgreen') +
-  
-  ggtitle('NEP')+
-  facet_wrap(~ID, scales = "free") +
-  theme_minimal()
 
 
 
