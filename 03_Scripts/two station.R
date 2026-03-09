@@ -15,7 +15,7 @@ area<-left_join(width, length)%>% mutate(area=w*m)%>%
 
 
 (file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
-file.names<-file.names[c(2,4,6,11)]
+file.names<-file.names[c(2,4,6,12)]
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
 
 master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
@@ -29,10 +29,7 @@ full_join(master, VentDO, by=c('ID', 'Date'))%>%
   group_by(ID)%>%
   fill(VentDO, VentTemp, K600_1.d_daily, .direction= "downup")%>%
   filter(!ID %in% c('OS', 'IU'))%>%
-  distinct(ID, Date, .keep_all = T)%>%
-  mutate(
-    depth=if_else(ID=='AM', depth-0.5, depth)
-    )
+  distinct(ID, Date, .keep_all = T)
 
 #1. interpolate Q####
 discharge<-master%>%
@@ -40,7 +37,7 @@ discharge<-master%>%
     discharge=w*depth*velocity*86400)
 
 prepped.for.one<-discharge%>% select(ID, Date, DO, discharge, depth, Temp)
-write_csv(prepped.for.one, "01_Raw_data/prepped.for.one.station.csv")
+#write_csv(prepped.for.one, "01_Raw_data/prepped.for.one.station.csv")
 
 # discharge<-discharge%>%select(Date, ID, discharge)
 # write_csv(discharge, "02_Clean_data/Chem/discharge.csv")
@@ -70,7 +67,7 @@ edit.K<-DO.deficit%>%
     )
 
 
-K.rearation<-edit.K%>%
+K.rearation<-DO.deficit%>%
   mutate(K.flux=(K600_1.d_daily)*depth*DO.deficit.from.sat)
 
 #5. air-water gas exchange####
@@ -78,6 +75,15 @@ air.water.xchange<-K.rearation%>%
   mutate(
     not.air.water.xchange=change.DO.flux-K.flux
     )
+
+# ggplot(air.water.xchange%>%filter(ID=='LF'),
+#        aes(x = Date, y = depth)) +
+#   geom_line()+
+#   geom_hline(yintercept = 0)+
+#   facet_wrap(~ID, scales='free')
+# 
+# ggplotly()
+
 #5.5 filter: estimating reach#####
 
 active.reach <- air.water.xchange %>% 
@@ -91,13 +97,6 @@ active.reach <- air.water.xchange %>%
   group_by(date) %>%
   filter(n() >= 20) %>%                 # keep only days with ≥ 20 hours
   ungroup()%>%select(-date)
-
-# ggplot(active.reach%>%filter(ID=='LF'), 
-#        aes(x = Date, y = depth, color=reach.test)) +
-#   geom_line()+
-#   geom_hline(yintercept = 0)+
-#   facet_wrap(~ID, scales='free')
-
 
 #6.parse day from night####
 lat.lon <- data.frame(
@@ -128,15 +127,15 @@ NEP<-left_join(GPP, ER)
 
 
 #8. Create datasets####
-write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34),
-          "04_Outputs/two.station.results.csv")
+# write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34),
+#           "04_Outputs/two.station.results.csv")
 
 left_join(day.parse, NEP)%>%
-  filter(ID=='LF',
-         #depth<0.35
-         )%>%
-  ggplot(aes(x = depth)) +
-  #geom_point(aes(y = GPP, color=K600_1.d_daily))+
+  # filter(ID=='AM',
+  #        #depth<0.35
+  #        )%>%
+  ggplot(aes(x = Date)) +
+  geom_point(aes(y = GPP, color=K600_1.d_daily))+
   geom_point(aes(y = ER, color=K600_1.d_daily))+
   scale_color_viridis_b()+
   geom_hline(yintercept = 34)+

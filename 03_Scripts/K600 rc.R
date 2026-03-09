@@ -78,11 +78,10 @@ for (sheet in sheet_names) {
 
 
 k600s.raw <- bind_rows(list_of_ks, .id = "ID") %>%
-  distinct(k600_1.day, .keep_all = T) %>% 
   mutate(Date = mdy(Date))
 
-power_sites <- c("AM", "LF")  # Specify your linear sites
-linear_sites <- c("ID", "GB")   # Specify your power sites
+power_sites <- c("AM", "LF", 'ID')  # Specify your linear sites
+linear_sites <- c("GB")   # Specify your power sites
 
 linear_data <- k600s.raw %>% filter(ID %in% linear_sites)
 rC_linear <- lmList(k600_1.day ~ depth | ID, data = linear_data)
@@ -100,12 +99,12 @@ k600s <- depth %>%
   mutate(
     k600_1d = case_when(
       # Linear relationships: k600 = a + b*depth
-      ID == "ID" ~ depth * cf_linear["ID", "depth"] + cf_linear["ID", "(Intercept)"],
       ID == "GB" ~ depth * cf_linear["GB", "depth"] + cf_linear["GB", "(Intercept)"],
       
       # Power relationships: k600 = a * depth^b (from log(k600) = log(a) + b*log(depth))
       ID == "AM" ~ exp(cf_power["AM", "(Intercept)"]) * depth^cf_power["AM", "log(depth)"],
       ID == "LF" ~ exp(cf_power["LF", "(Intercept)"]) * depth^cf_power["LF", "log(depth)"],
+      ID == "ID" ~ exp(cf_power["ID", "(Intercept)"]) * depth^cf_power["ID", "log(depth)"],
       
       # Keep the linear model for OS if needed
       ID == "OS" ~ depth * cf_linear["OS", "depth"] + cf_linear["OS", "(Intercept)"]
