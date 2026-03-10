@@ -96,7 +96,8 @@ gas.slope<-left_join(diffuse,gas, by=c('ID', 'day', 'rep'))%>%
     k600_1.day=(k600_m.day/depth)*24)%>% 
   select(day,ID,rep,Temp_C,CO2,CO2_enviro,depth,k600_1.day,KCO2_m.day)%>% 
   rename(Date=day)%>%
-  distinct(ID, k600_1.day, .keep_all = T)
+  distinct(ID, k600_1.day, .keep_all = T)%>%
+  arrange(ID, depth)
 
 
 # gas.slope%>%
@@ -108,5 +109,5 @@ gas.slope<-left_join(diffuse,gas, by=c('ID', 'day', 'rep'))%>%
 
 
 split<-gas.slope %>% split(gas.slope$ID)
-write.xlsx(split, file = '04_Outputs/rC_k6001.xlsx')
+write.xlsx(split, file = '04_Outputs/rC_k600_subset.xlsx')
 

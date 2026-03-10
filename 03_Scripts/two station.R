@@ -132,7 +132,7 @@ write_csv(left_join(day.parse, NEP)%>% filter(GPP<=34, ER>= -34),
 
 left_join(day.parse, NEP)%>%
   filter(
-    #ID=='LF',
+    #ID=='AM',
          reach.test %in% c('passes', 'above'),
          GPP<=34, ER>= -34
          )%>%
