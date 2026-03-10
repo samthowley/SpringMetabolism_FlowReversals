@@ -108,5 +108,5 @@ gas.slope<-left_join(diffuse,gas, by=c('ID', 'day', 'rep'))%>%
 
 
 split<-gas.slope %>% split(gas.slope$ID)
-write.xlsx(split, file = '04_Outputs/rC_k600.xlsx')
+write.xlsx(split, file = '04_Outputs/rC_k6001.xlsx')
 

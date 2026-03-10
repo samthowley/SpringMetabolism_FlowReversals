@@ -73,7 +73,7 @@ depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
     ggplot(aes(x = depth, color=source)) +
     geom_point(aes(y = GPP, shape='GPP'),) +
     geom_point(aes(y = ER, shape='ER'), shape=1) +
-    ggtitle('Two Station: Subset')+
+    ggtitle('Two Station: Linear RC')+
     facet_wrap(~ID, scales = "free") +
     theme_minimal()
   

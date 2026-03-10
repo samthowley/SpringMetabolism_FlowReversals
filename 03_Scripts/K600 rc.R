@@ -19,26 +19,27 @@ theme_set(theme(    strip.text = element_text(size = 12),
 sheet_names <- excel_sheets("04_Outputs/rC_K600.xlsx")
 list_of_ks <- list()
 for (sheet in sheet_names) {
-  df <- read_excel("04_Outputs/rC_K600.xlsx", sheet = sheet)
+  df <- read_excel("04_Outputs/rC_K6001.xlsx", sheet = sheet)
   list_of_ks[[sheet]] <- df
 }
 
 
 k600s.raw <- bind_rows(list_of_ks, .id = "ID") %>%
   mutate(Date = mdy(Date),
-         k600_1.day=if_else(ID=='AM', depth< 1, NA))
+         )
 
-#power_sites <- c("AM", "LF")  # Specify your linear sites
-linear_sites <- c("GB", "ID", "AM", "LF")   # Specify your power sites
+power_sites <- c("AM", "LF")  # Specify your linear sites
+linear_sites <- c("GB", "ID")   # Specify your power sites
+#, "AM", "LF"
 
 linear_data <- k600s.raw %>% filter(ID %in% linear_sites)
 rC_linear <- lmList(k600_1.day ~ depth | ID, data = linear_data)
 cf_linear <- coef(rC_linear)
 
-# power_data <- k600s.raw %>% 
-#   filter(ID %in% power_sites, k600_1.day > 0, depth > 0)  # Remove zeros/negatives for log
-# rC_power <- lmList(log(k600_1.day) ~ log(depth) | ID, data = power_data)
-# cf_power <- coef(rC_power)
+power_data <- k600s.raw %>%
+  filter(ID %in% power_sites, k600_1.day > 0, depth > 0)  # Remove zeros/negatives for log
+rC_power <- lmList(log(k600_1.day) ~ log(depth) | ID, data = power_data)
+cf_power <- coef(rC_power)
 
 # Apply the appropriate model to each site
 depth <- read_csv("02_Clean_data/Chem/depth.csv")
@@ -49,12 +50,12 @@ k600s <- depth %>%
       # Linear relationships: k600 = a + b*depth
       ID == "GB" ~ depth * cf_linear["GB", "depth"] + cf_linear["GB", "(Intercept)"],
       ID == "ID" ~ depth * cf_linear["ID", "depth"] + cf_linear["ID", "(Intercept)"],
-      ID == "AM" ~ depth * cf_linear["AM", "depth"] + cf_linear["AM", "(Intercept)"],
-      ID == "LF" ~ depth * cf_linear["LF", "depth"] + cf_linear["LF", "(Intercept)"],
+      # ID == "AM" ~ depth * cf_linear["AM", "depth"] + cf_linear["AM", "(Intercept)"],
+      # ID == "LF" ~ depth * cf_linear["LF", "depth"] + cf_linear["LF", "(Intercept)"],
       
       # Power relationships: k600 = a * depth^b (from log(k600) = log(a) + b*log(depth))
-      # ID == "AM" ~ exp(cf_power["AM", "(Intercept)"]) * depth^cf_power["AM", "log(depth)"],
-      # ID == "LF" ~ exp(cf_power["LF", "(Intercept)"]) * depth^cf_power["LF", "log(depth)"],
+      ID == "AM" ~ exp(cf_power["AM", "(Intercept)"]) * depth^cf_power["AM", "log(depth)"],
+      ID == "LF" ~ exp(cf_power["LF", "(Intercept)"]) * depth^cf_power["LF", "log(depth)"],
 
       # Keep the linear model for OS if needed
       ID == "OS" ~ depth * cf_linear["OS", "depth"] + cf_linear["OS", "(Intercept)"]
