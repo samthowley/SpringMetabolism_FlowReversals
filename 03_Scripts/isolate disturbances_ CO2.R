@@ -89,7 +89,8 @@ flood.impacts.CO2<-
   full_join(recession.lm,CO2.duration)%>%
   full_join(rise.lm, by=c('ID', 'flood'))%>%
   full_join(CO2.max, by=c('ID', 'flood'))%>%
-  full_join(CO2.base, by=c('ID', 'flood'))
+  full_join(CO2.base, by=c('ID', 'flood'))%>%
+  mutate(variable='CO2')
 
 write_csv(flood.impacts.CO2, "04_Outputs/flood impacts/CO2.csv")
 

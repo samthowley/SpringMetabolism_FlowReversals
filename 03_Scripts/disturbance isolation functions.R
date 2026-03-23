@@ -10,6 +10,8 @@ library(lme4)
 library(zoo)
 library(strucchange)
 
+floods <- read_csv("01_Raw_data/flood.periods.csv")
+
 
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.4, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))

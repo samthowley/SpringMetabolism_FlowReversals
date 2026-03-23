@@ -4,7 +4,7 @@
 source("03_Scripts/disturbance isolation functions.R")
 
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
-file.names<-file.names[c(1, 2, 4, 7, 10)]
+file.names<-file.names[c(2, 11, 7, 4, 1)]
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
 master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
   mutate(
@@ -45,7 +45,7 @@ slopes <- chem %>%
     date      = as.Date(Date),
     # 3-day index starting at the first date in your data
     day_index = as.integer(date - min(date)),
-    block3    = day_index %/% 4) %>%ungroup()%>%
+    block3    = day_index %/% 3) %>%ungroup()%>%
   group_by(block3, ID) %>%
   summarise(
     start_date = min(date),
@@ -126,6 +126,11 @@ stage_flagged <- master %>%
   arrange(ID, Date)
 
 
+ggplot(stage_flagged, aes(x=Date, y=depth, color=as.factor(flood)))+
+  geom_point()+
+  facet_wrap(~ID, scales='free')
+
+
 depth.base<-baseline(stage_flagged, depth)
 
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
@@ -157,11 +162,6 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
 depth.smooth<-smooth(stage_flagged, depth)
 
 depth.count<-count.max(depth.smooth, depth_loess)
-
-ggplot(depth.count%>%filter(ID=='LF'), aes(x=count, y=depth))+
-  geom_point()+
-  facet_wrap(~flood, scales='free')
-
 
 depth.max<-maximum(depth.count, depth)
 
@@ -267,10 +267,26 @@ floods.day <- read_csv("01_Raw_data/flood.periods.csv")%>%
     start=as.Date(start), end =as.Date(end)
   )
 
-one <- read_csv("04_Outputs/one.station.metabolism.csv")%>%
+SpC.avg<-SpC%>%
+  mutate(Date=as.Date(Date))%>%
+  group_by(Date, ID)%>%
+  mutate(SpC=mean(SpC, na.rm=T))
+
+metabolism <- read_csv("04_Outputs/master.metabolism.csv")%>%
   full_join(
-    floods.day, by = join_by(ID, between(date, start, end))
-  ) 
+    floods.day, by = join_by(ID, between(Date, start, end))
+  )%>%
+  left_join(SpC.avg)
+
+
+metabolism%>%
+  filter(ID=='AM')%>%
+  ggplot(aes(x=depth, y=ER, color=SpC))+
+  geom_point()+
+  scale_color_viridis_c()+
+  facet_wrap(~ID, scales='free')
+
+
   
 
 p1 <- stage_flagged %>%

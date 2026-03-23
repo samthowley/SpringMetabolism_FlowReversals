@@ -2,6 +2,7 @@ source("03_Scripts/disturbance isolation functions.R")
 
 DO <- read_csv("02_Clean_data/Chem/DO.csv")
 h <- read_csv("02_Clean_data/Chem/depth.csv")
+SpC <- read_csv("02_Clean_data/Chem/SpC.csv")
 
 DO<-full_join(DO, h)%>%
   filter(!is.na(Date), !is.na(DO))%>% 
@@ -11,7 +12,7 @@ DO<-full_join(DO, h)%>%
   group_by(ID, date)%>%
   mutate(
     DO.daily.min=min(DO, na.rm=T)
-  )
+  )%>%left_join(read_csv("02_Clean_data/Chem/SpC.csv"))
 
 floods <- read_csv("01_Raw_data/flood.periods.csv")
 
@@ -70,12 +71,40 @@ DO.prep<-prep.by.slope_decreases(DO.count, DO.daily.min)%>%
   drop_na(DO)
 
 
-DO.trim<-trim(DO.prep)
+class <- read_csv("04_Outputs/flood impacts/depth.csv")%>%select(ID, flood, class)
+  
+DO.trim<-trim(DO.prep)%>%left_join(class, by=c('ID', 'flood'))
 
-DO.trim%>% filter(ID=='AM')%>%
-  ggplot(aes(x=date, y=DO))+
-  geom_point()+
-  geom_smooth(method = lm, aes(group=stage, y=DO))+
+
+FR.class<-DO.trim%>% 
+  left_join(SpC)%>%
+  arrange(ID, Date)%>%
+  fill(SpC, .direction = 'down')%>%
+  filter(count>-7*24, count<7*24)%>%
+  mutate(
+    class=if_else(class=='RR' & SpC<200 & DO>4, "FR", class),
+    class=if_else(class=='RR', "BO", class)
+  )%>%
+    group_by(ID, flood) %>%
+    mutate(
+      max_height = which.max(replace(DO, is.na(DO), -Inf)), 
+      minimum = case_when(
+        row_number() == max_height ~ 0))%>%
+    filter(minimum==0)%>%
+  select(ID, flood, class)
+
+unique(FR.class$class)
+write_csv(FR.class, "04_Outputs/FR.class.csv")
+
+
+
+DO.trim%>% 
+  select(-class)%>%
+  left_join(FR.class)%>%
+  filter(ID=='OS')%>%
+  ggplot(aes(x=count, y=DO))+
+  geom_point(aes(color=class))+
+  #geom_smooth(method = lm, aes(group=stage, y=DO))+
   facet_wrap(~flood, scales='free')+
   theme(legend.position = "bottom")
 
@@ -92,17 +121,11 @@ flood.impacts.DO<-
   full_join(recession.lm,DO.duration)%>%
   full_join(rise.lm, by=c('ID', 'flood'))%>%
   full_join(DO.min, by=c('ID', 'flood'))%>%
-  full_join(DO.base, by=c('ID', 'flood'))
+  full_join(DO.base, by=c('ID', 'flood'))%>%
+  mutate(variable='DO')
 
 
-ggplot(flood.impacts.DO, aes(x=flood))+
-  geom_point(aes(y=base))+
-  geom_point(aes(y=minimum), color='red')+
-  geom_point(aes(y=rise.intercept), color='lightblue')+
-  geom_point(aes(y=recess.intercept), color='blue')
-
-
-write_csv(flood.impacts.DO, "04_Outputs/flood impacts/DO")
+write_csv(flood.impacts.DO, "04_Outputs/flood impacts/DO.csv")
 
 
 
