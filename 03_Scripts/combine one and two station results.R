@@ -125,5 +125,6 @@ depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
     theme_minimal()
 
 
-
+write_csv(all.met, "04_Outputs/master.metabolism.csv")
+  
 
