@@ -21,40 +21,124 @@ ER_flagged <- ER %>%
   select(-start, -end)%>%
   arrange(ID, Date)%>%
   filter(!is.na(ER))%>%
-  mutate(date=Date)
+  mutate(date=Date,
+         ER=if_else(Date>"2023-08-01" & ID=='AM' & flood==3, NA, ER))
 
 
 ER.base<-baseline(ER_flagged, ER)
 
 
+fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.5, min_rows = 5) {
+  y_name <- rlang::as_name(rlang::enquo(y_var))
+  x_name <- rlang::as_name(rlang::enquo(x_var))
+  g_name <- rlang::as_name(rlang::enquo(group_var))
+  
+  split_list <- split(df, df[[g_name]])
+  
+  lapply(split_list, function(.x) {
+    # Remove NAs pairwise for this group/var
+    complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
+    .x_clean <- .x[complete_cases, ]
+    
+    if (nrow(.x_clean) < min_rows) {
+      message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
+      return(NULL)
+    }
+    
+    fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
+    
+    # Predict on full original rows (fills NA with NA)
+    .x %>%
+      mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
+  }) %>%
+    compact() %>%
+    bind_rows()
+}
 ER.smooth<-smooth(ER_flagged, ER)
 
 
-all_out <- run_bp_all_sites(ER_flagged, site_col = ID, y = ER, x = depth, breaks = 2)
-brk.slopes<-all_out$segments%>%select(ID, seg_start, seg_end, slope)
-
-
-ER.impact <- ER.smooth %>%
-  left_join(
-    brk.slopes, by = join_by(ID, between(depth, seg_start, seg_end))
-  )%>%  
-  select(-seg_start, -seg_end)%>%
+ER.count<-count.min(ER.smooth, ER_loess)%>%
   mutate(
-    impact=
-      case_when(
-        slope<0 ~ 'dec',
-        slope>0 ~ 'inc')
+    count=if_else(ID=='AM' & flood==3, count+10, count)
+  )
+
+
+#ER.prep<-
+  
+prep.by.slope_decreases(ER.count, ER_loess)%>%
+  mutate(
+   remove=if_else(count>=-3 & count<=3, 'keep', remove)
   )%>%
-  group_by(ID, flood) %>%
-  mutate(
-    max_height = which.max(replace(depth, is.na(depth), -Inf)), 
-    maximum = case_when(
-      row_number() == max_height ~ 0))%>%
-  filter(maximum==0)%>%
-  select(Date, ID, flood, impact)%>%
-  rename(impact.sum=impact)%>%select(-Date)
+  filter(ID=='GB')%>%
+  ggplot(aes(x=count, y=ER))+
+  geom_point()+
+  geom_point(aes(y=ER_loess, color=remove), alpha=0.3)+
+  #geom_smooth(method = lm, aes(group=stage, y=ER), color="blue")+
+  facet_wrap(~flood, scales='free')+
+  theme(legend.position = "bottom")
 
-ER.parse<-left_join(ER.smooth, ER.impact, by=c('flood', 'ID'))
+
+
+#ER.trim<-trim(ER.prep)
+
+
+trim(ER.prep)%>%
+  filter(ID=='GB')%>%
+  ggplot(aes(x=count, y=ER))+
+  geom_point()+
+  geom_point(aes(y=ER_loess), alpha=0.3)+
+  geom_line(aes(y=depth*5), color='gray')+
+  geom_smooth(method = lm, aes(group=stage, y=ER), color="blue")+
+  facet_wrap(~flood, scales='free')+
+  theme(legend.position = "bottom")
+
+
+
+ER.min<-minimum(ER.trim,  ER)
+
+ER.duration<-duration(ER.trim)
+
+recession.lm<-fit_recessions(ER.trim, ER.base, ER, base.ER) 
+rise.lm<-fit_rise(ER.trim, ER.base, ER, base.ER) 
+
+
+flood.impacts.ER<-
+  full_join(recession.lm,ER.duration)%>%
+  full_join(rise.lm, by=c('ID', 'flood'))%>%
+  full_join(ER.min, by=c('ID', 'flood'))%>%
+  full_join(ER.base, by=c('ID', 'flood'))%>%
+  mutate(variable='ER')
+
+
+write_csv(flood.impacts.ER, "04_Outputs/flood impacts/ER.csv")
+
+
+
+# all_out <- run_bp_all_sites(ER_flagged, site_col = ID, y = ER, x = depth, breaks = 2)
+# brk.slopes<-all_out$segments%>%select(ID, seg_start, seg_end, slope)
+# 
+# 
+# ER.impact <- ER.smooth %>%
+#   left_join(
+#     brk.slopes, by = join_by(ID, between(depth, seg_start, seg_end))
+#   )%>%  
+#   select(-seg_start, -seg_end)%>%
+#   mutate(
+#     impact=
+#       case_when(
+#         slope<0 ~ 'dec',
+#         slope>0 ~ 'inc')
+#   )%>%
+#   group_by(ID, flood) %>%
+#   mutate(
+#     max_height = which.max(replace(depth, is.na(depth), -Inf)), 
+#     maximum = case_when(
+#       row_number() == max_height ~ 0))%>%
+#   filter(maximum==0)%>%
+#   select(Date, ID, flood, impact)%>%
+#   rename(impact.sum=impact)%>%select(-Date)
+# 
+# ER.parse<-left_join(ER.smooth, ER.impact, by=c('flood', 'ID'))
 
 #RR periods########
 
