@@ -15,6 +15,13 @@ CO2_flagged <- co2 %>%
   mutate(
     date=as.Date(Date)
   )%>%
+  mutate(
+    CO2=if_else(ID=='AM' & CO2<2000, NA, CO2),
+    CO2=if_else(ID=='AM' & Date<'2022-07-30', NA, CO2),
+    CO2=if_else(ID=='AM' & flood==4 & CO2 >12700, NA , CO2),
+    CO2=if_else(ID=='LF' & flood==3 & CO2 >2560, NA , CO2),
+    
+    )%>%
   filter(!is.na(CO2))%>%
   group_by(ID, date)%>%
   mutate(CO2.daily.min=min(CO2, na.rm=T))
@@ -49,16 +56,22 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
     bind_rows()
 }
 
-CO2.smooth<-smooth(CO2_flagged, CO2.daily.min)%>%
+
+CO2.count<-count.max(CO2_flagged, CO2)
+
+CO2.remove.gaps<-remove_gaps(CO2.count, gap_days=7)
+
+CO2.smooth<-smooth(CO2.remove.gaps, CO2.daily.min)%>%
   rename(CO2_loess=CO2.daily.min_loess)
 
-CO2.count<-count.max(CO2.smooth, CO2_loess)
 
-CO2.prep<-prep.by.slope_increases(CO2.count, CO2_loess)%>%
+
+CO2.prep<-prep.by.slope_increases(CO2.smooth, CO2_loess)%>%
   mutate(
-    remove = if_else(abs(count)<100, "keep", remove),
-    remove = if_else(ID=='OS' & abs(count)<200, "keep", remove)
-    )
+    remove=if_else(count<120 & count> -120, 'keep', remove),
+    remove=if_else(ID=='OS'& flood==1& count<300 & count> -120, 'keep', remove)
+    
+  )
 
 CO2.trim<-trim(CO2.prep)
 
@@ -69,11 +82,9 @@ CO2.trim%>%
     )%>%
     ggplot(aes(x=count, y=CO2))+
     geom_point()+
+    geom_point(aes(y=CO2_loess, color=remove))+
     geom_smooth(aes(group = stage, y=CO2.daily.min), method='lm')+
     facet_wrap(~flood, scales='free')
-  ggplotly(
-
-)
 
 
 CO2.duration<-duration(CO2.trim)

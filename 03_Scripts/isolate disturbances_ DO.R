@@ -24,6 +24,14 @@ DO_flagged <- DO %>%
   arrange(ID, Date)
 
 
+
+DO%>%
+  ggplot(aes(x=Date, y=DO))+
+  geom_point()+
+  facet_wrap(~ID, scales='free')
+
+
+
 DO.base<-baseline(DO_flagged, DO)
 
 fit_loess_by_group <- 
@@ -58,23 +66,57 @@ fit_loess_by_group <-
 DO.smooth<-smooth(DO_flagged, DO.daily.min)%>%
   rename(DO_loess= DO.daily.min_loess)
 
-DO.count<-count.min(DO.smooth, DO.daily.min)
+DO.count<-count.min(DO.smooth, DO)
+
+
+
+remove_gaps <- function(trim_counted, gap_days = 7) {
+  trim_counted %>%
+    group_by(ID, flood) %>%
+    arrange(Date) %>%
+    mutate(
+      days_since_last = as.numeric(difftime(Date, lag(Date), units = "days")),
+      row = row_number(),
+      peak_row = first(row[count == 0])
+    ) %>%
+    mutate(
+      pre_gap_row = {
+        pre <- which(row < peak_row & days_since_last >= gap_days)
+        if (length(pre) > 0) max(pre) else 0
+      },
+      post_gap_row = {
+        post <- which(row > peak_row & days_since_last >= gap_days)
+        if (length(post) > 0) min(post) else (max(row) + 1)
+      }
+    ) %>%
+    filter(row > pre_gap_row & row < post_gap_row) %>%
+    select(-days_since_last, -row, -peak_row, -pre_gap_row, -post_gap_row) %>%
+    ungroup()
+}
+
+DO.remove.gaps<-remove_gaps(DO.count, 7)
 
 
 DO.prep<-prep.by.slope_decreases(DO.count, DO.daily.min)%>%
   mutate(
     remove=if_else(ID %in% c('ID', 'GB') & DO_loess<5, 'keep', remove),
     remove=if_else(ID %in% c('AM', 'LF', 'OS') & DO_loess<3.5, 'keep', remove),
-    DO=if_else(ID=='LF' & flood=='4' & count>700, NA, DO),
-    DO=if_else(ID=='ID' & flood=='1' & count>500, NA, DO),
+    # DO=if_else(ID=='LF' & flood=='4' & count>700, NA, DO),
+    # DO=if_else(ID=='ID' & flood=='1' & count>500, NA, DO),
   )%>%
   drop_na(DO)
-
 
 class <- read_csv("04_Outputs/flood impacts/depth.csv")%>%select(ID, flood, class)
   
 DO.trim<-trim(DO.prep)%>%left_join(class, by=c('ID', 'flood'))
 
+
+DO.trim%>%
+  filter(ID=='ID', !is.na(flood))%>%
+  ggplot(aes(x=count, y=DO, color=as.factor(remove)))+
+  geom_point(aes(y=DO_loess), color='red')+
+  geom_point(size=0.5)+
+  facet_wrap(~flood, scales='free')
 
 FR.class<-DO.trim%>% 
   left_join(SpC)%>%
@@ -96,17 +138,6 @@ FR.class<-DO.trim%>%
 unique(FR.class$class)
 write_csv(FR.class, "04_Outputs/FR.class.csv")
 
-
-
-DO.trim%>% 
-  select(-class)%>%
-  left_join(FR.class)%>%
-  filter(ID=='OS')%>%
-  ggplot(aes(x=count, y=DO))+
-  geom_point(aes(color=class))+
-  #geom_smooth(method = lm, aes(group=stage, y=DO))+
-  facet_wrap(~flood, scales='free')+
-  theme(legend.position = "bottom")
 
 
 DO.min<-minimum(DO.trim,  DO)

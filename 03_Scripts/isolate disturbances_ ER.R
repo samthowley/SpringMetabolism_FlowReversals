@@ -28,7 +28,8 @@ ER_flagged <- ER %>%
 ER.base<-baseline(ER_flagged, ER)
 
 
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.5, min_rows = 5) {
+fit_loess_by_group <- function(df, y_var, x_var = "t", 
+                               group_var, span = 0.65, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))
   x_name <- rlang::as_name(rlang::enquo(x_var))
   g_name <- rlang::as_name(rlang::enquo(group_var))
@@ -59,35 +60,30 @@ ER.smooth<-smooth(ER_flagged, ER)
 
 ER.count<-count.min(ER.smooth, ER_loess)%>%
   mutate(
-    count=if_else(ID=='AM' & flood==3, count+10, count)
+    count=if_else(ID=='GB' & flood==2, count+21, count)
   )
 
 
-#ER.prep<-
-  
-prep.by.slope_decreases(ER.count, ER_loess)%>%
+ER.prep<-prep.by.slope_decreases(ER.count, ER_loess)%>%
   mutate(
-   remove=if_else(count>=-3 & count<=3, 'keep', remove)
-  )%>%
-  filter(ID=='GB')%>%
+   remove=if_else(count>=-3 & count<=3, 'keep', remove),
+   remove=if_else(ID=='GB' & flood==1, 'keep', remove),
+   remove=if_else(ID=='GB' & flood==2 & count>0, 'keep', remove),
+   remove=if_else(ID=='ID' & flood==3, 'keep', remove),
+   remove=if_else(ID=='OS' & flood==1 & count<40, 'keep', remove),
+   remove=if_else(ID=='OS' & flood==5 & count> -47, 'keep', remove),
+   remove=if_else(ID=='LF' & flood==2, 'keep', remove)
+  )
+
+
+ER.trim<-trim(ER.prep)
+
+
+ER.trim%>%
+  filter(ID=='OS')%>%
   ggplot(aes(x=count, y=ER))+
-  geom_point()+
-  geom_point(aes(y=ER_loess, color=remove), alpha=0.3)+
-  #geom_smooth(method = lm, aes(group=stage, y=ER), color="blue")+
-  facet_wrap(~flood, scales='free')+
-  theme(legend.position = "bottom")
-
-
-
-#ER.trim<-trim(ER.prep)
-
-
-trim(ER.prep)%>%
-  filter(ID=='GB')%>%
-  ggplot(aes(x=count, y=ER))+
-  geom_point()+
+  geom_point(aes(color=remove))+
   geom_point(aes(y=ER_loess), alpha=0.3)+
-  geom_line(aes(y=depth*5), color='gray')+
   geom_smooth(method = lm, aes(group=stage, y=ER), color="blue")+
   facet_wrap(~flood, scales='free')+
   theme(legend.position = "bottom")

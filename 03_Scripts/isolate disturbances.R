@@ -13,7 +13,7 @@ master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
     )%>%
   filter(
     Date> '2022-01-01', 
-    ID %in% c('GB', 'AM', 'LF', 'OS', 'ID'),
+    ID %in% c('GB', 'AM', 'LF', 'OS', 'ID', 'IU'),
     min==0
     )%>%
   select(-min)
@@ -127,7 +127,7 @@ stage_flagged <- master %>%
 
 
 ggplot(stage_flagged, aes(x=Date, y=depth, color=as.factor(flood)))+
-  geom_point()+
+  geom_point(size=0.5)+
   facet_wrap(~ID, scales='free')
 
 
@@ -175,6 +175,14 @@ prep<- depth.smooth %>%
       TRUE~'norm')
   )%>%
   fill(flood, .direction = 'down')
+
+
+prep%>%
+  filter(ID=='LF', !is.na(flood))%>%
+ggplot(aes(x=Date, y=depth, color=as.factor(flood)))+
+  geom_point(size=0.5)+
+  facet_wrap(~flood, scales='free')
+
 
 
 time.btwn<- prep %>%

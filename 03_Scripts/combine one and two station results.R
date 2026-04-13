@@ -51,7 +51,7 @@ depth <- read_csv("02_Clean_data/Chem/depth.csv")%>%
   )
 
 
-  all.met <- onestation %>%
+all.met <- onestation %>%
     full_join(two, by = c("Date", "ID"), suffix = c("_onestation", "_two")) %>%
     mutate(
       # Prioritize "two" over "onestation"
@@ -97,7 +97,7 @@ max.depths <- two %>%
     group_by(ID) %>%
     summarise(max.depth = max(depth, na.rm = TRUE))
   
-  file.names <- list.files(path = "04_Outputs/one station results", pattern = ".csv", full.names = TRUE)
+file.names <- list.files(path = "04_Outputs/one station results", pattern = ".csv", full.names = TRUE)
   onestation.df <- data.frame()
   for (fil in file.names) {
     df <- read_csv(fil)
@@ -113,18 +113,28 @@ onestation <- onestation.df %>%
     left_join(max.depths) %>%
     filter(depth > max.depth) %>%
     select(names(two))
+
+IU.OS<-onestation.df%>%filter(ID %in% c('OS', 'IU'))%>%
+  rename(Date=date, K600=K600_daily_mean, GPP= GPP_daily_mean,
+         ER=ER_daily_mean)%>%
+  left_join(depth%>%filter(ID %in% c('IU', 'OS')))%>%
+  select(Date, ID, K600, GPP, ER, depth)
   
-rbind(two, onestation) %>%
+
+combined<-rbind(two, onestation)%>%
+  select(names(IU.OS))
+
+
+rbind(combined, IU.OS)%>%
     arrange(ID, Date) %>%
     ggplot(aes(x = depth)) +
     geom_point(aes(y = GPP, shape = 'GPP')) +
     geom_point(aes(y = ER), shape = 1) +
-    ggtitle(title) +
     facet_wrap(~ID, scales = "free") +
     theme_minimal()
 
 
-write_csv(rbind(two, onestation), "04_Outputs/master.metabolism.csv")
+write_csv(rbind(combined, IU.OS), "04_Outputs/master.metabolism.csv")
 
 
 

@@ -40,6 +40,15 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.4, mi
     bind_rows()
 }
 
+remove.data.gaps <- function(df, date, gap) {
+  df1<-df%>%
+    arrange(ID, Date) %>%
+    group_by(ID, flood) %>%
+    mutate(days_since_last = as.numeric(difftime({{date}}, lag(), units = "days"))) %>%
+    filter(is.na(days_since_last) | cumsum(coalesce(days_since_last > {{gap}}, FALSE)) == 0) %>%
+    ungroup()
+}
+
 smooth <- function(flagged, variable) {
   prep <- flagged %>%
     filter(!is.na({{variable}})) %>%
@@ -81,6 +90,29 @@ baseline <- function(flagged, variable) {
   #   fill(base, .direction = 'down')
 }
 
+remove_gaps <- function(trim_counted, gap_days) {
+  trim_counted %>%
+    group_by(ID, flood) %>%
+    arrange(Date) %>%
+    mutate(
+      days_since_last = as.numeric(difftime(Date, lag(Date), units = "days")),
+      row = row_number(),
+      peak_row = first(row[count == 0])
+    ) %>%
+    mutate(
+      pre_gap_row = {
+        pre <- which(row < peak_row & days_since_last >= gap_days)
+        if (length(pre) > 0) max(pre) else 0
+      },
+      post_gap_row = {
+        post <- which(row > peak_row & days_since_last >= gap_days)
+        if (length(post) > 0) min(post) else (max(row) + 1)
+      }
+    ) %>%
+    filter(row > pre_gap_row & row < post_gap_row) %>%
+    select(-days_since_last, -row, -peak_row, -pre_gap_row, -post_gap_row) %>%
+    ungroup()
+}
 
 prep.by.slope_increases<-function(df, variable){
   slopes <- df %>%
