@@ -134,7 +134,12 @@ rbind(combined, IU.OS)%>%
     theme_minimal()
 
 
+<<<<<<< HEAD
 write_csv(rbind(combined, IU.OS), "04_Outputs/master.metabolism.csv")
+=======
+
+write_csv(rbind(two, onestation), "04_Outputs/master.metabolism.csv")
+>>>>>>> 25a8706b7e660fd12f400a2bad4ea1d95f8e23b2
 
 
 
