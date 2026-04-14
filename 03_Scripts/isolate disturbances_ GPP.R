@@ -21,16 +21,8 @@ GPP_flagged <- GPP %>%
   arrange(ID, Date)%>%
   filter(!is.na(GPP))%>%
   mutate(date=Date,
-         GPP=if_else(ID=='GB' & flood=='1' & Date>'2022-10-01', NA, GPP)
-         )
-
-
-#something is going on where this is getting rid of days
-GPP_flagged%>%
-  ggplot(aes(x=Date, y=GPP))+
-  geom_point()+
-  facet_wrap(~ID, scales='free')
-
+         GPP=if_else(ID=='GB' & flood=='1' & Date>'2022-10-01' & Date<'2022-10-06', NA, GPP)
+  )
 
 
 GPP.base<-baseline(GPP_flagged, GPP)
@@ -74,13 +66,11 @@ GPP.prep<-prep.by.slope_decreases(GPP.smooth, GPP_loess)%>%
   mutate(
     remove=if_else(count>=-10 & count<=10, "keep", remove),
     remove=if_else(ID=='LF'& count>=-20 & count<=10, "keep", remove),
-    
-    #remove=if_else(flood==5 & ID=='LF' & count<0, "keep", remove)
     )
 
-GPP.prep%>% 
-  filter(ID=='OS', !is.na(flood))%>%
-  ggplot(aes(x=count, y=GPP))+
+GPP%>% 
+  filter(ID=='GB', !is.na(flood))%>%
+  ggplot(aes(x=Date, y=GPP))+
   geom_line(aes(y=GPP_loess), alpha=0.2)+
   geom_point(aes(color=remove))+
   facet_wrap(~flood, scales='free')+
@@ -109,51 +99,38 @@ recession.lm<-fit_recessions(GPP.trim, GPP.base, GPP, base.GPP)
 rise.lm<-fit_rise(GPP.trim, GPP.base, GPP, base.GPP) 
 
 
-GPP <- read_csv("04_Outputs/master.metabolism.csv")%>%
-  select(Date, ID, GPP)%>%
-  left_join(
-    read_csv("02_Clean_data/Chem/depth.csv")%>%
-      mutate(Date=as.Date(Date))%>%
-      group_by(ID, Date)%>%
-      summarise(depth=mean(depth, na.rm=T))
-  )%>%left_join(read_csv("02_Clean_data/Chem/DO.csv"))
-
-
-
-GPP.base<-baseline(GPP_flagged, GPP)
-GPP.count<-count.min(GPP_flagged, GPP)
-
-
-GPP_flagged%>%
-  fill(flood, .direction = "down")%>% 
-  # filter(ID=='GB'#, flood==2
-  # )%>%
-  ggplot(aes(x=Date, y=GPP))+
-  geom_point(aes(color=flood))+
-  facet_wrap(~ID, scales='free')+
-  theme(legend.position = "bottom")
-
-
-
-
-
-test <- GPP.count %>%
+GPP.recover.count1<-GPP.count %>%
   arrange(ID, Date) %>%
   fill(flood, .direction = "down") %>%
   left_join(GPP.base, by = c("ID", "flood")) %>%
+  fill(base, .direction="downup")
+
+GPP.recover.count2<-smooth(GPP.recover.count1, GPP)
+
+
+
+GPP.recover.count2%>%
   group_by(ID, flood) %>%
-  #filter(count >= 0) %>%
+  filter(count >= 0) %>%
   mutate(
     date = as.Date(Date),
-    within_baseline = (GPP / base),
-    recovered = if_else(within_baseline >= 0.7, "recovered", NA),
-    first_recovery = min(date[recovered == "recovered"], na.rm = TRUE),
-    days_to_recovery = as.numeric(difftime(first_recovery, min(date), units = "days")),
-    censored = is.infinite(first_recovery) | is.na(first_recovery),
-    days_to_recovery = if_else(censored, NA_real_, days_to_recovery)
-  ) %>%
-  ungroup()
-
+    within_baseline = (GPP_loess / base),
+    recovered = if_else(within_baseline >= 0.8, "recovered", NA))%>%
+  
+  filter(ID=='AM')%>%
+  ggplot(aes(x=Date, y=GPP))+
+  geom_point(aes(color=recovered))+
+  geom_point(aes(y=GPP_loess), alpha=0.3)+
+  geom_line(aes(y=base), color='purple')+
+  facet_wrap(~flood, scales='free')+
+  theme(legend.position = "bottom")
+  #   first_recovery = min(date[recovered == "recovered"], na.rm = TRUE),
+  #   days_to_recovery = as.numeric(difftime(first_recovery, min(date), units = "days")),
+  #   censored = is.infinite(first_recovery) | is.na(first_recovery),
+  #   days_to_recovery = if_else(censored, NA_real_, days_to_recovery)
+  # ) %>%
+  # ungroup()
+names(GPP.count)
 
 
 
@@ -182,29 +159,7 @@ test%>%
   facet_wrap(~flood, scales='free')+
   theme(legend.position = "bottom")
     
-    <= threshold,
-    # Rolling check: are the next consec_days rows also within baseline?
-    recovered = rollapply(
-      within_baseline,
-      width = consec_days,
-      FUN = all,
-      fill = FALSE,
-      align = "left",
-      na.rm = FALSE
-    )
-  ) %>%
-  summarise(
-    peak_date = min(date[count == 0], na.rm = TRUE),
-    recovery_date = min(date[recovered], na.rm = TRUE),
-    recovery_days = as.numeric(difftime(recovery_date, peak_date, units = "days")),
-    # Flag if no recovery detected within the flood window
-    censored = is.infinite(recovery_date) | is.na(recovery_date),
-    recovery_days = if_else(censored, NA_real_, recovery_days),
-    recovery_date = if_else(censored, as.Date(NA), recovery_date),
-    .groups = "drop"
-  )
 
-prep
 
 
 
