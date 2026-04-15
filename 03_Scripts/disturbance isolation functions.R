@@ -12,6 +12,31 @@ library(strucchange)
 
 floods <- read_csv("01_Raw_data/flood.periods.csv")
 
+recovery_time <- function(flagged, count_df, base_df, variable) {
+  
+  first_recovery<-count.min(flagged%>%
+                              arrange(ID, Date) %>%
+                              fill(flood, .direction = "down"), 
+                            {{variable}}) %>%
+    left_join(base_df, by = c("ID", "flood")) %>%
+    group_by(ID, flood) %>%
+    mutate(
+      flood=as.factor(flood),
+      date = as.Date(Date),
+      within_baseline = ({{variable}} / base),
+      recovered = if_else(within_baseline >= 0.7, "recovered", NA),
+      first_recovery = min(date[recovered == "recovered"], na.rm = TRUE),
+    )%>%
+    distinct(ID, flood, first_recovery)
+  
+  floodpeak<-count_df%>% filter(count==0)%>%
+    mutate(date=as.Date(date))%>%
+    select(ID, flood, date)%>%
+    rename(floodpeak=date)
+  
+  recovery_time<-left_join(test, test.2)%>%
+    mutate(recovey_period=floodpeak-first_recovery)
+}
 
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.4, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))
@@ -64,9 +89,7 @@ smooth <- function(flagged, variable) {
 }
 
 baseline <- function(flagged, variable) {
-  
-  flood.IDs<-flagged%>%select(ID, flood)
-  
+
   base_tbl <- flagged %>%
     mutate(
       flooded = case_when(
@@ -85,9 +108,27 @@ baseline <- function(flagged, variable) {
     ) %>%
     arrange(ID, flood)
   
-  # base_tbl<-left_join(flood.IDs, base_tbl)%>%
-  #   filter(!is.na(flood))%>%distinct(ID, flood, .keep_all = T)%>%
-  #   fill(base, .direction = 'down')
+  depth_i <- flagged %>%
+    fill(flood, .direction = "downup")%>%
+    group_by(ID) %>%
+    mutate(
+      depth25 = quantile(depth, 0.25, na.rm = TRUE),
+      depth75 = quantile(depth, 0.75, na.rm = TRUE),
+      IQR_val = depth75 - depth25,
+      depth_i = case_when(
+        depth < depth25  ~ "low",
+        depth > depth75  ~ "high",
+        TRUE ~ "normal"
+      ))%>%
+    group_by(ID, depth_i, flood)%>% 
+    summarise(
+      base_i=mean({{ variable }}, na.rm=T)
+    )%>%
+    filter(depth_i=="low")
+  
+  base<-left_join(base_tbl, depth_i, by=c('ID', 'flood'))%>% 
+    select(-depth_i)
+
 }
 
 remove_gaps <- function(trim_counted, gap_days) {
