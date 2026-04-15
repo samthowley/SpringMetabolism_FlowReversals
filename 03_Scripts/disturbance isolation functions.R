@@ -21,7 +21,6 @@ recovery_time <- function(flagged, count_df, base_df, variable) {
     left_join(base_df, by = c("ID", "flood")) %>%
     group_by(ID, flood) %>%
     mutate(
-      flood=as.factor(flood),
       date = as.Date(Date),
       within_baseline = ({{variable}} / base),
       recovered = if_else(within_baseline >= 0.7, "recovered", NA),
@@ -34,7 +33,7 @@ recovery_time <- function(flagged, count_df, base_df, variable) {
     select(ID, flood, date)%>%
     rename(floodpeak=date)
   
-  recovery_time<-left_join(test, test.2)%>%
+  recovery_time<-left_join(first_recovery, floodpeak)%>%
     mutate(recovey_period=floodpeak-first_recovery)
 }
 
@@ -103,7 +102,7 @@ baseline <- function(flagged, variable) {
     filter(flooded == "n") %>%
     group_by(flood, ID) %>%
     summarise(
-      base = mean({{ variable }}, na.rm = TRUE),
+      base_1 = mean({{ variable }}, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     arrange(ID, flood)
@@ -127,7 +126,8 @@ baseline <- function(flagged, variable) {
     filter(depth_i=="low")
   
   base<-left_join(base_tbl, depth_i, by=c('ID', 'flood'))%>% 
-    select(-depth_i)
+    mutate(base=(base_1+base_i)/2)%>%
+    select(flood, ID, base)
 
 }
 
@@ -344,7 +344,6 @@ fit_recessions <- function(trim, base, variable, base.var) {
     filter(!is.na(flood), count>0)%>%
     mutate(group_ID = paste0(ID, "_", flood))
 
-  # Build formula dynamically
   formula_str <- paste(as_label(enquo(variable)), "~ count | group_ID")
   rC <- lmList(as.formula(formula_str), data = prep)
   

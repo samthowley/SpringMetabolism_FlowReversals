@@ -23,7 +23,7 @@ GPP_flagged <- GPP %>%
   filter(!is.na(GPP))%>%
   mutate(date=Date,
          GPP=if_else(ID=='GB' & flood=='1' & Date>'2022-10-01'  & Date<'2022-10-06', NA, GPP),
-         flood=as.factor(flood))
+         )
 
 GPP.base<-baseline(GPP_flagged, GPP)
 
@@ -71,7 +71,7 @@ GPP.prep<-prep.by.slope_decreases(GPP.smooth, GPP_loess)%>%
 GPP.trim<-trim(GPP.prep)
 
 GPP.trim%>% 
-  filter(ID=='AM'#, flood==2
+  filter(ID=='LF'#, flood==2
          )%>%
   ggplot(aes(x=count, y=GPP))+
   geom_point(aes(color=remove))+
@@ -84,48 +84,37 @@ GPP.min<-minimum(GPP.trim,  GPP)
 
 GPP.duration<-duration(GPP.trim)
 
-recession.lm<-fit_recessions(GPP.trim, GPP.base, GPP, base.GPP) 
+recession.lm<-fit_recessions(GPP.trim, GPP.base, GPP, base.GPP)
 rise.lm<-fit_rise(GPP.trim, GPP.base, GPP, base.GPP) 
 
+recovery_time.GPP<-recovery_time(GPP_flagged, GPP.count, GPP.base, GPP)
 
-recovery_time <- function(flagged, count_df, base_df, variable) {
-  
-  first_recovery<-flagged%>%
-    arrange(ID, Date) %>%
-    fill(flood, .direction = "down") %>%
-    left_join(base_df, by = c("ID", "flood")) %>%
-    group_by(ID, flood) %>%
-    mutate(
-      flood=as.factor(flood),
-      date = as.Date(Date),
-      within_baseline = ({{variable}} / base),
-      recovered = if_else(within_baseline >= 0.7, "recovered", NA),
-      first_recovery = min(date[recovered == "recovered"], na.rm = TRUE),
-    )%>%
-    distinct(ID, flood, first_recovery)
-  
-  floodpeak<-count_df%>% filter(count==0)%>%
-    mutate(date=as.Date(date))%>%
-    select(ID, flood, date)%>%
-    rename(floodpeak=date)
-  
-  recovery_time<-left_join(test, test.2)%>%
-    mutate(recovey_period=floodpeak-first_recovery)
-}
 
-recovery_time_GPP<-recovery_time(GPP_flagged, GPP.count, GPP.base, GPP)
-
+depth <- read_csv("04_Outputs/flood impacts/depth.csv")%>%
+  select(ID, flood, percent.change, maximum, base)%>%
+  rename(percent.change.depth=percent.change, maximum.depth=maximum, base.depth=base)
 
 flood.impacts.GPP<-
   full_join(recession.lm,GPP.duration)%>%
   full_join(rise.lm, by=c('ID', 'flood'))%>%
   full_join(GPP.min, by=c('ID', 'flood'))%>%
   full_join(GPP.base, by=c('ID', 'flood'))%>%
-  mutate(variable='GPP')
-
+  full_join(recovery_time.GPP, by=c('ID', 'flood'))%>%
+  mutate(variable='GPP',
+         recession.days=(base-recess.intercept)/recess.slope,
+         rise.day=(base-rise.intercept)/rise.slope
+         )
 
 write_csv(flood.impacts.GPP, "04_Outputs/flood impacts/GPP.csv")
 
 
+flood.impacts.GPP%>%
+  left_join(read_csv("04_Outputs/FR.class.csv"))%>%
+  left_join(depth)%>%
+  
+  ggplot(aes(x=percent.change.depth, y=recess.slope))+
+  geom_point(aes(shape=ID, color=class))+ scale_y_log10()
 
+
+  names(flood.impacts.GPP)
   
