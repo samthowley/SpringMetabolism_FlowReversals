@@ -10,7 +10,35 @@ library(lme4)
 library(zoo)
 library(strucchange)
 
-floods <- read_csv("01_Raw_data/flood.periods.csv")
+floods <- read_csv("01_Raw_data/flood.periods.csv")%>%
+  mutate(start=as.Date(start), end=as.Date(end))
+
+recovery_time <- function(flagged, count_df, base_df, variable) {
+  
+  first_recovery<-count.min(flagged%>%
+                              arrange(ID, Date) %>%
+                              fill(flood, .direction = "down"), 
+                            {{variable}}) %>%
+    left_join(base_df, by = c("ID", "flood")) %>%
+    group_by(ID, flood) %>%
+    mutate(
+      date = as.Date(Date),
+      within_baseline = ({{variable}} / base),
+      recovered = if_else(within_baseline >= 0.7, "recovered", NA),
+      first_recovery = min(date[recovered == "recovered"], na.rm = TRUE),
+    )%>%
+    distinct(ID, flood, first_recovery)
+  
+  floodpeak<-count_df%>% filter(count==0)%>%
+    mutate(date=as.Date(date))%>%
+    select(ID, flood, date)%>%
+    rename(floodpeak=date)
+  
+  recovery_time<-left_join(first_recovery, floodpeak)%>%
+    mutate(recovey_period=floodpeak-first_recovery)%>%
+    
+    recovered<-left_join(first_recovery, recovery_time)
+}
 
 
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.4, min_rows = 5) {
@@ -64,9 +92,7 @@ smooth <- function(flagged, variable) {
 }
 
 baseline <- function(flagged, variable) {
-  
-  flood.IDs<-flagged%>%select(ID, flood)
-  
+
   base_tbl <- flagged %>%
     mutate(
       flooded = case_when(
@@ -80,14 +106,37 @@ baseline <- function(flagged, variable) {
     filter(flooded == "n") %>%
     group_by(flood, ID) %>%
     summarise(
-      base = mean({{ variable }}, na.rm = TRUE),
+      base_1 = mean({{ variable }}, na.rm = TRUE),
       .groups = "drop"
     ) %>%
     arrange(ID, flood)
   
-  # base_tbl<-left_join(flood.IDs, base_tbl)%>%
-  #   filter(!is.na(flood))%>%distinct(ID, flood, .keep_all = T)%>%
-  #   fill(base, .direction = 'down')
+  depth_i <- flagged %>%
+    fill(flood, .direction = "downup")%>%
+    group_by(ID) %>%
+    mutate(
+      depth25 = quantile(depth, 0.25, na.rm = TRUE),
+      depth75 = quantile(depth, 0.75, na.rm = TRUE),
+      IQR_val = depth75 - depth25,
+      depth_i = case_when(
+        depth < depth25  ~ "low",
+        depth > depth75  ~ "high",
+        TRUE ~ "normal"
+      ))%>%
+    group_by(ID, depth_i, flood)%>% 
+    summarise(
+      base_i=mean({{ variable }}, na.rm=T)
+    )%>%
+    filter(depth_i=="low")
+  
+  base<-full_join(base_tbl, depth_i, by=c('ID', 'flood'))%>% 
+    mutate(base=(base_1+base_i)/2)%>%
+    select(flood, ID, base)%>%
+    fill(base, .direction = 'downup')%>%
+    group_by(flood, ID)%>%
+    mutate(base=if_else(is.na(base), mean(base, na.rm=T), base))
+  
+
 }
 
 remove_gaps <- function(trim_counted, gap_days) {
@@ -112,6 +161,61 @@ remove_gaps <- function(trim_counted, gap_days) {
     filter(row > pre_gap_row & row < post_gap_row) %>%
     select(-days_since_last, -row, -peak_row, -pre_gap_row, -post_gap_row) %>%
     ungroup()
+}
+
+prep.count.min<-function(df.smooth, variable){
+  
+  df.recover<-df.smooth%>%    
+    group_by(ID, flood) %>%
+    mutate(
+      date = as.Date(Date),
+      within_baseline = ({{variable}}/ base),
+      recovered = if_else(within_baseline >= 0.8, "recovered", NA)
+    )
+  
+  df.count<-count.min(df.recover, {{variable}})%>%
+    arrange(ID, Date)%>%
+    group_by(ID, flood) %>%
+    mutate(
+      flood.stage=case_when(
+        count<0~ 'pre',
+        count>=0~ 'post'),
+      last_recovery  = max(Date[recovered == "recovered" & flood.stage == 'pre'],  na.rm = TRUE),
+      first_recovery = min(Date[recovered == "recovered" & flood.stage == 'post'], na.rm = TRUE))%>%
+    filter(
+      case_when(
+        !is.infinite(first_recovery) ~ Date >= last_recovery & Date <= first_recovery,
+        TRUE ~ Date >= last_recovery
+      )
+    )
+  
+}
+prep.count.max<-function(df.smooth, variable){
+  
+  df.recover<-df.smooth%>%    
+    group_by(ID, flood) %>%
+    mutate(
+      date = as.Date(Date),
+      within_baseline = ({{variable}}/ base),
+      recovered = if_else(within_baseline >= 0.8, "recovered", NA)
+    )
+  
+  df.count<-count.max(df.recover, {{variable}})%>%
+    arrange(ID, Date)%>%
+    group_by(ID, flood) %>%
+    mutate(
+      flood.stage=case_when(
+        count<0~ 'pre',
+        count>=0~ 'post'),
+      last_recovery  = max(Date[recovered == "recovered" & flood.stage == 'pre'],  na.rm = TRUE),
+      first_recovery = min(Date[recovered == "recovered" & flood.stage == 'post'], na.rm = TRUE))%>%
+    filter(
+      case_when(
+        !is.infinite(first_recovery) ~ Date >= last_recovery & Date <= first_recovery,
+        TRUE ~ Date >= last_recovery
+      )
+    )
+  
 }
 
 prep.by.slope_increases<-function(df, variable){
@@ -298,59 +402,44 @@ count.max<-function(trim, variable) {
 }
 
 fit_recessions <- function(trim, base, variable, base.var) {
-  
   prep <- trim %>%
-    filter(!is.na(flood), count>0)%>%
+    filter(!is.na(flood), count > 0) %>%
     mutate(group_ID = paste0(ID, "_", flood))
-
-  # Build formula dynamically
+  
   formula_str <- paste(as_label(enquo(variable)), "~ count | group_ID")
   rC <- lmList(as.formula(formula_str), data = prep)
   
-  recess.lm <- coef(rC) %>%
+  coef(rC) %>%
     as_tibble() %>%
-    mutate(ID = names(rC)) %>%
+    mutate(
+      ID    = names(rC),
+      r2    = sapply(rC, function(m) if (!is.null(m)) summary(m)$r.squared else NA_real_)
+    ) %>%
     rename(Intercept = "(Intercept)", slope = "count") %>%
     separate(ID, into = c("ID", "flood"), sep = "_", convert = TRUE) %>%
-    left_join(base, by = c("ID", "flood"))%>%
-    rename(recess.intercept=Intercept, recess.slope=slope)%>%
+    left_join(base, by = c("ID", "flood")) %>%
+    rename(recess.intercept = Intercept, recess.slope = slope, r2.recess=r2) %>%
     select(-base)
-  
-  table<-recess.lm%>%
-    group_by(ID, flood)%>%
-    summarise(
-      recess.intercept=mean(recess.intercept, na.rm=T),
-      recess.slope=mean(recess.slope, na.rm=T)
-  )
 }
 fit_rise <- function(trim, base, variable, base.var) {
-  
   prep <- trim %>%
-    filter(!is.na(flood), count<0)%>%
+    filter(!is.na(flood), count < 0) %>%
     mutate(group_ID = paste0(ID, "_", flood))
   
-  # Build formula dynamically
   formula_str <- paste(as_label(enquo(variable)), "~ count | group_ID")
   rC <- lmList(as.formula(formula_str), data = prep)
   
-  recess.lm <- coef(rC) %>%
+  coef(rC) %>%
     as_tibble() %>%
-    mutate(ID = names(rC)) %>%
+    mutate(
+      ID = names(rC),
+      r2 = sapply(rC, function(m) if (!is.null(m)) summary(m)$r.squared else NA_real_)
+    ) %>%
     rename(Intercept = "(Intercept)", slope = "count") %>%
     separate(ID, into = c("ID", "flood"), sep = "_", convert = TRUE) %>%
-    left_join(base, by = c("ID", "flood"))%>%
-    rename(rise.intercept=Intercept, rise.slope=slope)%>%
+    left_join(base, by = c("ID", "flood")) %>%
+    rename(rise.intercept = Intercept, rise.slope = slope, r2.rise=r2) %>%
     select(-base)
-  
-  
-  table<-recess.lm%>%
-    group_by(ID, flood)%>%
-    summarise(
-      rise.intercept=mean(rise.intercept, na.rm=T),
-      rise.slope=mean(rise.slope, na.rm=T)
-    )
-  
-  
 }
 
 flood.base_compare <- function(peak_df, base_df, variable) {
