@@ -85,12 +85,17 @@ write_csv(flood.impacts.GPP, "test.csv")
 #write_csv(flood.impacts.GPP, "04_Outputs/flood impacts/GPP.csv")
 
 
-flood.impacts.GPP%>%
+depth.impacts<-read_csv("04_Outputs/flood impacts/depth.csv")%>%
+  select(ID, flood, percent.change, SpC)
+
+check<-flood.impacts.GPP%>%
   left_join(read_csv("04_Outputs/FR.class.csv"))%>%
-  left_join(depth)%>%
+  left_join(depth.impacts, by=c('flood', 'ID'))%>%
+  filter(!is.na(class))
   
-  ggplot(aes(x=percent.change.depth, y=recess.slope))+
-  geom_point(aes(shape=ID, color=class))+ scale_y_log10()
+check%>%
+  ggplot(aes(x=ID, y=recovery_days, color=class))+
+  geom_boxplot()
 
 
   
