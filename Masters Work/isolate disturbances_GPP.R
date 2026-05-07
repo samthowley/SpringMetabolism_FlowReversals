@@ -50,8 +50,41 @@ GPP.smooth <- smooth(
   GPP) %>%
   left_join(GPP.base)
 
+# Check: smooth fit
+GPP.smooth %>%
+  filter(ID == 'OS') %>%
+  ggplot(aes(x = Date, y = GPP)) +
+  geom_point(color = 'grey60', size = 0.3) +
+  geom_line(aes(y = GPP_loess), color = 'blue') +
+  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "GPP: smooth check (OS)", y = "GPP")
+
 # --- Isolate disturbance ----------------------------------------------------
-GPP.clean <- prep.for.slope.min(GPP.smooth, GPP, GPP_loess)
+GPP.clean <- prep.for.slope.min.daily(GPP.smooth, GPP_loess, GPP_loess)
+
+plot_grid(
+
+# Check: clean fit
+GPP.clean %>%
+  filter(ID == 'AM', !is.na(flood)) %>%
+  ggplot(aes(x = count, y = GPP_loess)) +
+  geom_point(aes(color = 'red')) +
+  geom_point(aes(y = GPP), color = 'blue') +
+  geom_line(aes(y = base)) +
+  geom_smooth(aes(x = count, y = GPP, group = stage.flood), method = 'lm', se = FALSE) +
+  facet_wrap(~flood, scales = 'free') 
+,
+
+GPP.smooth %>%
+  filter(ID == 'AM') %>%
+  ggplot(aes(x = Date, y = GPP)) +
+  geom_point(color = 'grey60', size = 0.3) +
+  geom_line(aes(y = GPP_loess), color = 'blue') +
+  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+  facet_wrap(~flood, scales = 'free') 
+
+)
 
 # --- Flood bounds -----------------------------------------------------------
 flood.start <- GPP.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
@@ -65,6 +98,18 @@ GPP.duration <- duration(GPP.clean)
 # --- Recession & rise models ------------------------------------------------
 recession.lm <- fit_recessions(GPP.clean, GPP.base, GPP, base.GPP)
 rise.lm      <- fit_rise(GPP.clean,       GPP.base, GPP, base.GPP)
+
+# Check: recession fit
+GPP.clean %>%
+  filter(ID == 'OS') %>%
+  ggplot(aes(x = count, y = GPP, color = stage.flood)) +
+  geom_point(size = 0.5) +
+  geom_point(aes(y = GPP_loess), color = 'blue', alpha = 0.4) +
+  geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
+  geom_smooth(aes(x = count, y = GPP, group = stage.flood),
+              method = 'lm', se = FALSE, color = 'darkgreen') +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "GPP: recession check (OS)")
 
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.GPP <-

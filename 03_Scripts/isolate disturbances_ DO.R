@@ -24,13 +24,10 @@ DO_flagged <- DO %>%
   arrange(ID, Date)
 
 
-
 DO%>%
   ggplot(aes(x=Date, y=DO))+
   geom_point()+
   facet_wrap(~ID, scales='free')
-
-
 
 DO.base<-baseline(DO_flagged, DO)
 

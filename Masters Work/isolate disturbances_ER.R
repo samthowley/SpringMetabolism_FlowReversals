@@ -3,11 +3,10 @@ source("03_Scripts/disturbance isolation functions.R")
 # --- Data loading -----------------------------------------------------------
 ER <- read_csv("04_Outputs/master.metabolism.csv") %>%
   select(Date, ID, ER) %>%
-  left_join(
-    read_csv("02_Clean_data/Chem/depth.csv") %>%
-      mutate(Date = as.Date(Date)) %>%
-      group_by(ID, Date) %>%
-      summarise(depth = mean(depth, na.rm = TRUE), .groups = 'drop')
+  left_join(read_csv("02_Clean_data/Chem/depth.csv")) %>%
+  mutate(
+    Date = as.Date(Date),
+    ER   = abs(ER)
   )
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
@@ -29,8 +28,8 @@ ER_flagged <- ER %>%
 # --- Baseline ---------------------------------------------------------------
 ER.base <- baseline(ER_flagged, ER)
 
-# --- Local loess (span = 0.65) ----------------------------------------------
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.65, min_rows = 5) {
+# --- Local loess (span = 0.3) -----------------------------------------------
+fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))
   x_name <- rlang::as_name(rlang::enquo(x_var))
   g_name <- rlang::as_name(rlang::enquo(group_var))
@@ -49,12 +48,44 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.65, m
 
 # --- Smooth -----------------------------------------------------------------
 ER.smooth <- smooth(
-  ER_flagged %>% fill(flood, .direction = "down"),
+  ER_flagged %>% fill(flood, .direction = "down") %>% filter(!is.na(ER)),
   ER) %>%
   left_join(ER.base)
 
-# --- Isolate disturbance (ER increases during floods) -----------------------
-ER.clean <- prep.for.slope.max(ER.smooth, ER, ER_loess)
+# Check: smooth fit
+ER.smooth %>%
+  filter(ID == 'OS') %>%
+  ggplot(aes(x = Date, y = ER)) +
+  geom_point(color = 'grey60', size = 0.3) +
+  geom_line(aes(y = ER_loess), color = 'blue') +
+  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "ER: smooth check (OS)", y = "ER (abs)")
+
+# --- Isolate disturbance (|ER| increases during floods) ---------------------
+ER.clean <- prep.for.slope.max.daily(ER.smooth, ER_loess, ER_loess)
+
+# Check: clean fit
+plot_grid(
+  ER.smooth %>%
+    filter(ID == 'OS') %>%
+    ggplot(aes(x = Date, y = ER)) +
+    geom_point(color = 'grey60', size = 0.3) +
+    geom_line(aes(y = ER_loess), color = 'blue') +
+    geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+    facet_wrap(~flood, scales = 'free') +
+    labs(title = "ER: smooth check (OS)", y = "ER (abs)")
+  ,
+ER.clean %>%
+  filter(ID == 'OS', !is.na(flood)) %>%
+  ggplot(aes(x = count, y = ER_loess)) +
+  geom_point(aes(color = 'red')) +
+  geom_point(aes(y = ER), color = 'blue') +
+  geom_line(aes(y = base)) +
+  geom_smooth(aes(x = count, y = ER, group = stage.flood), method = 'lm', se = FALSE) +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "ER: clean check (OS)")
+)
 
 # --- Flood bounds -----------------------------------------------------------
 flood.start <- ER.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
@@ -68,6 +99,18 @@ ER.duration <- duration(ER.clean)
 # --- Recession & rise models ------------------------------------------------
 recession.lm <- fit_recessions(ER.clean, ER.base, ER, base.ER)
 rise.lm      <- fit_rise(ER.clean,       ER.base, ER, base.ER)
+
+# Check: recession fit
+ER.clean %>%
+  filter(ID == 'OS') %>%
+  ggplot(aes(x = count, y = ER, color = stage.flood)) +
+  geom_point(size = 0.5) +
+  geom_point(aes(y = ER_loess), color = 'blue', alpha = 0.4) +
+  geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
+  geom_smooth(aes(x = count, y = ER, group = stage.flood),
+              method = 'lm', se = FALSE, color = 'darkgreen') +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "ER: recession check (OS)")
 
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.ER <-

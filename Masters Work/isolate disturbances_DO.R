@@ -22,8 +22,8 @@ DO_flagged <- DO %>%
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
   select(-start, -end) %>%
-  arrange(ID, Date) %>%
-  mutate(DO = if_else(ID == 'OS' & Date > "2023-03-01" & flood == 4, NA_real_, DO))
+  arrange(ID, Date) #%>%
+  #mutate(DO = if_else(ID == 'OS' & Date > "2023-03-01" & flood == 4, NA_real_, DO))
 
 # --- Baseline ---------------------------------------------------------------
 DO.base <- baseline(DO_flagged, DO.daily.min) %>%
@@ -50,12 +50,45 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.1, mi
 # --- Smooth -----------------------------------------------------------------
 DO.smooth <- smooth(
   DO_flagged %>% fill(flood, .direction = "down"),
-  DO.daily.min) %>%
+  DO) %>%
   rename(DO_loess = DO.daily.min_loess) %>%
   left_join(DO.base)
 
+# Check: smooth fit
+DO.smooth %>%
+  filter(ID == 'OS') %>%
+  ggplot(aes(x = Date, y = DO.daily.min)) +
+  geom_point(color = 'grey60', size = 0.3) +
+  geom_line(aes(y = DO_loess), color = 'blue') +
+  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "DO: smooth check (OS)", y = "DO.daily.min")
+
 # --- Isolate disturbance ----------------------------------------------------
-DO.clean <- prep.for.slope.min(DO.smooth, DO, DO_loess)
+DO.clean <- prep.for.slope.min(DO.smooth, DO_loess, DO_loess)
+
+# Check: clean fit
+plot_grid(
+  DO.smooth %>%
+    filter(ID == 'LF') %>%
+    ggplot(aes(x = Date, y = DO)) +
+    geom_point(color = 'grey60', size = 0.3) +
+    geom_line(aes(y = DO_loess), color = 'blue') +
+    geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+    facet_wrap(~flood, scales = 'free') +
+    labs(title = "DO: smooth check (OS)", y = "DO.daily.min")
+  ,
+
+DO.clean %>%
+  filter(ID == 'LF', !is.na(flood)) %>%
+  ggplot(aes(x = count, y = DO_loess)) +
+  geom_point(aes(color = 'red')) +
+  geom_point(aes(y = DO), color = 'gray60') +
+  geom_line(aes(y = base)) +
+  #geom_smooth(aes(x = count, y = DO.daily.min, group = stage.flood), method = 'lm', se = FALSE) +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "DO: clean check (OS)")
+)
 
 # --- Flood bounds -----------------------------------------------------------
 flood.start <- DO.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
@@ -63,12 +96,24 @@ flood.end   <- DO.clean %>% group_by(ID, flood) %>% summarise(end   = max(as.Dat
 flood.bounds <- left_join(flood.start, flood.end, by = c('ID', 'flood'))
 
 # --- Minimum, duration ------------------------------------------------------
-DO.min      <- minimum(DO.clean, DO.daily.min)
+DO.min      <- minimum(DO.clean, DO)
 DO.duration <- duration(DO.clean)
 
 # --- Recession & rise models ------------------------------------------------
-recession.lm <- fit_recessions(DO.clean, DO.base, DO.daily.min, base.DO)
-rise.lm      <- fit_rise(DO.clean,       DO.base, DO.daily.min, base.DO)
+recession.lm <- fit_recessions(DO.clean, DO.base, DO, base.DO)
+rise.lm      <- fit_rise(DO.clean,       DO.base, DO, base.DO)
+
+# Check: recession fit
+DO.clean %>%
+  filter(ID == 'OS') %>%
+  ggplot(aes(x = count, y = DO.daily.min, color = stage.flood)) +
+  geom_point(size = 0.5) +
+  geom_point(aes(y = DO_loess), color = 'blue', alpha = 0.4) +
+  geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
+  geom_smooth(aes(x = count, y = DO.daily.min, group = stage.flood),
+              method = 'lm', se = FALSE, color = 'darkgreen') +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "DO: recession check (OS)")
 
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.DO <-

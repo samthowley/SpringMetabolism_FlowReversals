@@ -41,7 +41,6 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.4, mi
     bind_rows()
 }
 
-
 smooth <- function(flagged, variable) {
   prep <- flagged %>%
     filter(!is.na({{variable}})) %>%
@@ -97,7 +96,7 @@ baseline <- function(flagged, variable) {
   base<-full_join(base_tbl, depth_i, by=c('ID', 'flood'))%>% 
     mutate(base=(base_1+base_i)/2)%>%
     select(flood, ID, base)%>%
-    fill(base, .direction = '{{variable}}wnup')%>%
+    fill(base, .direction = 'downup')%>%
     group_by(flood, ID)%>%
     mutate(base=if_else(is.na(base), mean(base, na.rm=T), base))
   
@@ -123,12 +122,12 @@ prep.for.slope.min<-function(df.smooth, variable, variable_loess){
     mutate(
       stage.flood     = if_else(count >= 0, 'post', 'pre'),
       days_since_last = as.numeric(difftime(as.Date(Date), lag(as.Date(Date)), units = "days")),
-      gap_in_post     = stage.flood == 'post' & !is.na(days_since_last) & days_since_last > 1.5,
+      gap_in_post     = stage.flood == 'post' & !is.na(days_since_last) & days_since_last > 15,  # gap threshold (days) — change here
       after_first_gap = cumsum(coalesce(gap_in_post, FALSE)) > 0
     ) %>%
     filter(!(after_first_gap & stage.flood == 'post')) %>%
     ungroup()
-  
+
 }
 prep.for.slope.max<-function(df.smooth, variable, variable_loess){
 
@@ -148,12 +147,63 @@ prep.for.slope.max<-function(df.smooth, variable, variable_loess){
     mutate(
       stage.flood     = if_else(count >= 0, 'post', 'pre'),
       days_since_last = as.numeric(difftime(as.Date(Date), lag(as.Date(Date)), units = "days")),
-      gap_in_post     = stage.flood == 'post' & !is.na(days_since_last) & days_since_last > 1.5,
+      gap_in_post     = stage.flood == 'post' & !is.na(days_since_last) & days_since_last > 15,  # gap threshold (days) — change here
       after_first_gap = cumsum(coalesce(gap_in_post, FALSE)) > 0
     ) %>%
     filter(!(after_first_gap & stage.flood == 'post')) %>%
     ungroup()
 
+}
+
+# Daily variants: 5-day gap filter post-peak (for variables already at daily resolution)
+prep.for.slope.min.daily <- function(df.smooth, variable, variable_loess) {
+
+  df.recover <- df.smooth %>%
+    group_by(ID, flood) %>%
+    mutate(
+      date            = as.Date(Date),
+      within_baseline = ({{variable}} / base),
+      threshold       = if_else(any(within_baseline < 0.8, na.rm = TRUE), 0.8, 1.0),
+      recovered       = if_else(within_baseline >= threshold, "recovered", NA_character_)
+    )
+
+  count.min(df.recover, {{variable_loess}}) %>%
+    filter({{variable}} < base) %>%
+    arrange(ID, flood, Date) %>%
+    group_by(ID, flood) %>%
+    mutate(
+      stage.flood     = if_else(count >= 0, 'post', 'pre'),
+      days_since_last = as.numeric(difftime(as.Date(Date), lag(as.Date(Date)), units = "days")),
+      gap_in_post     = stage.flood == 'post' & !is.na(days_since_last) & days_since_last > 15,  # gap threshold (days) — change here
+      after_first_gap = cumsum(coalesce(gap_in_post, FALSE)) > 0
+    ) %>%
+    filter(!(after_first_gap & stage.flood == 'post')) %>%
+    ungroup()
+}
+
+prep.for.slope.max.daily <- function(df.smooth, variable, variable_loess) {
+
+  df.recover <- df.smooth %>%
+    group_by(ID, flood) %>%
+    mutate(
+      date            = as.Date(Date),
+      within_baseline = ({{variable}} / base),
+      threshold       = if_else(any(within_baseline > 1.2, na.rm = TRUE), 1.2, 1.0),
+      recovered       = if_else(within_baseline <= threshold, "recovered", NA_character_)
+    )
+
+  count.max(df.recover, {{variable_loess}}) %>%
+    filter({{variable}} > base) %>%
+    arrange(ID, flood, Date) %>%
+    group_by(ID, flood) %>%
+    mutate(
+      stage.flood     = if_else(count >= 0, 'post', 'pre'),
+      days_since_last = as.numeric(difftime(as.Date(Date), lag(as.Date(Date)), units = "days")),
+      gap_in_post     = stage.flood == 'post' & !is.na(days_since_last) & days_since_last > 15,  # gap threshold (days) — change here
+      after_first_gap = cumsum(coalesce(gap_in_post, FALSE)) > 0
+    ) %>%
+    filter(!(after_first_gap & stage.flood == 'post')) %>%
+    ungroup()
 }
 
 
