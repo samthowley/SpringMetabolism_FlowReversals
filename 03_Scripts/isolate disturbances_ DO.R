@@ -34,67 +34,14 @@ DO%>%
 
 DO.base<-baseline(DO_flagged, DO)
 
-fit_loess_by_group <- 
-  function(df, y_var, x_var = "t", group_var, span = 0.6, min_rows = 5) {
-    y_name <- rlang::as_name(rlang::enquo(y_var))
-    x_name <- rlang::as_name(rlang::enquo(x_var))
-    g_name <- rlang::as_name(rlang::enquo(group_var))
-    
-    split_list <- split(df, df[[g_name]])
-    
-    lapply(split_list, function(.x) {
-      # Remove NAs pairwise for this group/var
-      complete_cases <- complete.cases(.x[[y_name]], .x[[x_name]])
-      .x_clean <- .x[complete_cases, ]
-      
-      if (nrow(.x_clean) < min_rows) {
-        message("Skip group with only ", nrow(.x_clean), " complete cases (min: ", min_rows, ")")
-        return(NULL)
-      }
-      
-      fit <- loess(.x_clean[[y_name]] ~ .x_clean[[x_name]], span = span)
-      
-      # Predict on full original rows (fills NA with NA)
-      .x %>%
-        mutate(!!paste0(y_name, "_loess") := predict(fit, newdata = .x[[x_name]]))
-    }) %>%
-      compact() %>%
-      bind_rows()
-  }
-
-
 DO.smooth<-smooth(DO_flagged, DO.daily.min)%>%
   rename(DO_loess= DO.daily.min_loess)
 
-DO.count<-count.min(DO.smooth, DO)
-
-
-
-remove_gaps <- function(trim_counted, gap_days = 7) {
-  trim_counted %>%
-    group_by(ID, flood) %>%
-    arrange(Date) %>%
-    mutate(
-      days_since_last = as.numeric(difftime(Date, lag(Date), units = "days")),
-      row = row_number(),
-      peak_row = first(row[count == 0])
-    ) %>%
-    mutate(
-      pre_gap_row = {
-        pre <- which(row < peak_row & days_since_last >= gap_days)
-        if (length(pre) > 0) max(pre) else 0
-      },
-      post_gap_row = {
-        post <- which(row > peak_row & days_since_last >= gap_days)
-        if (length(post) > 0) min(post) else (max(row) + 1)
-      }
-    ) %>%
-    filter(row > pre_gap_row & row < post_gap_row) %>%
-    select(-days_since_last, -row, -peak_row, -pre_gap_row, -post_gap_row) %>%
-    ungroup()
-}
-
-DO.remove.gaps<-remove_gaps(DO.count, 7)
+DO.count <- DO.smooth %>%
+  left_join(DO.base, by = c("ID", "flood")) %>%
+  count.min(DO) %>%
+  filter(is.na(flood) | is.na(base) | DO < base) %>%
+  trim_post_gap(gap_days = 1.5)
 
 
 DO.prep<-prep.by.slope_decreases(DO.count, DO.daily.min)%>%

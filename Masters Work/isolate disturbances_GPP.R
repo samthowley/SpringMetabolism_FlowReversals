@@ -1,35 +1,30 @@
 source("03_Scripts/disturbance isolation functions.R")
 
 # --- Data loading -----------------------------------------------------------
-CO2 <- read_csv("02_Clean_data/Chem/CO2.csv")
-h   <- read_csv("02_Clean_data/Chem/depth.csv")
-
-co2 <- full_join(CO2, h)
+GPP <- read_csv("04_Outputs/master.metabolism.csv") %>%
+  select(Date, ID, GPP) %>%
+  left_join(
+    read_csv("02_Clean_data/Chem/depth.csv") %>%
+      mutate(Date = as.Date(Date)) %>%
+      group_by(ID, Date) %>%
+      summarise(depth = mean(depth, na.rm = TRUE), .groups = 'drop')
+  )
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
 
 # --- Flag flood periods -----------------------------------------------------
-CO2_flagged <- co2 %>%
+GPP_flagged <- GPP %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
   select(-start, -end) %>%
   arrange(ID, Date) %>%
-  mutate(
-    date = as.Date(Date),
-    CO2  = if_else(ID == 'AM' & CO2 < 2000,              NA_real_, CO2),
-    CO2  = if_else(ID == 'AM' & Date < '2022-07-30',      NA_real_, CO2),
-    CO2  = if_else(ID == 'AM' & flood == 4 & CO2 > 12700, NA_real_, CO2),
-    CO2  = if_else(ID == 'LF' & flood == 3 & CO2 > 2560,  NA_real_, CO2)
-  ) %>%
-  filter(!is.na(CO2)) %>%
-  group_by(ID, date) %>%
-  mutate(CO2.daily.min = min(CO2, na.rm = TRUE)) %>%
-  ungroup()
+  filter(!is.na(GPP)) %>%
+  mutate(date = as.Date(Date))
 
 # --- Baseline ---------------------------------------------------------------
-CO2.base <- baseline(CO2_flagged, CO2.daily.min)
+GPP.base <- baseline(GPP_flagged, GPP)
 
 # --- Local loess (span = 0.3) -----------------------------------------------
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
@@ -50,35 +45,34 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
 }
 
 # --- Smooth -----------------------------------------------------------------
-CO2.smooth <- smooth(
-  CO2_flagged %>% fill(flood, .direction = "down"),
-  CO2.daily.min) %>%
-  rename(CO2_loess = CO2.daily.min_loess) %>%
-  left_join(CO2.base)
+GPP.smooth <- smooth(
+  GPP_flagged %>% fill(flood, .direction = "down"),
+  GPP) %>%
+  left_join(GPP.base)
 
-# --- Isolate disturbance (CO2 increases during floods) ----------------------
-CO2.clean <- prep.for.slope.max(CO2.smooth, CO2.daily.min, CO2_loess)
+# --- Isolate disturbance ----------------------------------------------------
+GPP.clean <- prep.for.slope.min(GPP.smooth, GPP, GPP_loess)
 
 # --- Flood bounds -----------------------------------------------------------
-flood.start <- CO2.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
-flood.end   <- CO2.clean %>% group_by(ID, flood) %>% summarise(end   = max(as.Date(Date)), .groups = 'drop')
+flood.start <- GPP.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
+flood.end   <- GPP.clean %>% group_by(ID, flood) %>% summarise(end   = max(as.Date(Date)), .groups = 'drop')
 flood.bounds <- left_join(flood.start, flood.end, by = c('ID', 'flood'))
 
-# --- Maximum, duration ------------------------------------------------------
-CO2.max      <- maximum(CO2.clean, CO2.daily.min)
-CO2.duration <- duration(CO2.clean)
+# --- Minimum, duration ------------------------------------------------------
+GPP.min      <- minimum(GPP.clean, GPP)
+GPP.duration <- duration(GPP.clean)
 
 # --- Recession & rise models ------------------------------------------------
-recession.lm <- fit_recessions(CO2.clean, CO2.base, CO2.daily.min, base.CO2)
-rise.lm      <- fit_rise(CO2.clean,       CO2.base, CO2.daily.min, base.CO2)
+recession.lm <- fit_recessions(GPP.clean, GPP.base, GPP, base.GPP)
+rise.lm      <- fit_rise(GPP.clean,       GPP.base, GPP, base.GPP)
 
 # --- Compile outputs --------------------------------------------------------
-flood.impacts.CO2 <-
-  full_join(recession.lm, CO2.duration) %>%
+flood.impacts.GPP <-
+  full_join(recession.lm, GPP.duration) %>%
   full_join(rise.lm,      by = c('ID', 'flood')) %>%
-  full_join(CO2.max,      by = c('ID', 'flood')) %>%
-  full_join(CO2.base,     by = c('ID', 'flood')) %>%
+  full_join(GPP.min,      by = c('ID', 'flood')) %>%
+  full_join(GPP.base,     by = c('ID', 'flood')) %>%
   full_join(flood.bounds, by = c('ID', 'flood')) %>%
-  mutate(variable = 'CO2')
+  mutate(variable = 'GPP')
 
-write_csv(flood.impacts.CO2, "04_Outputs/flood impacts/CO2.csv")
+write_csv(flood.impacts.GPP, "04_Outputs/flood impacts/GPP.csv")
