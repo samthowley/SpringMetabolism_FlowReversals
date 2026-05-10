@@ -16,10 +16,10 @@ CO2_flagged <- co2 %>%
     date=as.Date(Date)
   )%>%
   mutate(
-    CO2=if_else(ID=='AM' & CO2<2000, NA, CO2),
-    CO2=if_else(ID=='AM' & Date<'2022-07-30', NA, CO2),
-    CO2=if_else(ID=='AM' & flood==4 & CO2 >12700, NA , CO2),
-    CO2=if_else(ID=='LF' & flood==3 & CO2 >2560, NA , CO2),
+    # CO2=if_else(ID=='AM' & CO2<2000, NA, CO2),
+    # CO2=if_else(ID=='AM' & Date<'2022-07-30', NA, CO2),
+    # CO2=if_else(ID=='AM' & flood==4 & CO2 >12700, NA , CO2),
+    # CO2=if_else(ID=='LF' & flood==3 & CO2 >2560, NA , CO2),
     
     )%>%
   filter(!is.na(CO2))%>%

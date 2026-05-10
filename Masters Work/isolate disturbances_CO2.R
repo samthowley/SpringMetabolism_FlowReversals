@@ -29,10 +29,13 @@ CO2_flagged <- co2 %>%
   ungroup()
 
 # --- Baseline ---------------------------------------------------------------
-CO2.base <- baseline(CO2_flagged, CO2.daily.max)
+CO2.base <- baseline(CO2_flagged, CO2.daily.max)%>%
+  mutate(base = if_else(ID == 'GB' & base<5000, NA, base))%>%
+  group_by(ID) %>%
+  mutate(base = if_else(is.na(base), mean(base, na.rm = TRUE), base))
 
 # --- Local loess (span = 0.3) -----------------------------------------------
-fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.2, min_rows = 5) {
+fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))
   x_name <- rlang::as_name(rlang::enquo(x_var))
   g_name <- rlang::as_name(rlang::enquo(group_var))
@@ -50,39 +53,39 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.2, mi
 }
 
 # --- Smooth -----------------------------------------------------------------
+CO2_flagged<-CO2_flagged %>% fill(flood, .direction = "down")%>% filter(!is.na(CO2), !is.na(Date))
 CO2.smooth <- smooth(
-  CO2_flagged %>% fill(flood, .direction = "down")%>% filter(!is.na(CO2)),
+  CO2_flagged,
   CO2) %>%
   left_join(CO2.base)
 
 # Check: smooth fit
-CO2.smooth %>%
-  filter(ID == 'AM') %>%
-  ggplot(aes(x = Date, y = CO2.daily.max)) +
-  geom_point(color = 'grey60', size = 0.3) +
-  geom_line(aes(y = CO2_loess), color = 'blue') +
-  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-  facet_wrap(~flood, scales = 'free') +
-  labs(title = "CO2: smooth check (OS)", y = "CO2.daily.max")
+# CO2.smooth %>%
+#   filter(ID == 'AM') %>%
+#   ggplot(aes(x = Date, y = CO2.daily.max)) +
+#   geom_point(color = 'grey60', size = 0.3) +
+#   geom_line(aes(y = CO2_loess), color = 'blue') +
+#   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+#   facet_wrap(~flood, scales = 'free') +
+#   labs(title = "CO2: smooth check (OS)", y = "CO2.daily.max")
 
 # --- Isolate disturbance (CO2 increases during floods) ----------------------
-CO2.clean <- prep.for.slope.max(CO2.smooth, CO2_loess, CO2_loess)
+CO2.clean <- prep.max.both(CO2.smooth, CO2.daily.max, CO2_loess)
 
 # Check: clean fit
 
 plot_grid(
   CO2.smooth %>%
-    filter(ID =='LF') %>%
+    filter(ID =='OS') %>%
     ggplot(aes(x = Date, y = CO2)) +
     geom_point(color = 'grey60', size = 0.3) +
     geom_point(aes(y = CO2_loess), color = 'blue') +
     geom_point(aes(y = base), color = 'red', linetype = 'dashed') +
-    facet_wrap(~flood, scales = 'free') +
-    labs(title = "CO2: smooth check (OS)", y = "CO2.daily.max")
+    facet_wrap(~flood, scales = 'free') 
   ,
 CO2.clean %>%
-  filter(ID =='LF', !is.na(flood)) %>%
-  ggplot(aes(x = count, y = CO2_loess)) +
+  filter(ID =='OS', !is.na(flood)) %>%
+  ggplot(aes(x = Date, y = CO2_loess)) +
   geom_point(aes(color = 'red')) +
   geom_point(aes(y = CO2), color = 'grey60') +
   geom_line(aes(y = base)) +

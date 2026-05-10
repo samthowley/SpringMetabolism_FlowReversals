@@ -61,7 +61,7 @@ GPP.smooth %>%
   labs(title = "GPP: smooth check (OS)", y = "GPP")
 
 # --- Isolate disturbance ----------------------------------------------------
-GPP.clean <- prep.for.slope.min.daily(GPP.smooth, GPP_loess, GPP_loess)
+GPP.clean <- prep.min.post.daily(GPP.smooth, GPP_loess, GPP_loess)
 
 plot_grid(
 

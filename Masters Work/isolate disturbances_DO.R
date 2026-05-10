@@ -1,4 +1,4 @@
-source("03_Scripts/disturbance isolation functions.R")
+source("03_Scripts/disturbance isolation functions hourly.R")
 
 # --- Data loading -----------------------------------------------------------
 DO  <- read_csv("02_Clean_data/Chem/DO.csv")
@@ -9,7 +9,11 @@ DO <- full_join(DO, h) %>%
   filter(!is.na(Date), !is.na(DO)) %>%
   mutate(date = as.Date(Date)) %>%
   group_by(ID, date) %>%
-  mutate(DO.daily.min = min(DO, na.rm = TRUE)) %>%
+  mutate(
+    DO.daily = mean(DO, na.rm = TRUE),
+    DO.daily.min = min(DO, na.rm = TRUE),
+    
+    ) %>%
   ungroup() %>%
   left_join(SpC)
 
@@ -51,44 +55,44 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.1, mi
 DO.smooth <- smooth(
   DO_flagged %>% fill(flood, .direction = "down"),
   DO) %>%
-  rename(DO_loess = DO.daily.min_loess) %>%
   left_join(DO.base)
 
 # Check: smooth fit
-DO.smooth %>%
-  filter(ID == 'OS') %>%
-  ggplot(aes(x = Date, y = DO.daily.min)) +
-  geom_point(color = 'grey60', size = 0.3) +
-  geom_line(aes(y = DO_loess), color = 'blue') +
-  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-  facet_wrap(~flood, scales = 'free') +
-  labs(title = "DO: smooth check (OS)", y = "DO.daily.min")
+# DO.smooth %>%
+#   filter(ID == 'OS') %>%
+#   ggplot(aes(x = Date, y = DO)) +
+#   geom_point(color = 'grey60', size = 0.3) +
+#   geom_line(aes(y = DO_loess), color = 'blue') +
+#   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+#   facet_wrap(~flood, scales = 'free') +
+#   labs(title = "DO: smooth check (OS)", y = "DO.daily.min")
 
 # --- Isolate disturbance ----------------------------------------------------
-DO.clean <- prep.for.slope.min(DO.smooth, DO_loess, DO_loess)
+DO.clean <- prep.min.both(DO.smooth, DO.daily.min, DO_loess)
+
 
 # Check: clean fit
 plot_grid(
   DO.smooth %>%
-    filter(ID == 'LF') %>%
+    filter(ID == 'OS', !is.na(flood)) %>%
     ggplot(aes(x = Date, y = DO)) +
     geom_point(color = 'grey60', size = 0.3) +
     geom_line(aes(y = DO_loess), color = 'blue') +
     geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-    facet_wrap(~flood, scales = 'free') +
-    labs(title = "DO: smooth check (OS)", y = "DO.daily.min")
+    facet_wrap(~flood, scales = 'free') 
   ,
 
 DO.clean %>%
-  filter(ID == 'LF', !is.na(flood)) %>%
+  filter(ID == 'OS', !is.na(flood)) %>%
   ggplot(aes(x = count, y = DO_loess)) +
-  geom_point(aes(color = 'red')) +
   geom_point(aes(y = DO), color = 'gray60') +
+  geom_point(aes(color = 'red')) +
   geom_line(aes(y = base)) +
   #geom_smooth(aes(x = count, y = DO.daily.min, group = stage.flood), method = 'lm', se = FALSE) +
-  facet_wrap(~flood, scales = 'free') +
-  labs(title = "DO: clean check (OS)")
+  facet_wrap(~flood, scales = 'free') ,
+ncol=1
 )
+
 
 # --- Flood bounds -----------------------------------------------------------
 flood.start <- DO.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
