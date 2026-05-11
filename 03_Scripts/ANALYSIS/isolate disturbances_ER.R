@@ -1,5 +1,4 @@
-source("03_Scripts/disturbance isolation functions daily.R")
-source("03_Scripts/disturbance isolation functions.R")
+source("03_Scripts/ANALYSIS/disturbance isolation functions daily.R")
 
 
 # --- Data loading -----------------------------------------------------------
@@ -27,8 +26,10 @@ ER_flagged <- ER %>%
          )
 # --- Baseline ---------------------------------------------------------------
 ER.base <- baseline(ER_flagged, ER)
+ER.max      <- maximum(ER_flagged, ER)
 
-# --- Local loess (span = 0.3) -----------------------------------------------
+# --- Smooth -----------------------------------------------------------------
+
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
   y_name <- rlang::as_name(rlang::enquo(y_var))
   x_name <- rlang::as_name(rlang::enquo(x_var))
@@ -46,21 +47,11 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
   }) %>% compact() %>% bind_rows()
 }
 
-# --- Smooth -----------------------------------------------------------------
+
 ER.smooth <- smooth(
   ER_flagged %>% fill(flood, .direction = "down") %>% filter(!is.na(ER)),
   ER) %>%
   left_join(ER.base)
-
-# Check: smooth fit
-# ER.smooth %>%
-#   filter(ID == 'OS') %>%
-#   ggplot(aes(x = Date, y = ER)) +
-#   geom_point(color = 'grey60', size = 0.3) +
-#   geom_line(aes(y = ER_loess), color = 'blue') +
-#   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-#   facet_wrap(~flood, scales = 'free') +
-#   labs(title = "ER: smooth check (OS)", y = "ER (abs)")
 
 # --- Isolate disturbance (|ER| increases during floods) ---------------------
 ER.clean <- rbind(
@@ -80,44 +71,27 @@ prep.max.both.daily(
 
 # Check: clean fit####
 ER.clean %>%
-  filter(ID == 'AM', !is.na(flood)) %>%
+  filter(ID == 'OS', !is.na(flood)) %>%
   ggplot(aes(x = count, y = ER_loess)) +
   geom_point(color = 'red') +
   geom_point(aes(y = ER), color = 'blue') +
   geom_line(aes(y = base)) +
   facet_wrap(~flood, scales = 'free') 
 
-
-#LF
-plot_grid(
-ER.clean %>%
-  filter(ID == 'LF', !is.na(flood)) %>%
-  ggplot(aes(x = Date, y = ER_loess)) +
-  geom_point(color = 'red') +
-  geom_point(aes(y = ER), color = 'blue') +
-  geom_line(aes(y = base)) +
-  facet_wrap(~flood, scales = 'free') 
-,
   ER.smooth %>%
     filter(ID == 'AM') %>%
     ggplot(aes(x = Date, y = ER)) +
     geom_point(color = 'grey60', size = 0.3) +
     geom_line(aes(y = ER_loess), color = 'blue') +
     geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-    facet_wrap(~flood, scales = 'free') ,
-ncol=1
-)
+    facet_wrap(~flood, scales = 'free') 
 
 # --- Flood bounds -----------------------------------------------------------
 
-#flood_dates <- function(df, variable)
 flood.bounds<-flood_dates(ER.smooth, ER_loess, direction='max')
-
-plot_flood_dates(ER.smooth, ER_loess, flood.bounds)
-
+#plot_flood_dates(ER.smooth, ER_loess, flood.bounds)
 
 # --- Maximum, duration ------------------------------------------------------
-ER.max      <- maximum(ER.clean, ER)
 ER.duration <- duration(flood.bounds)
 
 # --- Recession & rise models ------------------------------------------------
@@ -144,3 +118,18 @@ flood.impacts.ER <-
   mutate(variable = 'ER')
 
 write_csv(flood.impacts.ER, "04_Outputs/flood impacts/ER.csv")
+
+
+flood.bounds.join<-flood.bounds%>%mutate(keep='Y')
+
+ER_trimmed <- ER.smooth %>%
+  left_join(
+    flood.bounds.join, by = join_by(ID, flood, between(Date, flood.start, flood.end)))%>%
+  filter(keep=='Y') %>%
+  select(-keep, -flood.start, -flood.end)%>%
+  mutate(variable='ER')%>%
+  rename(conc=ER, loess=ER_loess)%>%
+  select(Date, ID, flood, conc, loess, base, variable)
+
+write_csv(ER_trimmed, "04_Outputs/flood impacts/ER.flood.df.csv")
+

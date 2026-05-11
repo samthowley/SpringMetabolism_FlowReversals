@@ -168,19 +168,82 @@ duration <- function(dates) {
 }
 
 # --- Consecutive-run helper --------------------------------------------------
-# first_of_three: TRUE at row i when condition holds at rows i, i+1, and i+2.
-# Adjust the lead() offsets here to change the required run length.
 
 first_of_three <- function(cond) {
+  cond <- coalesce(as.logical(cond), FALSE)
   cond &
     lead(cond, 1, default = FALSE) &
     lead(cond, 2, default = FALSE)
 }
 
+# --- Flood date extraction ---------------------------------------------------
+
+flood_dates <- function(df, variable, direction = c('min', 'max')) {
+
+  direction <- match.arg(direction)
+
+  count.df <- if (direction == 'min') count.min(df, {{variable}}) else count.max(df, {{variable}})
+
+  df_aug <- count.df %>%
+    filter(!is.na(flood)) %>%
+    group_by(ID, flood) %>%
+    mutate(
+      stage.flood = if_else(count >= 0, 'post', 'pre'),
+      .wb         = {{variable}} / base,
+      .threshold  = if (direction == 'min')
+                      if_else(any(.wb < 0.8, na.rm = TRUE), 0.8, 1.0)
+                    else
+                      if_else(any(.wb > 1.2, na.rm = TRUE), 1.2, 1.0)
+    ) %>%
+    ungroup()
+
+  if (direction == 'min') {
+
+    flood.start <- df_aug %>%
+      filter(stage.flood == 'pre') %>%
+      group_by(ID, flood) %>%
+      mutate(crit = first_of_three(.wb < .threshold)) %>%
+      filter(crit) %>%
+      summarise(flood.start = min(as.Date(Date)), .groups = 'drop')
+
+    flood.end <- df_aug %>%
+      filter(stage.flood == 'post') %>%
+      group_by(ID, flood) %>%
+      mutate(crit = first_of_three(.wb >= .threshold)) %>%
+      summarise(
+        flood.end = if (any(crit, na.rm = TRUE))
+                      min(as.Date(Date[crit]), na.rm = TRUE)
+                    else
+                      max(as.Date(Date)) + 1L,
+        .groups = 'drop'
+      )
+
+  } else {
+
+    flood.start <- df_aug %>%
+      filter(stage.flood == 'pre') %>%
+      group_by(ID, flood) %>%
+      mutate(crit = first_of_three(.wb > .threshold)) %>%
+      filter(crit) %>%
+      summarise(flood.start = min(as.Date(Date)), .groups = 'drop')
+
+    flood.end <- df_aug %>%
+      filter(stage.flood == 'post') %>%
+      group_by(ID, flood) %>%
+      mutate(crit = first_of_three(.wb <= .threshold)) %>%
+      summarise(
+        flood.end = if (any(crit, na.rm = TRUE))
+                      min(as.Date(Date[crit]), na.rm = TRUE)
+                    else
+                      max(as.Date(Date)) + 1L,
+        .groups = 'drop'
+      )
+  }
+
+  full_join(flood.start, flood.end, by = c('ID', 'flood'))
+}
+
 # --- Trim smooth data to flood window ----------------------------------------
-# Removes all rows outside (flood.start, flood.end) per flood group.
-# Use after flood_dates() and before re-running a prep function so that count
-# is recalculated relative to the peak within the trimmed window.
 
 trim_to_flood_dates <- function(df, dates) {
   df %>%

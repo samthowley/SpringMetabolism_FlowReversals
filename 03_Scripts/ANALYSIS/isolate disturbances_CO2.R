@@ -1,4 +1,4 @@
-source("03_Scripts/disturbance isolation functions hourly.R")
+source("03_Scripts/ANALYSIS/disturbance isolation functions hourly.R")
 
 # --- Data loading -----------------------------------------------------------
 CO2 <- read_csv("02_Clean_data/Chem/CO2.csv")%>%
@@ -60,26 +60,25 @@ CO2.smooth <- smooth(
 
 CO2.clean <- prep.max.both(CO2.smooth, CO2, CO2_loess)
 
-CO2.clean %>%
-  filter(ID =='OS', !is.na(flood), flood==1) %>%
-  ggplot(aes(x = count, y = CO2_loess)) +
-  geom_point(color = 'red') +
-  geom_point(aes(y = CO2), color = 'grey60') +
-  geom_line(aes(y = base)) +
-  #geom_smooth(aes(x = count, y = CO2.daily.max, group = stage.flood), method = 'lm', se = FALSE) +
-  facet_wrap(~flood, scales = 'free') +
-  theme_minimal()
+# CO2.clean %>%
+#   filter(ID =='OS', !is.na(flood), flood==1) %>%
+#   ggplot(aes(x = count, y = CO2_loess)) +
+#   geom_point(color = 'red') +
+#   geom_point(aes(y = CO2), color = 'grey60') +
+#   geom_line(aes(y = base)) +
+#   #geom_smooth(aes(x = count, y = CO2.daily.max, group = stage.flood), method = 'lm', se = FALSE) +
+#   facet_wrap(~flood, scales = 'free') +
+#   theme_minimal()
+# 
+# # Check: clean fit
+#   CO2.smooth %>%
+#     filter(ID =='OS', flood==1) %>%
+#     ggplot(aes(x = Date, y = CO2)) +
+#     geom_point(color = 'grey60', size = 0.3) +
+#     geom_point(aes(y = CO2_loess), color = 'blue') +
+#     geom_point(aes(y = base), color = 'red', linetype = 'dashed') +
+#     facet_wrap(~flood, scales = 'free') 
 
-# Check: clean fit
-  CO2.smooth %>%
-    filter(ID =='OS', flood==1) %>%
-    ggplot(aes(x = Date, y = CO2)) +
-    geom_point(color = 'grey60', size = 0.3) +
-    geom_point(aes(y = CO2_loess), color = 'blue') +
-    geom_point(aes(y = base), color = 'red', linetype = 'dashed') +
-    facet_wrap(~flood, scales = 'free') 
-
-  ggplotly()
 # --- Flood bounds -----------------------------------------------------------
 flood.bounds <- flood_dates(CO2.smooth, CO2_loess, direction = 'max')
 #plot_flood_dates(CO2.smooth, CO2_loess, flood.bounds)
@@ -92,16 +91,16 @@ recession.lm <- fit_recessions(CO2.clean, CO2.base, CO2, base.CO2)
 rise.lm      <- fit_rise(CO2.clean,       CO2.base, CO2, base.CO2)
 
 # Check: recession fit
-CO2.clean %>%
-  filter(ID == 'OS', count>0) %>%
-  ggplot(aes(x = count, y = CO2, color = stage.flood)) +
-  geom_point(size = 0.5) +
-  geom_point(aes(y = CO2_loess), color = 'blue', alpha = 0.4) +
-  geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
-  geom_smooth(aes(x = count, y = CO2.daily.max, group = stage.flood),
-              method = 'lm', se = FALSE, color = 'darkgreen') +
-  facet_wrap(~flood, scales = 'free') +
-  labs(title = "CO2: recession check (OS)")
+# CO2.clean %>%
+#   filter(ID == 'OS', count>0) %>%
+#   ggplot(aes(x = count, y = CO2, color = stage.flood)) +
+#   geom_point(size = 0.5) +
+#   geom_point(aes(y = CO2_loess), color = 'blue', alpha = 0.4) +
+#   geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
+#   geom_smooth(aes(x = count, y = CO2.daily.max, group = stage.flood),
+#               method = 'lm', se = FALSE, color = 'darkgreen') +
+#   facet_wrap(~flood, scales = 'free') +
+#   labs(title = "CO2: recession check (OS)")
 
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.CO2 <-
@@ -109,7 +108,20 @@ flood.impacts.CO2 <-
   full_join(rise.lm,  by = c('ID', 'flood')) %>%
   full_join(CO2.max,  by = c('ID', 'flood')) %>%
   full_join(CO2.base, by = c('ID', 'flood')) %>%
-  full_join(flood.bounds, by = c('ID', 'flood')) %>%
   mutate(variable = 'CO2')
 
 write_csv(flood.impacts.CO2, "04_Outputs/flood impacts/CO2.csv")
+
+flood.bounds.join<-flood.bounds%>%mutate(keep='Y')
+
+CO2_trimmed <- CO2.smooth %>%
+  left_join(
+    flood.bounds.join, by = join_by(ID, flood, between(Date, flood.start, flood.end)))%>%
+  filter(keep=='Y') %>%
+  select(-keep, -flood.start, -flood.end)%>%
+  mutate(variable='CO2')%>%
+  rename(conc=CO2, loess=CO2_loess)%>%
+  select(Date, ID, flood, conc, loess, base, variable)
+
+write_csv(CO2_trimmed, "04_Outputs/flood impacts/CO2.flood.df.csv")
+

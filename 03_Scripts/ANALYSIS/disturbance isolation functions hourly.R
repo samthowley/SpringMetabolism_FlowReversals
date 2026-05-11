@@ -1,4 +1,4 @@
-source("03_Scripts/disturbance isolation functions.R")
+source("03_Scripts/ANALYSIS/disturbance isolation functions.R")
 
 trim_gaps <- function(df, gap_days = 7) {
   df %>%
@@ -75,81 +75,5 @@ prep.max.both <- function(df.smooth, variable, variable_loess) {
     ) %>%
     ungroup() %>%
     trim_gaps()
-}
-
-
-flood_dates <- function(df, variable, direction = c('min', 'max')) {
-
-  direction <- match.arg(direction)
-
-  daily <- df %>%
-    filter(!is.na(flood)) %>%
-    mutate(.date = as.Date(Date)) %>%
-    group_by(ID, flood, .date) %>%
-    summarise(
-      .peak = first(na.omit({{variable}})),
-      base  = first(na.omit(base)),
-      .groups = 'drop'
-    ) %>%
-    rename(Date = .date)
-
-  count.df <- if (direction == 'min') count.min(daily, .peak) else count.max(daily, .peak)
-
-  df_aug <- count.df %>%
-    group_by(ID, flood) %>%
-    mutate(
-      stage.flood = if_else(count >= 0, 'post', 'pre'),
-      .wb         = .peak / base,
-      .threshold  = if (direction == 'min')
-                      if_else(any(.wb < 0.8, na.rm = TRUE), 0.8, 1.0)
-                    else
-                      if_else(any(.wb > 1.2, na.rm = TRUE), 1.2, 1.0)
-    ) %>%
-    ungroup()
-
-  if (direction == 'min') {
-
-    flood.start <- df_aug %>%
-      filter(stage.flood == 'pre') %>%
-      group_by(ID, flood) %>%
-      mutate(crit = first_of_three(.wb < .threshold)) %>%
-      filter(crit) %>%
-      summarise(flood.start = min(as.Date(Date)), .groups = 'drop')
-
-    flood.end <- df_aug %>%
-      filter(stage.flood == 'post') %>%
-      group_by(ID, flood) %>%
-      mutate(crit = first_of_three(.wb >= .threshold)) %>%
-      summarise(
-        flood.end = if (any(crit, na.rm = TRUE))
-                      min(as.Date(Date[crit]), na.rm = TRUE)
-                    else
-                      max(as.Date(Date)) + 1L,
-        .groups = 'drop'
-      )
-
-  } else {
-
-    flood.start <- df_aug %>%
-      filter(stage.flood == 'pre') %>%
-      group_by(ID, flood) %>%
-      mutate(crit = first_of_three(.wb > .threshold)) %>%
-      filter(crit) %>%
-      summarise(flood.start = min(as.Date(Date)), .groups = 'drop')
-
-    flood.end <- df_aug %>%
-      filter(stage.flood == 'post') %>%
-      group_by(ID, flood) %>%
-      mutate(crit = first_of_three(.wb <= .threshold)) %>%
-      summarise(
-        flood.end = if (any(crit, na.rm = TRUE))
-                      min(as.Date(Date[crit]), na.rm = TRUE)
-                    else
-                      max(as.Date(Date)) + 1L,
-        .groups = 'drop'
-      )
-  }
-
-  full_join(flood.start, flood.end, by = c('ID', 'flood'))
 }
 
