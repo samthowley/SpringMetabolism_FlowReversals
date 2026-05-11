@@ -1,4 +1,5 @@
 source("03_Scripts/disturbance isolation functions.R")
+source("03_Scripts/disturbance isolation functions daily.R")
 
 # --- Data loading -----------------------------------------------------------
 GPP <- read_csv("04_Outputs/master.metabolism.csv") %>%
@@ -21,7 +22,8 @@ GPP_flagged <- GPP %>%
   select(-start, -end) %>%
   arrange(ID, Date) %>%
   filter(!is.na(GPP)) %>%
-  mutate(date = as.Date(Date))
+  mutate(date = as.Date(Date),
+         GPP=if_else(ID=='LF' & flood==2 & GPP<1.2, NA_real_, GPP))
 
 # --- Baseline ---------------------------------------------------------------
 GPP.base <- baseline(GPP_flagged, GPP)
@@ -51,30 +53,27 @@ GPP.smooth <- smooth(
   left_join(GPP.base)
 
 # Check: smooth fit
-GPP.smooth %>%
-  filter(ID == 'OS') %>%
-  ggplot(aes(x = Date, y = GPP)) +
-  geom_point(color = 'grey60', size = 0.3) +
-  geom_line(aes(y = GPP_loess), color = 'blue') +
-  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-  facet_wrap(~flood, scales = 'free') +
-  labs(title = "GPP: smooth check (OS)", y = "GPP")
+# GPP.smooth %>%
+#   filter(ID == 'OS') %>%
+#   ggplot(aes(x = Date, y = GPP)) +
+#   geom_point(color = 'grey60', size = 0.3) +
+#   geom_line(aes(y = GPP_loess), color = 'blue') +
+#   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+#   facet_wrap(~flood, scales = 'free') +
+#   labs(title = "GPP: smooth check (OS)", y = "GPP")
 
 # --- Isolate disturbance ----------------------------------------------------
-GPP.clean <- prep.min.post.daily(GPP.smooth, GPP_loess, GPP_loess)
+GPP.clean <- prep.min.both.daily(GPP.smooth, GPP_loess, GPP, 14)
 
-plot_grid(
-
-# Check: clean fit
 GPP.clean %>%
-  filter(ID == 'AM', !is.na(flood)) %>%
+  filter(ID == 'OS', !is.na(flood)) %>%
   ggplot(aes(x = count, y = GPP_loess)) +
-  geom_point(aes(color = 'red')) +
+  geom_point(color = 'red') +
   geom_point(aes(y = GPP), color = 'blue') +
   geom_line(aes(y = base)) +
   geom_smooth(aes(x = count, y = GPP, group = stage.flood), method = 'lm', se = FALSE) +
   facet_wrap(~flood, scales = 'free') 
-,
+
 
 GPP.smooth %>%
   filter(ID == 'AM') %>%
@@ -84,16 +83,17 @@ GPP.smooth %>%
   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
   facet_wrap(~flood, scales = 'free') 
 
-)
 
 # --- Flood bounds -----------------------------------------------------------
-flood.start <- GPP.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
-flood.end   <- GPP.clean %>% group_by(ID, flood) %>% summarise(end   = max(as.Date(Date)), .groups = 'drop')
-flood.bounds <- left_join(flood.start, flood.end, by = c('ID', 'flood'))
+
+#flood_dates <- function(df, variable)
+GPP.dates<-flood_dates(GPP.smooth, GPP_loess, direction="min")
+
+plot_flood_dates(GPP.smooth, GPP_loess, GPP.dates)
 
 # --- Minimum, duration ------------------------------------------------------
 GPP.min      <- minimum(GPP.clean, GPP)
-GPP.duration <- duration(GPP.clean)
+GPP.duration <- duration(GPP.dates)
 
 # --- Recession & rise models ------------------------------------------------
 recession.lm <- fit_recessions(GPP.clean, GPP.base, GPP, base.GPP)
@@ -101,7 +101,7 @@ rise.lm      <- fit_rise(GPP.clean,       GPP.base, GPP, base.GPP)
 
 # Check: recession fit
 GPP.clean %>%
-  filter(ID == 'OS') %>%
+  filter(ID == 'ID') %>%
   ggplot(aes(x = count, y = GPP, color = stage.flood)) +
   geom_point(size = 0.5) +
   geom_point(aes(y = GPP_loess), color = 'blue', alpha = 0.4) +
@@ -114,10 +114,9 @@ GPP.clean %>%
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.GPP <-
   full_join(recession.lm, GPP.duration) %>%
-  full_join(rise.lm,      by = c('ID', 'flood')) %>%
-  full_join(GPP.min,      by = c('ID', 'flood')) %>%
-  full_join(GPP.base,     by = c('ID', 'flood')) %>%
-  full_join(flood.bounds, by = c('ID', 'flood')) %>%
+  full_join(rise.lm,  by = c('ID', 'flood')) %>%
+  full_join(GPP.min,  by = c('ID', 'flood')) %>%
+  full_join(GPP.base, by = c('ID', 'flood')) %>%
   mutate(variable = 'GPP')
 
 write_csv(flood.impacts.GPP, "04_Outputs/flood impacts/GPP.csv")

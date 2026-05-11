@@ -109,13 +109,16 @@ ncol=1
 )
 
 # --- Flood bounds -----------------------------------------------------------
-flood.start <- ER.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
-flood.end   <- ER.clean %>% group_by(ID, flood) %>% summarise(end   = max(as.Date(Date)), .groups = 'drop')
-flood.bounds <- left_join(flood.start, flood.end, by = c('ID', 'flood'))
+
+#flood_dates <- function(df, variable)
+flood.bounds<-flood_dates(ER.smooth, ER_loess, direction='max')
+
+plot_flood_dates(ER.smooth, ER_loess, flood.bounds)
+
 
 # --- Maximum, duration ------------------------------------------------------
 ER.max      <- maximum(ER.clean, ER)
-ER.duration <- duration(ER.clean)
+ER.duration <- duration(flood.bounds)
 
 # --- Recession & rise models ------------------------------------------------
 recession.lm <- fit_recessions(ER.clean, ER.base, ER, base.ER)
@@ -135,10 +138,9 @@ ER.clean %>%
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.ER <-
   full_join(recession.lm, ER.duration) %>%
-  full_join(rise.lm,      by = c('ID', 'flood')) %>%
-  full_join(ER.max,       by = c('ID', 'flood')) %>%
-  full_join(ER.base,      by = c('ID', 'flood')) %>%
-  full_join(flood.bounds, by = c('ID', 'flood')) %>%
+  full_join(rise.lm,  by = c('ID', 'flood')) %>%
+  full_join(ER.max,   by = c('ID', 'flood')) %>%
+  full_join(ER.base,  by = c('ID', 'flood')) %>%
   mutate(variable = 'ER')
 
 write_csv(flood.impacts.ER, "04_Outputs/flood impacts/ER.csv")

@@ -162,12 +162,59 @@ maximum <- function(df, variable) {
       peak.Date=Date)
 }
 
-duration <- function(df) {
+duration <- function(dates) {
+  dates %>%
+    mutate(duration = as.numeric(flood.end - flood.start))
+}
+
+# --- Consecutive-run helper --------------------------------------------------
+# first_of_three: TRUE at row i when condition holds at rows i, i+1, and i+2.
+# Adjust the lead() offsets here to change the required run length.
+
+first_of_three <- function(cond) {
+  cond &
+    lead(cond, 1, default = FALSE) &
+    lead(cond, 2, default = FALSE)
+}
+
+# --- Trim smooth data to flood window ----------------------------------------
+# Removes all rows outside (flood.start, flood.end) per flood group.
+# Use after flood_dates() and before re-running a prep function so that count
+# is recalculated relative to the peak within the trimmed window.
+
+trim_to_flood_dates <- function(df, dates) {
   df %>%
+    left_join(select(dates, ID, flood, flood.start, flood.end),
+              by = c('ID', 'flood')) %>%
+    filter(!is.na(flood.start), !is.na(flood.end),
+           as.Date(Date) > flood.start,
+           as.Date(Date) < flood.end) %>%
+    select(-flood.start, -flood.end)
+}
+
+
+plot_flood_dates <- function(df, variable, dates) {
+
+  df_plot <- df %>%
     filter(!is.na(flood)) %>%
-    group_by(ID, flood) %>%
-    mutate(duration = n_distinct(date)) %>%
-    summarise(duration = max(duration))
+    left_join(dates, by = c('ID', 'flood')) %>%
+    mutate(date = as.Date(Date))
+
+  ggplot(df_plot, aes(x = date)) +
+    geom_point(aes(y = {{variable}}), color = 'grey50', size = 0.5) +
+    geom_line(aes(y = base), color = 'red', linetype = 'dashed', linewidth = 0.6) +
+    geom_vline(aes(xintercept = flood.start), color = 'steelblue',
+               linetype = 'dashed', linewidth = 0.7) +
+    geom_vline(aes(xintercept = flood.end), color = 'darkorange',
+               linetype = 'dashed', linewidth = 0.7) +
+    facet_wrap(~ ID + flood, scales = 'free') +
+    labs(
+      x        = 'Date',
+      y        = rlang::as_name(rlang::enquo(variable)),
+      title    = 'Flood date extraction check',
+      subtitle = 'Blue = flood.start | Orange = flood.end | Red = baseline'
+    ) +
+    theme_bw(base_size = 10)
 }
 
 # --- Regression helpers ------------------------------------------------------

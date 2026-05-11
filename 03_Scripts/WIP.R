@@ -89,11 +89,11 @@ DO.clean %>%
   facet_wrap(~flood, scales = 'free') +
   labs(title = "DO: prep.count.min check (OS)")
 
-# --- Recovery, minimum, duration --------------------------------------------
-flood.start <- DO.clean %>% group_by(ID, flood) %>% summarise(start = min(as.Date(Date)), .groups = 'drop')
-flood.end   <- DO.clean %>% group_by(ID, flood) %>% summarise(end   = max(as.Date(Date)), .groups = 'drop')
+# --- Flood dates (start / end) ----------------------------------------------
+flood.bounds <- flood_dates(DO.clean, DO.daily.min)
 
-flood.bounds <- left_join(flood.start, flood.end, by = c('ID', 'flood'))
+# Check: flood date extraction
+plot_flood_dates(DO.clean, DO.daily.min, flood.bounds)
 
 ##
 DO.min      <- minimum(DO.clean, DO.daily.min)
