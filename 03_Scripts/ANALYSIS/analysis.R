@@ -1,11 +1,5 @@
 source("03_Scripts/ANALYSIS/disturbance isolation functions.R")
 
-(file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
-file.names<-file.names[c(1,4,2)]
-
-data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
-
-
 SpC<-read_csv("04_Outputs/flood impacts/SpC.csv")%>%
   select(ID, flood, minimum)%>%
   rename(SpC=minimum)
@@ -41,11 +35,39 @@ flood.response<-rbind(declined, increased)%>%
   left_join(h.percent.change)%>%
   mutate(reponse.percent.change=(peak.response-base)/base*100)
 
+flood.response%>%
+  filter(variable=='GPP')%>%
+  ggplot(aes(x=h.percent.change, y=recess.slope, color=r2.recess))+
+  geom_point(size=2)+
+  facet_wrap(~ID, scales='free')
 
-flood.response%>%filter(variable %in% c('GPP', 'DO'))%>%
-ggplot(aes(x=h.percent.change, y=reponse.percent.change, color=variable, shape=ID))+
-  geom_point()+
-  geom_smooth(method='lm', aes(group = ID), se=F)+
-  theme_bw()
 
+GPP_flood_df <- read_csv("04_Outputs/flood impacts/GPP.flood.df.csv")
+ER_flood_df  <- read_csv("04_Outputs/flood impacts/ER.flood.df.csv")
+DO_flood_df  <- read_csv("04_Outputs/flood impacts/DO.flood.df.csv")
+CO2_flood_df <- read_csv("04_Outputs/flood impacts/CO2.flood.df.csv")
+depth_flood_df <- read_csv("04_Outputs/flood impacts/depth.flood.df.csv")
+
+h.per.change.timeseries <- depth_flood_df%>%
+  mutate(h.percent.change=(conc-base)/base*100)%>%
+  select(ID, flood, Date, h.percent.change)
+
+time.series <- rbind(GPP_flood_df, ER_flood_df, DO_flood_df, CO2_flood_df,depth_flood_df)%>%
+  left_join(h.per.change.timeseries)%>%
+  left_join(flood.class)
+
+
+time.series%>%
+  filter(variable=='ER')%>%
+  ggplot(aes(x=h.percent.change, y=conc, color=class))+
+  geom_point(size=1)+
+  facet_wrap(~ID, scales='free')
+
+
+time.series%>%
+  filter(flood==1, variable %in% c('GPP', 'DO'))%>%
+  mutate(loess.per.change=(loess-base)/base*100)%>%
+  ggplot(aes(x=h.percent.change, y=loess.per.change, color=variable))+
+  geom_point(size=1)+
+  facet_wrap(~ID, scales='free')
 

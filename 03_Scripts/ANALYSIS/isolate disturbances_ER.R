@@ -70,21 +70,21 @@ prep.max.both.daily(
 )
 
 # Check: clean fit####
-ER.clean %>%
-  filter(ID == 'OS', !is.na(flood)) %>%
-  ggplot(aes(x = count, y = ER_loess)) +
-  geom_point(color = 'red') +
-  geom_point(aes(y = ER), color = 'blue') +
-  geom_line(aes(y = base)) +
-  facet_wrap(~flood, scales = 'free') 
-
-  ER.smooth %>%
-    filter(ID == 'AM') %>%
-    ggplot(aes(x = Date, y = ER)) +
-    geom_point(color = 'grey60', size = 0.3) +
-    geom_line(aes(y = ER_loess), color = 'blue') +
-    geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-    facet_wrap(~flood, scales = 'free') 
+# ER.clean %>%
+#   filter(ID == 'OS', !is.na(flood)) %>%
+#   ggplot(aes(x = count, y = ER_loess)) +
+#   geom_point(color = 'red') +
+#   geom_point(aes(y = ER), color = 'blue') +
+#   geom_line(aes(y = base)) +
+#   facet_wrap(~flood, scales = 'free') 
+# 
+#   ER.smooth %>%
+#     filter(ID == 'AM') %>%
+#     ggplot(aes(x = Date, y = ER)) +
+#     geom_point(color = 'grey60', size = 0.3) +
+#     geom_line(aes(y = ER_loess), color = 'blue') +
+#     geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+#     facet_wrap(~flood, scales = 'free') 
 
 # --- Flood bounds -----------------------------------------------------------
 
@@ -99,15 +99,15 @@ recession.lm <- fit_recessions(ER.clean, ER.base, ER, base.ER)
 rise.lm      <- fit_rise(ER.clean,       ER.base, ER, base.ER)
 
 # Check: recession fit
-ER.clean %>%
-  filter(ID == 'OS') %>%
-  ggplot(aes(x = count, y = ER, color = stage.flood)) +
-  geom_point() +
-  geom_point(aes(y = ER_loess), color = 'blue', alpha = 0.4) +
-  geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
-  geom_smooth(aes(x = count, y = ER, group = stage.flood),
-              method = 'lm', se = FALSE, color = 'darkgreen') +
-  facet_wrap(~flood, scales = 'free') 
+# ER.clean %>%
+#   filter(ID == 'OS') %>%
+#   ggplot(aes(x = count, y = ER, color = stage.flood)) +
+#   geom_point() +
+#   geom_point(aes(y = ER_loess), color = 'blue', alpha = 0.4) +
+#   geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
+#   geom_smooth(aes(x = count, y = ER, group = stage.flood),
+#               method = 'lm', se = FALSE, color = 'darkgreen') +
+#   facet_wrap(~flood, scales = 'free') 
 
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.ER <-

@@ -56,24 +56,24 @@ GPP.smooth <- smooth(
 
 # --- Isolate disturbance ----------------------------------------------------
 GPP.clean <- prep.min.both.daily(GPP.smooth, GPP_loess, GPP, 14)
-
-GPP.clean %>%
-  filter(ID == 'OS', !is.na(flood)) %>%
-  ggplot(aes(x = count, y = GPP_loess)) +
-  geom_point(color = 'red') +
-  geom_point(aes(y = GPP), color = 'blue') +
-  geom_line(aes(y = base)) +
-  geom_smooth(aes(x = count, y = GPP, group = stage.flood), method = 'lm', se = FALSE) +
-  facet_wrap(~flood, scales = 'free') 
-
-
-GPP.smooth %>%
-  filter(ID == 'GB') %>%
-  ggplot(aes(x = Date, y = GPP)) +
-  geom_point(color = 'grey60', size = 0.3) +
-  geom_line(aes(y = GPP_loess), color = 'blue') +
-  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-  facet_wrap(~flood, scales = 'free') 
+# 
+# GPP.clean %>%
+#   filter(ID == 'OS', !is.na(flood)) %>%
+#   ggplot(aes(x = count, y = GPP_loess)) +
+#   geom_point(color = 'red') +
+#   geom_point(aes(y = GPP), color = 'blue') +
+#   geom_line(aes(y = base)) +
+#   geom_smooth(aes(x = count, y = GPP, group = stage.flood), method = 'lm', se = FALSE) +
+#   facet_wrap(~flood, scales = 'free') 
+# 
+# 
+# GPP.smooth %>%
+#   filter(ID == 'GB') %>%
+#   ggplot(aes(x = Date, y = GPP)) +
+#   geom_point(color = 'grey60', size = 0.3) +
+#   geom_line(aes(y = GPP_loess), color = 'blue') +
+#   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+#   facet_wrap(~flood, scales = 'free') 
 
 
 # --- Flood bounds -----------------------------------------------------------
