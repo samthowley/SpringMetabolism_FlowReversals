@@ -1,33 +1,21 @@
 #call in data########
-
+library(weathermetrics)
 #might be worth seeing if GB has anymore DO data
 source("03_Scripts/disturbance isolation functions.R")
 
-file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
-file.names<-file.names[c(2, 11, 7, 4, 1)]
-data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
-master <- reduce(data, full_join, by = c("ID", 'Date'))%>%
+master <- read_csv("02_Clean_data/master_chem1.csv")%>%
   mutate(
     min=minute(Date),
     depth=if_else(ID=='GB' & Date>'2024-07-01', NA, depth)
     )%>%
   filter(
-    Date> '2022-01-01', 
-    ID %in% c('GB', 'AM', 'LF', 'OS', 'ID', 'IU'),
-    min==0
-    )%>%
-  select(-min)
+    Date> '2022-01-01')
 
 
 chem <- master %>%
   arrange(Date) %>%
   filter(!is.na(depth))%>%
   mutate(
-    Temp_C = fahrenheit.to.celsius(Temp),
-    Temp_K = Temp_C + 273.15,
-    exp    = 2400 * ((1/Temp_K) - (1/298.15)),
-    KH     = 0.034 * 2.178^exp,
-    CO2.mg.L = CO2 / 10^6 * KH * 44.01 * 10^3,
     day    = as.Date(Date)
   ) %>%
   group_by(ID)%>%
@@ -110,6 +98,19 @@ flood.periods <- runs %>%
     start = run_start,
     end   = next_end
   )
+
+#check#######
+
+depth_flagged <- master %>%
+  left_join(
+    flood.periods, by = join_by(ID, between(Date, start, end))
+  ) 
+
+depth_flagged%>%
+  ggplot(aes(x=Date, y=depth, color=as.factor(flood)))+
+  geom_line()+
+  facet_wrap(~ID)
+  
 
 write_csv(flood.periods, "01_Raw_data/flood.periods.csv")
 

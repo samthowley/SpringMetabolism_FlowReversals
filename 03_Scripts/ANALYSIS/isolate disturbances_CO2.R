@@ -1,17 +1,15 @@
 source("03_Scripts/ANALYSIS/disturbance isolation functions hourly.R")
 
 # --- Data loading -----------------------------------------------------------
-CO2 <- read_csv("02_Clean_data/Chem/CO2.csv")%>%
-  filter(CO2>600)
-h   <- read_csv("02_Clean_data/Chem/depth.csv")
 
-co2 <- full_join(CO2, h)
+CO2<-master%>%select(Date, ID, CO2, depth)%>%
+  filter(CO2>600)
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
 
 # --- Flag flood periods -----------------------------------------------------
-CO2_flagged <- co2 %>%
+CO2_flagged <- CO2 %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
@@ -87,12 +85,12 @@ flood.bounds <- flood_dates(CO2.smooth, CO2_loess, direction = 'max')
 CO2.duration <- duration(flood.bounds)
 
 # --- Recession & rise models ------------------------------------------------
-recession.lm <- fit_recessions(CO2.clean, CO2.base, CO2, base.CO2)
-rise.lm      <- fit_rise(CO2.clean,       CO2.base, CO2, base.CO2)
+recession.lm <- fit_recessions(CO2.clean, CO2.base, CO2.daily.max, base.CO2)
+rise.lm      <- fit_rise(CO2.clean,       CO2.base, CO2.daily.max, base.CO2)
 
 # Check: recession fit
 # CO2.clean %>%
-#   filter(ID == 'OS', count>0) %>%
+#   filter(ID == 'AM', count>0) %>%
 #   ggplot(aes(x = count, y = CO2, color = stage.flood)) +
 #   geom_point(size = 0.5) +
 #   geom_point(aes(y = CO2_loess), color = 'blue', alpha = 0.4) +

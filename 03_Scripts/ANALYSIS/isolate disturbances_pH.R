@@ -1,14 +1,13 @@
 source("03_Scripts/disturbance isolation functions.R")
 
 # --- Data loading -----------------------------------------------------------
-pH <- read_csv("02_Clean_data/Chem/pH.csv")
-h  <- read_csv("02_Clean_data/Chem/depth.csv")
+pH<-master%>%select(Date, ID, depth, pH)
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
 
 # --- Flag flood periods -----------------------------------------------------
-pH_flagged <- full_join(pH, h) %>%
+pH_flagged <- pH %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%

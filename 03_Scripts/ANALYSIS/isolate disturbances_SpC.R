@@ -1,14 +1,13 @@
 source("03_Scripts/disturbance isolation functions.R")
 
 # --- Data loading -----------------------------------------------------------
-SpC <- read_csv("02_Clean_data/Chem/SpC.csv")
-h   <- read_csv("02_Clean_data/Chem/depth.csv")
+SpC<-master%>%select(Date, ID, depth, SpC)
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
 
 # --- Flag flood periods -----------------------------------------------------
-SpC_flagged <- full_join(SpC, h) %>%
+SpC_flagged <- SpC %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%

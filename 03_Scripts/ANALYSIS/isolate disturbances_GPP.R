@@ -10,6 +10,7 @@ GPP <- read_csv("04_Outputs/master.metabolism.csv") %>%
       summarise(depth = mean(depth, na.rm = TRUE), .groups = 'drop')
   )
 
+
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
 
@@ -55,25 +56,29 @@ GPP.smooth <- smooth(
   left_join(GPP.base)
 
 # --- Isolate disturbance ----------------------------------------------------
-GPP.clean <- prep.min.both.daily(GPP.smooth, GPP_loess, GPP, 14)
+GPP.clean <- prep.min.both.daily(GPP.smooth, GPP_loess, GPP, 14)%>%
+  mutate(
+    GPP=if_else(ID=='IU' & flood==2 & count>100, NA, GPP),
+    GPP=if_else(ID=='IU' & flood==4 & count>20, NA, GPP)
+  )
 # 
 # GPP.clean %>%
-#   filter(ID == 'OS', !is.na(flood)) %>%
+#   filter(ID == 'IU', !is.na(flood)) %>%
 #   ggplot(aes(x = count, y = GPP_loess)) +
 #   geom_point(color = 'red') +
 #   geom_point(aes(y = GPP), color = 'blue') +
 #   geom_line(aes(y = base)) +
 #   geom_smooth(aes(x = count, y = GPP, group = stage.flood), method = 'lm', se = FALSE) +
-#   facet_wrap(~flood, scales = 'free') 
+#   facet_wrap(~flood, scales = 'free')
 # 
 # 
 # GPP.smooth %>%
-#   filter(ID == 'GB') %>%
+#   filter(ID == 'IU') %>%
 #   ggplot(aes(x = Date, y = GPP)) +
 #   geom_point(color = 'grey60', size = 0.3) +
 #   geom_line(aes(y = GPP_loess), color = 'blue') +
 #   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-#   facet_wrap(~flood, scales = 'free') 
+#   facet_wrap(~flood, scales = 'free')
 
 
 # --- Flood bounds -----------------------------------------------------------
@@ -90,16 +95,16 @@ recession.lm <- fit_recessions(GPP.clean, GPP.base, GPP, base.GPP)
 rise.lm      <- fit_rise(GPP.clean,       GPP.base, GPP, base.GPP)
 
 # Check: recession fit
-# GPP.clean %>%
-#   filter(ID == 'ID') %>%
-#   ggplot(aes(x = count, y = GPP, color = stage.flood)) +
-#   geom_point(size = 0.5) +
-#   geom_point(aes(y = GPP_loess), color = 'blue', alpha = 0.4) +
-#   geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
-#   geom_smooth(aes(x = count, y = GPP, group = stage.flood),
-#               method = 'lm', se = FALSE, color = 'darkgreen') +
-#   facet_wrap(~flood, scales = 'free') +
-#   labs(title = "GPP: recession check (OS)")
+GPP.clean %>%
+  filter(ID == 'IU', count>0) %>%
+  ggplot(aes(x = count, y = GPP, color = stage.flood)) +
+  geom_point(size = 0.5) +
+  geom_point(aes(y = GPP_loess), color = 'blue', alpha = 0.4) +
+  geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
+  geom_smooth(aes(x = count, y = GPP, group = stage.flood),
+              method = 'lm', se = FALSE, color = 'darkgreen') +
+  facet_wrap(~flood, scales = 'free') +
+  labs(title = "GPP: recession check (OS)")
 
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.GPP <-
@@ -113,7 +118,7 @@ write_csv(flood.impacts.GPP, "04_Outputs/flood impacts/GPP.csv")
 
 
 
-flood.bounds.join<-flood.bounds%>%mutate(keep='Y')
+flood.bounds.join<-GPP.dates%>%mutate(keep='Y')
 
 GPP_trimmed <- GPP.smooth %>%
   left_join(

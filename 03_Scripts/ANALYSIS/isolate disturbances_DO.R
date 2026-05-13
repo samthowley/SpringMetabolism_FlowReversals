@@ -2,19 +2,13 @@ source("03_Scripts/ANALYSIS/disturbance isolation functions hourly.R")
 
 
 # --- Data loading -----------------------------------------------------------
-DO  <- read_csv("02_Clean_data/Chem/DO.csv")
-h   <- read_csv("02_Clean_data/Chem/depth.csv")
-SpC <- read_csv("02_Clean_data/Chem/SpC.csv")
-
-DO <- full_join(DO, h) %>%
+DO  <- master%>% select(Date, ID, DO, depth)%>%
   filter(!is.na(Date), !is.na(DO)) %>%
   mutate(date = as.Date(Date)) %>%
   group_by(ID, date) %>%
   mutate(
     DO.daily.min = min(DO, na.rm = TRUE),
-    ) %>%
-  ungroup() %>%
-  left_join(SpC)
+    )
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
@@ -62,12 +56,12 @@ DO.clean <- prep.min.both(DO.smooth, DO, DO_loess)#%>%
   #mutate(DO=if_else(ID=='GB' & flood==2 & count>1500, NA, DO))
 
 # DO.clean %>%
-#   filter(ID == 'OS', !is.na(flood)) %>%
+#   filter(ID == 'IU', !is.na(flood)) %>%
 #   ggplot(aes(x = count, y = DO_loess)) +
 #   geom_point(aes(y = DO), color = 'gray60') +
 #   geom_point(aes(color = 'red')) +
 #   geom_line(aes(y = base)) +
-#   facet_wrap(~flood, scales = 'free') 
+#   facet_wrap(~flood, scales = 'free')
 # 
 # # Check: clean fit
 #   DO.smooth %>%
@@ -86,17 +80,17 @@ flood.bounds<-flood_dates(DO.smooth, DO_loess, direction='min')
 DO.duration <- duration(flood.bounds)
 
 # --- Recession & rise models ------------------------------------------------
-recession.lm <- fit_recessions(DO.clean, DO.base, DO, base.DO)
-rise.lm      <- fit_rise(DO.clean,       DO.base, DO, base.DO)
+recession.lm <- fit_recessions(DO.clean, DO.base, DO.daily.min, base.DO)
+rise.lm      <- fit_rise(DO.clean,       DO.base, DO.daily.min, base.DO)
 
 # Check: recession fit
 # DO.clean %>%
-#   filter(ID == 'OS', count>0) %>%
+#   filter(ID == 'ID', count>0) %>%
 #   ggplot(aes(x = count, y = DO, color = stage.flood)) +
 #   geom_point(size = 1, alpha=0.5) +
 #   geom_line(aes(y = DO_loess), color = 'blue', alpha = 0.4) +
 #   geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
-#   geom_smooth(aes(x = count, y = DO, group = stage.flood),
+#   geom_smooth(aes(x = count, y = DO.daily.min, group = stage.flood),
 #               method = 'lm', se = FALSE, color = 'darkgreen') +
 #   facet_wrap(~flood, scales = 'free') +theme_minimal()
 # 
@@ -111,27 +105,6 @@ flood.impacts.DO <-
 write_csv(flood.impacts.DO, "04_Outputs/flood impacts/DO.csv")
 
 
-# FR.class <- DO.clean %>%
-#   left_join(class, by = c('ID', 'flood')) %>%
-#   left_join(SpC) %>%
-#   arrange(ID, Date) %>%
-#   fill(SpC, .direction = 'down') %>%
-#   filter(count > -7 * 24, count < 7 * 24) %>%
-#   mutate(
-#     class = if_else(class == 'RR' & SpC < 200 & DO > 4, "FR", class),
-#     class = if_else(class == 'RR', "BO", class)
-#   ) %>%
-#   group_by(ID, flood) %>%
-#   mutate(
-#     max_height = which.max(replace(DO, is.na(DO), -Inf)),
-#     minimum    = case_when(row_number() == max_height ~ 0)
-#   ) %>%
-#   filter(minimum == 0) %>%
-#   select(ID, flood, class)
-# 
-# write_csv(FR.class, "04_Outputs/FR.class.csv")
-
-
 flood.bounds.join<-flood.bounds%>%mutate(keep='Y')
 
 DO_trimmed <- DO.smooth %>%
@@ -144,4 +117,46 @@ DO_trimmed <- DO.smooth %>%
   select(Date, ID, flood, conc, loess, base, variable)
 
 write_csv(DO_trimmed, "04_Outputs/flood impacts/DO.flood.df.csv")
+
+
+# --- Flood classification (FR / BO / HI) ------------------------------------
+
+SpC <- read_csv("02_Clean_data/Chem/SpC.csv")
+
+flood.class <- DO.clean %>%
+  filter(!is.na(flood)) %>%
+  select(Date, ID, flood, DO, count) %>%
+  left_join(
+    SpC, by = c("Date", "ID")
+  ) %>%
+  group_by(ID, flood) %>%
+  #filter(count> -7*24 & count<7*24)%>%
+  mutate(
+    class.raw= case_when(
+      DO>5 & SpC<200 ~'FR',
+      DO<3 ~'BO'),
+    has_FR = any(class.raw=='FR', na.rm = TRUE),
+    has_BO = any(class.raw=='BO', na.rm = TRUE),
+    .groups = "drop"
+  )%>%
+  mutate(
+    class = case_when(
+      has_FR ~ "FR",
+      has_BO ~ "BO",
+      TRUE   ~ "HI"
+    ),
+    class=if_else(ID=='AM' & flood==6, 'FR', class),
+    class=if_else(ID=='LF' & flood==6, 'FR', class)
+  ) %>%
+  filter(count==0)%>%
+  select(ID, flood, class)
+
+
+flood.class%>%filter(ID=='AM')%>%
+  ggplot(aes(x=Date, y=DO, color=class))+
+  geom_point()+
+  facet_wrap(~flood, scales='free')
+
+write_csv(flood.class, "04_Outputs/flood impacts/FR_class.csv")
+
 

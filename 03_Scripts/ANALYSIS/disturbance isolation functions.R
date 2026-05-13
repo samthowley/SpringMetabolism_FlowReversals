@@ -13,6 +13,8 @@ library(strucchange)
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
 
+master<- read_csv("02_Clean_data/master_chem1.csv")
+
 # --- Smoothing ---------------------------------------------------------------
 
 smooth <- function(flagged, variable) {
