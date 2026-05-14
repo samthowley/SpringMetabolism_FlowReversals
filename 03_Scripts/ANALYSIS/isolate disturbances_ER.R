@@ -69,9 +69,9 @@ prep.max.both.daily(
     )
 )
 
-# Check: clean fit####
+#Check: clean fit####
 # ER.clean %>%
-#   filter(ID == 'IU', !is.na(flood)) %>%
+#   filter(ID == 'LF', !is.na(flood)) %>%
 #   ggplot(aes(x = count, y = ER_loess)) +
 #   geom_point(color = 'red') +
 #   geom_point(aes(y = ER), color = 'blue') +

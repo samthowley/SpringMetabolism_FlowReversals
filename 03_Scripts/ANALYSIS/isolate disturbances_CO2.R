@@ -17,7 +17,10 @@ CO2_flagged <- CO2 %>%
   arrange(ID, Date) %>%
   mutate(
      date = as.Date(Date),
-     CO2=if_else(ID=='OS' & flood==1 & CO2>3500, NA, CO2)) %>%
+     CO2=if_else(ID=='OS' & flood==1 & CO2>3500, NA, CO2),
+     CO2=if_else(ID=='AM' & flood==4 & CO2>15000, NA, CO2),
+     
+     ) %>%
   filter(!is.na(CO2)) %>%
   group_by(ID, date) %>%
   mutate(CO2.daily.max = max(CO2, na.rm = TRUE)) %>%
@@ -58,15 +61,15 @@ CO2.smooth <- smooth(
 
 CO2.clean <- prep.max.both(CO2.smooth, CO2, CO2_loess)
 
-# CO2.clean %>%
-#   filter(ID =='OS', !is.na(flood), flood==1) %>%
-#   ggplot(aes(x = count, y = CO2_loess)) +
-#   geom_point(color = 'red') +
-#   geom_point(aes(y = CO2), color = 'grey60') +
-#   geom_line(aes(y = base)) +
-#   #geom_smooth(aes(x = count, y = CO2.daily.max, group = stage.flood), method = 'lm', se = FALSE) +
-#   facet_wrap(~flood, scales = 'free') +
-#   theme_minimal()
+CO2.clean %>%
+  filter(ID =='AM', !is.na(flood)) %>%
+  ggplot(aes(x = count, y = CO2_loess)) +
+  geom_point(color = 'red') +
+  geom_point(aes(y = CO2), color = 'grey60') +
+  geom_line(aes(y = base)) +
+  #geom_smooth(aes(x = count, y = CO2.daily.max, group = stage.flood), method = 'lm', se = FALSE) +
+  facet_wrap(~flood, scales = 'free') +
+  theme_minimal()
 # 
 # # Check: clean fit
 #   CO2.smooth %>%

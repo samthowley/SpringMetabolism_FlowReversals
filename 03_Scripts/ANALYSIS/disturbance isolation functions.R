@@ -70,18 +70,28 @@ baseline <- function(flagged, variable) {
 }
 
 # --- Peak counters -----------------------------------------------------------
+# Peaks are located at the center of the 3-day rolling-mean window with the
+# most extreme value, reducing sensitivity to point-in-time noise. Window size
+# is auto-detected: k=72 for hourly data, k=3 for daily data.
+
+.roll_k <- function(dates) {
+  dt_h <- as.numeric(median(diff(as.POSIXct(dates)), na.rm = TRUE)) / 3600
+  as.integer(max(1L, round(72 / dt_h)))
+}
 
 count.min <- function(trim, variable) {
   trim %>%
     group_by(ID, flood) %>%
     arrange(Date) %>%
     mutate(
-      var_clean  = replace({{variable}}, is.na({{variable}}), Inf),
-      min_val    = min(var_clean, na.rm = TRUE),
-      max_height = max(which(var_clean == min_val)),
-      count      = row_number() - max_height
+      .k       = .roll_k(Date),
+      roll_avg = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+                                fill = NA, align = 'center', na.rm = TRUE),
+      roll_avg = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
+      peak_row = which.min(replace(roll_avg, is.na(roll_avg), Inf)),
+      count    = row_number() - peak_row
     ) %>%
-    select(-var_clean, -min_val) %>%
+    select(-.k, -roll_avg, -peak_row) %>%
     ungroup()
 }
 
@@ -90,30 +100,37 @@ count.max <- function(trim, variable) {
     group_by(ID, flood) %>%
     arrange(Date) %>%
     mutate(
-      var_clean  = replace({{variable}}, is.na({{variable}}), Inf),
-      max_val    = max(var_clean, na.rm = TRUE),
-      max_height = max(which(var_clean == max_val)),
-      count      = row_number() - max_height
+      .k       = .roll_k(Date),
+      roll_avg = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+                                fill = NA, align = 'center', na.rm = TRUE),
+      roll_avg = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
+      peak_row = which.max(replace(roll_avg, is.na(roll_avg), -Inf)),
+      count    = row_number() - peak_row
     ) %>%
-    select(-var_clean, -max_val) %>%
+    select(-.k, -roll_avg, -peak_row) %>%
     ungroup()
 }
 
-# Double-peak variants — anchor count=0 at last local min/max (second peak).
+# Double-peak variants — anchor count=0 at the last local min/max of the
+# 3-day rolling mean (second peak).
 count.min.double <- function(trim, variable) {
   trim %>%
     group_by(ID, flood) %>%
     arrange(Date) %>%
     mutate(
-      var_clean = replace({{variable}}, is.na({{variable}}), Inf),
-      d         = c(NA_real_, diff(var_clean)),
+      .k        = .roll_k(Date),
+      roll_avg  = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+                                 fill = NA, align = 'center', na.rm = TRUE),
+      roll_avg  = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
+      d         = c(NA_real_, diff(roll_avg)),
       d_next    = c(tail(d, -1), NA_real_),
       local_min = !is.na(d) & !is.na(d_next) & d < 0 & d_next > 0,
       peak_row  = suppressWarnings(max(which(local_min))),
-      peak_row  = if_else(is.finite(peak_row), peak_row, max(which(var_clean == min(var_clean)))),
+      peak_row  = if_else(is.finite(peak_row), peak_row,
+                          which.min(replace(roll_avg, is.na(roll_avg), Inf))),
       count     = row_number() - peak_row
     ) %>%
-    select(-var_clean, -d, -d_next, -local_min, -peak_row) %>%
+    select(-.k, -roll_avg, -d, -d_next, -local_min, -peak_row) %>%
     ungroup()
 }
 
@@ -122,15 +139,19 @@ count.max.double <- function(trim, variable) {
     group_by(ID, flood) %>%
     arrange(Date) %>%
     mutate(
-      var_clean = replace({{variable}}, is.na({{variable}}), -Inf),
-      d         = c(NA_real_, diff(var_clean)),
+      .k        = .roll_k(Date),
+      roll_avg  = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+                                 fill = NA, align = 'center', na.rm = TRUE),
+      roll_avg  = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
+      d         = c(NA_real_, diff(roll_avg)),
       d_next    = c(tail(d, -1), NA_real_),
       local_max = !is.na(d) & !is.na(d_next) & d > 0 & d_next < 0,
       peak_row  = suppressWarnings(max(which(local_max))),
-      peak_row  = if_else(is.finite(peak_row), peak_row, max(which(var_clean == max(var_clean)))),
+      peak_row  = if_else(is.finite(peak_row), peak_row,
+                          which.max(replace(roll_avg, is.na(roll_avg), -Inf))),
       count     = row_number() - peak_row
     ) %>%
-    select(-var_clean, -d, -d_next, -local_max, -peak_row) %>%
+    select(-.k, -roll_avg, -d, -d_next, -local_max, -peak_row) %>%
     ungroup()
 }
 
@@ -138,30 +159,36 @@ count.max.double <- function(trim, variable) {
 
 minimum <- function(df, variable) {
   df %>%
+    arrange(Date) %>%
     group_by(ID, flood) %>%
     mutate(
-      max_height = which.min(replace({{variable}}, is.na({{variable}}), -Inf)),
-      minimum    = case_when(row_number() == max_height ~ 0)
+      .k       = .roll_k(Date),
+      roll_avg = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+                                fill = NA, align = 'center', na.rm = TRUE),
+      roll_avg = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
+      peak_row = which.min(replace(roll_avg, is.na(roll_avg), Inf))
     ) %>%
-    filter(minimum == 0) %>%
-    select(Date, ID, flood, {{variable}}) %>%
-    rename(
-      minimum = {{variable}},
-      peak.Date=Date)
+    filter(row_number() == peak_row) %>%
+    select(Date, ID, flood, roll_avg) %>%
+    rename(minimum = roll_avg, peak.Date = Date) %>%
+    ungroup()
 }
 
 maximum <- function(df, variable) {
   df %>%
+    arrange(Date) %>%
     group_by(ID, flood) %>%
     mutate(
-      max_height = which.max(replace({{variable}}, is.na({{variable}}), -Inf)),
-      maximum    = case_when(row_number() == max_height ~ 0)
+      .k       = .roll_k(Date),
+      roll_avg = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+                                fill = NA, align = 'center', na.rm = TRUE),
+      roll_avg = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
+      peak_row = which.max(replace(roll_avg, is.na(roll_avg), -Inf))
     ) %>%
-    filter(maximum == 0) %>%
-    select(Date, ID, flood, {{variable}}) %>%
-    rename(
-      maximum = {{variable}},
-      peak.Date=Date)
+    filter(row_number() == peak_row) %>%
+    select(Date, ID, flood, roll_avg) %>%
+    rename(maximum = roll_avg, peak.Date = Date) %>%
+    ungroup()
 }
 
 duration <- function(dates) {

@@ -1,8 +1,8 @@
-source('03_Scripts/ANALYSIS/analysis prep.R')
+#source('03_Scripts/ANALYSIS/analysis prep.R')
 
-library(tidyverse)
-library(patchwork)
-library(segmented)
+#library(tidyverse)
+#library(patchwork)
+#library(segmented)
 select <- dplyr::select
 
 theme_spring <- function() {
@@ -15,18 +15,51 @@ theme_spring <- function() {
     )
 }
 
-class.periods <- flood.response %>% select(ID, class, flood.start, flood.end)
+df <- left_join(
+  chem_hourly %>%
+    select(ID, Date, DO, CO2, depth) %>%
+    mutate(Date = as.Date(Date)) %>%
+    group_by(ID, Date) %>%
+    summarise(DO    = mean(DO,    na.rm = TRUE),
+              CO2   = mean(CO2,   na.rm = TRUE),
+              depth = mean(depth, na.rm = TRUE),
+              .groups = "drop"),
+  metab %>% rename(Date = Date) %>% select(-depth, -K600) %>%
+    distinct(ID, Date, .keep_all = TRUE) %>%
+    mutate(NEP = GPP + ER),
+  by = c("Date", "ID"),
+  relationship = "one-to-one"
+) %>% arrange(ID, Date)
 
-master_long <- master %>%
-  pivot_longer(cols = c(GPP, ER, DO, CO2),
+# ── Join diagnostics (remove once IU is confirmed working) ───────────────────
+message("IDs in chem_hourly : ", paste(sort(unique(chem_hourly$ID)), collapse = ", "))
+message("IDs in metab       : ", paste(sort(unique(metab$ID)),        collapse = ", "))
+message("IDs in df          : ", paste(sort(unique(df$ID)),           collapse = ", "))
+df %>%
+  group_by(ID) %>%
+  summarise(n_rows  = n(),
+            n_depth = sum(!is.na(depth)),
+            n_CO2   = sum(!is.na(CO2)),
+            n_GPP   = sum(!is.na(GPP)),
+            n_ER    = sum(!is.na(ER)),
+            .groups = "drop") %>%
+  print()
+
+
+master_long <- df %>%
+  pivot_longer(cols = c(GPP, ER, NEP, DO, CO2),
                names_to = "variable", values_to = "value") %>%
-  filter(!is.na(depth), !is.na(value)) %>%
-  left_join(class.periods, by = join_by(ID, between(Date, flood.start, flood.end))) %>%
-  arrange(ID, Date) %>%
-  group_by(ID, variable) %>%
-  fill(class, .direction = "down") %>%
-  ungroup()
-
+  filter(!is.na(depth)) %>%
+  left_join(peak_dates, by = join_by(ID, Date), relationship = "many-to-many") %>%
+  arrange(ID, depth)%>%
+  group_by(ID)%>%
+  #fill(class, .direction = 'down')%>%
+  mutate(
+    class=if_else(is.na(class), 'baseline', class),
+    variable = factor(variable, levels = c("depth", "DO", "CO2", "GPP", "ER", "NEP")),
+    ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
+  )
+unique(master_long$ID)
 
 # ── Model-selection parameters ────────────────────────────────────────────────
 # fit_criterion: "adjR2" (default) | "AIC" | "BIC"
@@ -81,21 +114,27 @@ seg_preds <- list()
 seg_bps   <- list()
 bp_slopes <- list()
 
-for (var in c("GPP", "ER", "DO", "CO2")) {
-  dat_v <- master %>%
+for (var in c("GPP", "ER", "NEP", "DO", "CO2")) {
+  dat_v <- df %>%
     transmute(Date, ID, depth, value = .data[[var]]) %>%
     filter(!is.na(depth), !is.na(value))
 
   for (site in unique(dat_v$ID)) {
     sub <- filter(dat_v, ID == site) %>% arrange(depth)
-    if (nrow(sub) < 25) next
+    if (nrow(sub) < 25) {
+      message(sprintf("SKIP  %s × %s — only %d observations (need ≥ 25)", var, site, nrow(sub)))
+      next
+    }
 
     lm_fit <- lm(value ~ depth, data = sub)
     seg1   <- try_seg(lm_fit, sub$depth, 1)
     seg2   <- try_seg(lm_fit, sub$depth, 2)
 
     best <- choose_model(seg1, seg2)
-    if (is.null(best)) next
+    if (is.null(best)) {
+      message(sprintf("SKIP  %s × %s — both segmented fits failed to converge", var, site))
+      next
+    }
 
     key   <- paste(var, site)
     bp_val <- best$psi[, "Est."]   # length = n_bp (2 or 3)
@@ -133,8 +172,17 @@ for (var in c("GPP", "ER", "DO", "CO2")) {
   }
 }
 
-seg_pred_all <- bind_rows(seg_preds)
-seg_bp_all   <- bind_rows(seg_bps)
+id_levels  <- levels(master_long$ID)
+var_levels <- levels(master_long$variable)
+
+seg_pred_all <- bind_rows(seg_preds) %>%
+  mutate(ID       = factor(ID,       levels = id_levels),
+         variable = factor(variable, levels = var_levels))
+
+seg_bp_all <- bind_rows(seg_bps) %>%
+  mutate(ID       = factor(ID,       levels = id_levels),
+         variable = factor(variable, levels = var_levels))
+
 bp_slopes_df <- bind_rows(bp_slopes)
 
 # ── Dominant flood class per segment ─────────────────────────────────────────
@@ -171,11 +219,12 @@ bp_slopes_df <- bp_slopes_df %>%
 
 # write_csv(bp_slopes_df, "04_Outputs/breakpoint_slopes.csv")
 
-#"GPP","ER","DO",
 # ── Breakpoint plot ───────────────────────────────────────────────────────────
-a<-ggplot(master_long%>%filter(variable %in% c("CO2","GPP","ER","DO")),
-       aes(x = depth, y = value)) +
-  geom_point(aes(color = class), alpha = 0.25, size = 0.6) +
+(a <- master_long %>%
+  filter(variable %in% c("GPP", "ER", "NEP", "DO", "CO2")) %>%
+    mutate(class = factor(class, levels = c("baseline", "HI", "BO", "FR")))%>% 
+  ggplot(aes(x = depth, y = value)) +
+  geom_point(aes(color = class), size = 0.6) +
   geom_line(data = seg_pred_all,
             mapping = aes(x = depth, y = fitted),
             color = "black", linewidth = 0.9,
@@ -189,8 +238,9 @@ a<-ggplot(master_long%>%filter(variable %in% c("CO2","GPP","ER","DO")),
   labs(x = "Depth (m)", y = NULL, color = "Class") +
   theme_spring() +
   theme(axis.text.x = element_text(size = 7),
-        legend.position = 'righ')
+        legend.position = 'right'))
 
+unique(master_long$class)
 # ggsave("05_Figures/H1_fig2_breakpoints.png", fig2,
 #        width = 14, height = 10, dpi = 300)
 
@@ -205,7 +255,11 @@ criterion_caption <- switch(fit_criterion,
   BIC   = "BIC"
 )
 
-b<-                  %>%
+b <- bp_slopes_df %>%
+    mutate(
+      variable = factor(variable, levels = c("depth", "DO", "CO2", "NEP", "GPP", "ER")),
+      ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
+    )%>%
   ggplot(aes(x = ID, y = slope, color = seg_class, group = ID)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
   # lines connecting segments within a site
@@ -214,17 +268,14 @@ b<-                  %>%
   geom_errorbar(aes(ymin = slope - slope_se, ymax = slope + slope_se,
                     color = seg_class),
                 width = 0.15, linewidth = 0.4, na.rm = TRUE) +
-  # segment number as the point marker; shallow → deep reads 1 → n
+  # segment number as the point marker; shallow -> deep reads 1 → n
   geom_text(aes(label = segment, color = seg_class),
             fontface = "bold", size = 4, show.legend = FALSE) +
   scale_color_manual(values = class_colors, na.value = "grey70",
-                     name = "Dominant flood\nclass (shallow → deep)") +
-  facet_wrap(~variable, scales = "free_y", nrow=1) +
-  labs(x = "Site", y = "Slope (per m depth)",
-       title = "H1: Segment slopes by site"
-       ) +
+                     name = "Dominant flood\nclass (shallow -> deep)") +
+  facet_wrap(~variable, scales = "free_y", nrow=1)  +
   theme_spring() +
   theme(legend.position = "right")
 
 
-plot_grid(a,b, ncol=1, rel_heights = c(1, 0.45))
+plot_grid(a,b, ncol=1, rel_heights = c(1, 0.35))

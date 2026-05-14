@@ -6,7 +6,7 @@ library(cowplot)
 site_colors <- c(AM = "#E41A1C", GB = "#377EB8", ID = "#4DAF4A",
                  LF = "#984EA3", OS = "#FF7F00", IU = "#A65628")
 
-class_colors <- c(BO = "#A65628", FR = "black", HI = "#2171B5", baseline='red')
+class_colors <- c(BO = "#A65628", FR = "black", HI = "#2171B5", baseline='lightblue')
 
 site_shapes <- c(AM = 16, GB = 17, ID = 15, LF = 18, OS = 8, IU = 3)
 
@@ -30,7 +30,7 @@ pH<-read_csv("04_Outputs/flood impacts/pH.csv")%>%
 
 flood.class<-full_join(SpC, pH)%>%
   filter(!is.na(flood))%>%
-  left_join(read_csv("04_Outputs/flood impacts/FR.class.csv"))
+  left_join(read_csv("04_Outputs/flood impacts/FR_class.csv"))
 
 vulnerability <- data.frame(
   ID = c('IU', 'ID', 'GB', 'LF', 'AM', 'OS'),
@@ -77,7 +77,9 @@ flood.response<-rbind(declined, increased)%>%
   arrange(ID, variable, flood.start)%>%
   mutate(
     days.since.last.flood   = as.numeric(difftime(flood.start, lag(flood.end), units = "days")),
-    avg.days.between.floods = mean(days.since.last.flood, na.rm = TRUE)
+    avg.days.between.floods = mean(days.since.last.flood, na.rm = TRUE),
+    variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
+    ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
   )%>%
   ungroup()
 
@@ -102,6 +104,7 @@ time.series <- rbind(GPP_flood_df, ER_flood_df, DO_flood_df, CO2_flood_df,depth_
     Date = as.Date(Date), 
     peak.Date = as.Date(peak.Date),
     variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
+    ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS')),
     perc.change = (conc - base) / base * 100,
     )%>%
   group_by(ID, flood, variable)%>%
@@ -112,6 +115,8 @@ time.series <- rbind(GPP_flood_df, ER_flood_df, DO_flood_df, CO2_flood_df,depth_
     flood=as.factor(flood)
   )
 
+
+peak_dates <- read_csv("04_Outputs/flood impacts/peak dates.csv")
 #write_csv(time.series, "04_Outputs/flood impacts/flood.time.series.csv")
 
 #needed df##########
@@ -136,7 +141,7 @@ flood_periods <- read_csv("01_Raw_data/flood.periods.csv",
          end   = as.POSIXct(end,   tz = "UTC"))
 
 
-flood_class <- read_csv("04_Outputs/flood impacts/FR.class.csv",
+flood_class <- read_csv("04_Outputs/flood impacts/FR_class.csv",
                         show_col_types = FALSE)
 
 chem_daily <- chem_hourly %>%
@@ -166,3 +171,44 @@ master <- metab %>%
   left_join(chem_daily,  by = c("Date", "ID")) %>%
   left_join(vel_daily,   by = c("Date", "ID")) %>%
   left_join(dis_daily,   by = c("Date", "ID"))
+unique(master$ID)
+
+
+floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
+  mutate(start = as.Date(start), end = as.Date(end))
+
+analysis <- left_join(
+  chem_hourly %>%
+    select(ID, Date, DO, CO2, depth) %>%
+    mutate(Date = as.Date(Date)) %>%
+    group_by(ID, Date) %>%
+    summarise(DO    = mean(DO,    na.rm = TRUE),
+              CO2   = mean(CO2,   na.rm = TRUE),
+              depth = mean(depth, na.rm = TRUE),
+              .groups = "drop"),
+  metab %>% rename(Date = Date) %>% select(-depth, -K600) %>%
+    distinct(ID, Date, .keep_all = TRUE) %>%
+    mutate(NEP = GPP + ER),
+  by = c("Date", "ID"),
+  relationship = "one-to-one"
+) %>% arrange(ID, Date)%>%
+  left_join(
+    floods, by = join_by(ID, between(Date, start, end))
+  )
+
+
+analysis.long<-analysis%>%
+  pivot_longer(
+    cols = c('DO', 'CO2', 'depth', 'GPP', 'ER'),
+    names_to = "variable",
+    values_to='conc'
+  )%>%
+  mutate(
+    flood=as.factor(flood),
+    variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
+    ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
+  )%>%
+  left_join(  flood.response%>%select(ID, flood, variable, peak.Date)
+  )
+
+

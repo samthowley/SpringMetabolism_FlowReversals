@@ -57,13 +57,7 @@ flood.response%>%
   )
 
 #difference in peaks########
-time.series%>%
-  filter(ID=='OS')%>%
-  ggplot(aes(x=Date,y=conc, color=variable))+
-  geom_point(aes(),shape=1)+
-  geom_smooth(method='loess', se=F,span=0.3)+
-  theme_spring()+
-  facet_grid(variable ~ flood, scales = "free")
+
 #Recovery##########
 time.series %>%
   filter(
