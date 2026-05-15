@@ -122,6 +122,8 @@ write_csv(DO_trimmed, "04_Outputs/flood impacts/DO.flood.df.csv")
 # --- Flood classification (FR / BO / HI) ------------------------------------
 
 SpC <- read_csv("02_Clean_data/Chem/SpC.csv")
+pH <- read_csv("02_Clean_data/Chem/pH.csv")
+
 
 flood.class.dates <- DO.clean %>%
   filter(!is.na(flood)) %>%
@@ -129,12 +131,15 @@ flood.class.dates <- DO.clean %>%
   left_join(
     SpC, by = c("Date", "ID")
   ) %>%
+  left_join(
+    pH, by = c("Date", "ID")
+  )%>%
   group_by(ID, flood) %>%
   #filter(count> -7*24 & count<7*24)%>%
   mutate(
     class.raw= case_when(
       DO>5 & SpC<200 ~'FR',
-      DO<3 & SpC<300 ~'BO'),
+      DO<3   ~'BO'),
     has_FR = any(class.raw=='FR', na.rm = TRUE),
     has_BO = any(class.raw=='BO', na.rm = TRUE),
     .groups = "drop"
@@ -146,9 +151,18 @@ flood.class.dates <- DO.clean %>%
       TRUE   ~ "HI"
     ),
     class=if_else(ID=='AM' & flood==6, 'FR', class),
-    class=if_else(ID=='LF' & flood==6, 'FR', class)
-  ) %>%
-  select(Date, ID, flood, count, class)
+    class=if_else(ID=='LF' & flood==6, 'FR', class),
+    class=if_else(ID=='LF' & class=='BO', 'HI', class)
+    
+  ) #%>%
+  
+#select(Date, ID, flood, count, class)
+
+flood.class.dates%>%
+  filter(ID=='AM')%>%
+  ggplot(aes(x=count, y=DO, color=class))+
+  geom_point()+
+  facet_wrap(~flood, scales='free')
 
 
 write_csv(flood.class.dates, "04_Outputs/flood impacts/peak dates.csv")
@@ -157,5 +171,3 @@ flood.class<-flood.class.dates%>%
   filter(count==0)%>%select(ID, flood, class)
 
 write_csv(flood.class, "04_Outputs/flood impacts/FR_class.csv")
-
-

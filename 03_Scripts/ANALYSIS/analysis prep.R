@@ -2,6 +2,9 @@ library(ggnewscale)
 library(ggpmisc)
 library(tidyverse)
 library(cowplot)
+library(ggh4x)
+library(lme4)
+
 
 site_colors <- c(AM = "#E41A1C", GB = "#377EB8", ID = "#4DAF4A",
                  LF = "#984EA3", OS = "#FF7F00", IU = "#A65628")
@@ -56,7 +59,8 @@ flood.response<-rbind(declined, increased)%>%
   left_join(h.percent.change)%>%
   mutate(reponse.percent.change=(peak.response-base)/base*100,
          flood=as.factor(flood),
-         variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER'))
+         variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
+         class = factor(class, levels = c("HI", "BO", "FR"))
          )%>%
   mutate(
     recess.slope=if_else(variable =='ER' & recess.slope>0, NA, recess.slope),
@@ -71,7 +75,8 @@ flood.response<-rbind(declined, increased)%>%
     recess.slope=if_else(variable=='DO' & recess.slope<0, NA, recess.slope),
     r2.recess=if_else(variable=='DO' & recess.slope<0, NA, r2.recess),
 
-    time.to.recover = as.numeric(flood.end - peak.Date)
+    time.to.recover = as.numeric(flood.end - peak.Date),
+    time2peak       = as.numeric(difftime(peak.Date, flood.start, units = "days"))
   )%>%
   group_by(ID, variable)%>%
   arrange(ID, variable, flood.start)%>%
@@ -80,6 +85,12 @@ flood.response<-rbind(declined, increased)%>%
     avg.days.between.floods = mean(days.since.last.flood, na.rm = TRUE),
     variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
     ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
+  )%>%
+  ungroup()%>%
+  group_by(variable)%>%
+  mutate(
+    recess.slope.z = as.numeric(scale(recess.slope)),
+    rise.slope.z   = as.numeric(scale(rise.slope))
   )%>%
   ungroup()
 
@@ -105,6 +116,7 @@ time.series <- rbind(GPP_flood_df, ER_flood_df, DO_flood_df, CO2_flood_df,depth_
     peak.Date = as.Date(peak.Date),
     variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
     ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS')),
+    class = factor(class, levels = c("HI", "BO", "FR")),
     perc.change = (conc - base) / base * 100,
     )%>%
   group_by(ID, flood, variable)%>%
@@ -143,6 +155,7 @@ flood_periods <- read_csv("01_Raw_data/flood.periods.csv",
 
 flood_class <- read_csv("04_Outputs/flood impacts/FR_class.csv",
                         show_col_types = FALSE)
+unique(flood_class$class)
 
 chem_daily <- chem_hourly %>%
   mutate(day = as.Date(Date)) %>%
@@ -206,9 +219,10 @@ analysis.long<-analysis%>%
   mutate(
     flood=as.factor(flood),
     variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
-    ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
+    ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS')),
+    #class = factor(class, levels = c("HI", "BO", "FR"))
   )%>%
-  left_join(  flood.response%>%select(ID, flood, variable, peak.Date)
+  left_join(  flood.response%>%select(ID, flood, variable, peak.Date, flood.end, flood.start)
   )
 
 
