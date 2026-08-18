@@ -1,0 +1,5 @@
+ID,depth_p80,n_days_in_zone,pct_of_zone_excluded,n_excluded_streaks,median_excluded_streak_days,pct_excluded_days_in_streaks_le2
+AM,1.65,184,93.5,4,31.5,1.2
+GB,0.66,178,62.4,10,10.5,2.7
+ID,2.64,146,87.7,5,1,2.3
+LF,1.19,184,95.1,6,9.5,1.7
