@@ -191,14 +191,17 @@ write_csv(SpC.edited, "02_Clean_data/Chem/SpC.csv")
 
 ###compile####
 file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE)
-file.names<-file.names[c(1, 2, 4, 7, 10)]
+file.names<-file.names[c(1, 2, 4,11, 7)]
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
 master <- reduce(data, full_join, by = c("ID", 'Date'))
 
-master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0) %>%select(-min)
+master <- master %>%
+  mutate(min = minute(Date)) %>%
+  filter(min == 0) %>%
+  select(-min, -source_file, -remove)
 master <- master[!duplicated(master[c('Date','ID')]),]
     
-
+names(master)
 ###Include IU####
 library(dataRetrieval)
 startDate <- "2022-05-12"
@@ -206,14 +209,17 @@ endDate <- "2024-07-25"
 parameterCd <- c('00010','00300','00095','00400','00065')
 ventID<-'02322700'
 
-IU<- readNWISuv(ventID,parameterCd, startDate, endDate)
-IU<-IU %>% 
+IU.raw<- readNWISuv(ventID,parameterCd, startDate, endDate)
+IU<-IU.raw %>% 
   rename('Date'='dateTime', 'Temp'='X_00010_00000',
                   'DO'='X_00300_00000', 'SpC'='X_00095_00000',
                   'pH'='X_00400_00000', 'depth'='X_00065_00000')%>%
-  mutate(min=minute(Date), day=day(Date), mnth=month(Date), yr=year(Date))%>%
-  mutate(min=minute(Date),CO2=NA,depth=depth-13.72, ID='IU')%>%
-  filter(min==0)%>% select(Date, depth, ID, SpC, CO2, DO, Temp, pH)
+ mutate(min=minute(Date),
+        CO2=NA,
+        depth=depth-13.72, 
+        ID='IU')%>%
+  filter(min==0)%>% 
+  select(names(master))
 
 master<- rbind(master, IU)
 
