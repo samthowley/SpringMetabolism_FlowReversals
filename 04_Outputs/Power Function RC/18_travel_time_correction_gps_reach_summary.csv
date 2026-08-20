@@ -1,0 +1,14 @@
+ID,method,GPP,ER,n
+AM,one-station,3.5131799851328567,-11.69601004180854,509
+AM,"two-station, solar+shift, GPS reach length",15.241143411349404,-1.2710433448354075,297
+AM,"two-station, solar+shift, OLD reach length (excel/AM override)",20.53675209583641,0.6499099589993514,292
+GB,one-station,2.7065072489438258,-19.364467013121356,632
+GB,"two-station, solar+shift, GPS reach length",2.9903549988654308,-14.64421460377853,659
+GB,"two-station, solar+shift, OLD reach length (excel/AM override)",3.0696940299224003,-14.646418092482996,657
+ID,one-station,8.228618552235744,-17.143626403677064,467
+ID,"two-station, solar+shift, GPS reach length",2.5570930073612193,-16.316171561440772,482
+ID,"two-station, solar+shift, OLD reach length (excel/AM override)",5.324882997399096,-16.86020598627186,483
+IU,one-station,4.260818917522908,-9.665999525063121,874
+LF,one-station,3.535320403745743,-17.028680471734987,378
+LF,"two-station, solar+shift, GPS reach length",17.919361222147984,-3.2115476196351085,391
+LF,"two-station, solar+shift, OLD reach length (excel/AM override)",18.03244950131468,-3.375832820901884,400
