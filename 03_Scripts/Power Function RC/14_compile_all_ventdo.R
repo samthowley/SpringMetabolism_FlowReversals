@@ -6,6 +6,8 @@
 # ID keeps its existing continuous USGS-gauge VentDO (pulled in 03_Scripts/VentDO.R,
 # already in 04_Outputs/VentDO.csv) -- no roving grab files exist for ID, it doesn't
 # need this treatment (already the best-instrumented site).
+# GB and LF additionally get county SRWMD/USGS WQ grab-sample DO merged in
+# (01_Raw_data/County Data/{GB,LF}.Vent_WQ.xlsx) -- see below.
 #
 # Data-quality rules (Samantha, established during the GB investigation):
 #   - Any reading >7 mg/L within a file = sensor out of the water. Discard those
@@ -220,7 +222,48 @@ id_ventdo <- read_csv("04_Outputs/VentDO.csv", show_col_types = FALSE) %>%
   filter(ID == "ID") %>%
   select(ID, Date, VentDO, VentTemp)
 
-master_ventdo <- bind_rows(new_ventdo, id_ventdo) %>% arrange(ID, Date) %>% distinct()
+# ---- county WQ data (GB, LF) -----------------------------------------------
+# 01_Raw_data/County Data/{GB,LF}.Vent_WQ.xlsx -- SRWMD/USGS grab-sample WQ
+# visits, includes DO_mg/L. No equivalent WQ file exists for AM in this
+# folder (only AM.Vent_Flow.xlsx, discharge-only), so AM isn't extended here.
+# Adds many more visits per site (GB: +213, LF: +21) spanning back to the
+# 1990s, well beyond our own ~2022-2023 roving-visit window -- the extra
+# historical rows don't affect the two-station pipeline (which only pulls
+# VentDO within the project's own date range via fill()), but give a much
+# richer baseline for the rating-curve work.
+excel_date <- function(x) as.POSIXct(x * 86400, origin = "1899-12-30", tz = "UTC")
+
+read_county_wq <- function(f, site_id) {
+  raw <- read_excel(file.path("01_Raw_data/County Data", f), skip = 13, col_names = FALSE)
+  hdr <- as.character(unlist(raw[1, ]))
+  d <- raw[-1, ]
+  names(d) <- make.unique(hdr)  # many repeated "Code" columns, one per parameter
+  d %>%
+    transmute(ID = site_id,
+              Date = excel_date(as.numeric(Date)),
+              VentDO = as.numeric(`DO_mg/L`),
+              VentTemp = as.numeric(Water_Temp_C)) %>%
+    filter(!is.na(VentDO))
+}
+
+county_ventdo <- bind_rows(
+  read_county_wq("GB.Vent_WQ.xlsx", "GB"),
+  read_county_wq("LF.Vent_WQ.xlsx", "LF")
+)
+
+# known-bad point, confirmed against county data: our own 2023-03-15 GB
+# reading (VentDO=0.222) is far outside both our own site's normal range
+# (3.6-4.8) and the county's contemporaneous range for the same date window
+# -- VentTemp on that row (71.1) is normal, so this looks like an isolated
+# DO-probe misread, not a mislabeled/whole-row failure like the cases above.
+county_confirmed_bad <- tribble(
+  ~ID,  ~Date,
+  "GB", ymd_hms("2023-03-15 00:00:00")
+)
+
+master_ventdo <- bind_rows(new_ventdo, id_ventdo, county_ventdo) %>%
+  anti_join(county_confirmed_bad, by = c("ID", "Date")) %>%
+  arrange(ID, Date) %>% distinct()
 
 write_csv(master_ventdo, file.path(outdir, "VentDO_all.csv"))
 write_csv(master_ventdo, "02_Clean_data/Chem/VentDO_all.csv")
