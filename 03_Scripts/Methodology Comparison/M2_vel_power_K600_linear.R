@@ -1,10 +1,3 @@
-## =============================================================================
-## M2 -- velocity RC = POWER   |   K600 = LINEAR rating curve (gas dome, ~depth)
-##
-## One uniform methodology applied to ALL FIVE sites. Standalone: run it top to
-## bottom from the project root. Everything except the two config lines below is
-## identical across M1-M6, so any difference in the results is the methodology.
-## =============================================================================
 rm(list = ls())
 source("03_Scripts/Methodology Comparison/_engine_two_station.R")
 
@@ -27,12 +20,10 @@ res   <- run_two_station(recipe, LABEL)
 daily <- res$daily
 score <- score_methodology(daily)
 
-print(score)
-write_csv(daily, file.path("04_Outputs/Methodology Comparison", paste0(LABEL, "_daily.csv")))
-
 ## ---- plots ------------------------------------------------------------------
 daily %>%
   mutate(ID = factor(ID, levels = sites)) %>%
+  filter(ID %in% c('AM', 'LF', 'GB'))%>%
   ggplot(aes(x = date)) +
   annotate("rect", xmin = -Inf, xmax = Inf,
            ymin = GPP_RANGE[1], ymax = GPP_RANGE[2], fill = "#1b9e77", alpha = 0.08) +
@@ -47,10 +38,27 @@ daily %>%
        x = NULL, y = "g O2 m-2 d-1") +
   theme_bw(base_size = 10)
 
+plot_grid(
 daily %>%
-  mutate(ID = factor(ID, levels = sites)) %>%
-  ggplot(aes(x = date, y = K600, color = reach_test_mode)) +
-  geom_point(size = 0.8) +
-  facet_wrap(~ID, scales = "free") +
-  labs(title = paste(LABEL, "-- K600 and reach test"), x = NULL, y = "K600 (1/day)") +
-  theme_bw(base_size = 10)
+  mutate(ID = factor(ID, levels = c("AM", "GB", "LF", "ID", "OS")))%>%
+  filter(ID %in% c('AM', 'LF', 'GB'))%>%
+  ggplot(aes(x = depth)) +
+  geom_point(aes(y = ER, color=reach_test_mode), size = 1) +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~ID, scales = "free", ncol=2) +
+  ggtitle("Velocity Power, K600 Linear:ER")+
+  theme_bw(base_size = 10)+
+  theme(legend.position = "bottom") 
+,
+
+daily %>%
+  mutate(ID = factor(ID, levels = c("AM", "GB", "LF", "ID", "OS")))%>%
+  filter(ID %in% c('AM', 'LF', 'GB'))%>%
+  ggplot(aes(x = depth)) +
+  geom_point(aes(y = GPP, color=reach_test_mode), size = 1) +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~ID, scales = "free", ncol=2) +
+  ggtitle("Velocity Power, K600 Linear:GPP")+
+  theme_bw(base_size = 10)+
+  theme(legend.position = "bottom") ,
+ncol=2)

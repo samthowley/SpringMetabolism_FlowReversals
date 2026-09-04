@@ -1,10 +1,3 @@
-## =============================================================================
-## M3 -- velocity RC = POWER   |   K600 = FREE-WATER (Bayesian one-station)
-##
-## One uniform methodology applied to ALL FIVE sites. Standalone: run it top to
-## bottom from the project root. Everything except the two config lines below is
-## identical across M1-M6, so any difference in the results is the methodology.
-## =============================================================================
 rm(list = ls())
 source("03_Scripts/Methodology Comparison/_engine_two_station.R")
 
@@ -26,9 +19,6 @@ recipe <- uniform_recipe(vel_form  = VEL_FORM,
 res   <- run_two_station(recipe, LABEL)
 daily <- res$daily
 score <- score_methodology(daily)
-
-print(score)
-write_csv(daily, file.path("04_Outputs/Methodology Comparison", paste0(LABEL, "_daily.csv")))
 
 ## ---- plots ------------------------------------------------------------------
 daily %>%

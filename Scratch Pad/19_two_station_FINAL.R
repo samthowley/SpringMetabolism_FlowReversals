@@ -336,9 +336,94 @@ daily %>%
 
 daily %>%
   mutate(ID = factor(ID, levels = c("AM", "GB", "LF", "ID", "OS")))%>%
-  ggplot(aes(x = date)) +
-  geom_point(aes(y = GPP, color=reach_test_mode), size = 0.8) +
+  ggplot(aes(x = depth)) +
+  geom_point(aes(y = GPP, color=reach_test_mode), size = 1) +
   geom_hline(yintercept = 0) +
+  facet_wrap(~ID, scales = "free", ncol=2) +
+  ggtitle("GPP")+
+  theme_bw(base_size = 10)+
+  theme(legend.position = "bottom") 
+
+
+daily %>%
+  mutate(ID = factor(ID, levels = c("AM", "GB", "LF", "ID", "OS")))%>%
+  ggplot(aes(x = depth)) +
+  geom_point(aes(y = ER, color=reach_test_mode), size = 1) +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~ID, scales = "free", ncol=2) +
+  ggtitle("ER")+
+  theme_bw(base_size = 10)+
+  theme(legend.position = "bottom") 
+
+#COMBINE ONE STATION AND TWO STATION###################
+
+
+
+file.names <- list.files(path="04_Outputs/one station results", pattern=".csv", full.names=TRUE)
+onestation.df <- data.frame()
+for(fil in file.names){
+  df <- read_csv(fil)
+  onestation.df <- rbind(onestation.df, df)}
+
+
+onestation<-onestation.df%>%
+  rename(GPP1=GPP_daily_mean,
+         ER1=ER_daily_mean,
+         K6001=K600_daily_mean,
+         Date=date)%>%
+  separate(ID,into = c('ID', 'stage'),sep='_')%>%
+  mutate(GPP1=if_else(GPP1<0, 0, GPP1),
+         model="1")%>%
+  select(-ER_Rhat, -K600_daily_Rhat, -stage)%>%
+  arrange(ID, Date)
+
+two<-daily%>% select(date, ID, depth, GPP, ER, K600_day)%>%
+  rename(GPP2=GPP, ER2=ER, K6002=K600_day, Date=date)%>%
+  mutate(model="2",
+         GPP2=if_else(GPP2<3, NA, GPP2),
+         ER2=if_else(ER2> -3, NA, ER2),
+         )%>%
+  arrange(ID, Date)
+
+
+two%>%
+  filter(!ID %in% c('OS', 'IU'))%>%
+  ggplot(aes(x = depth)) +
+  geom_point(aes(y = GPP2, shape='GPP'),) +
+  geom_point(aes(y = ER2, shape='ER'), shape=1) +
   facet_wrap(~ID, scales = "free") +
-  theme_bw(base_size = 10)
+  theme_minimal()
+
+
+
+
+all.met <- onestation %>%
+  full_join(two, by = c("Date", "ID"), suffix = c("_onestation", "_two")) %>%
+  mutate(
+    # Prioritize "two" over "onestation"
+    GPP = coalesce(GPP2, GPP1),
+    ER = coalesce(ER2, ER1),
+    
+    # Track which dataset was used
+    source = case_when(
+      !is.na(GPP2) ~ "two",
+      !is.na(GPP1) ~ "one", 
+      TRUE ~ "neither"
+    )
+  ) %>%
+  arrange(ID, Date)
+
+all.met%>%
+  filter(!ID %in% c('OS', 'IU'))%>%
+  ggplot(aes(x = depth)) +
+  geom_point(aes(y = GPP1, color='1'),alpha=0.5) +
+  geom_point(aes(y = ER1, color='1'), alpha=0.5) +
+  
+  geom_point(aes(y = ER2, color='2'), alpha=0.5) +
+  geom_point(aes(y = GPP2, color='2'),alpha=0.5) +
+  facet_wrap(~ID, scales = "free") +
+  theme_minimal()
+
+
+
 

@@ -28,7 +28,6 @@ daily <- res$daily
 score <- score_methodology(daily)
 
 print(score)
-write_csv(daily, file.path("04_Outputs/Methodology Comparison", paste0(LABEL, "_daily.csv")))
 
 ## ---- plots ------------------------------------------------------------------
 daily %>%
@@ -42,15 +41,17 @@ daily %>%
   geom_point(aes(y = ER,  color = "ER"),  size = 0.8) +
   geom_hline(yintercept = 0) +
   scale_color_manual(values = c(GPP = "#1b9e77", ER = "#d95f02")) +
-  facet_wrap(~ID, scales = "free", ncol = 1) +
+  facet_wrap(~ID, scales = "free", ncol = 3) +
   labs(title = LABEL, subtitle = "shaded = plausible range",
        x = NULL, y = "g O2 m-2 d-1") +
   theme_bw(base_size = 10)
 
 daily %>%
-  mutate(ID = factor(ID, levels = sites)) %>%
-  ggplot(aes(x = date, y = K600, color = reach_test_mode)) +
-  geom_point(size = 0.8) +
-  facet_wrap(~ID, scales = "free") +
-  labs(title = paste(LABEL, "-- K600 and reach test"), x = NULL, y = "K600 (1/day)") +
-  theme_bw(base_size = 10)
+  mutate(ID = factor(ID, levels = c("AM", "GB", "LF", "ID", "OS")))%>%
+  ggplot(aes(x = Date)) +
+  geom_point(aes(y = ER, color=reach_test_mode), size = 1) +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~ID, scales = "free", ncol=2) +
+  ggtitle("ER")+
+  theme_bw(base_size = 10)+
+  theme(legend.position = "bottom") 
