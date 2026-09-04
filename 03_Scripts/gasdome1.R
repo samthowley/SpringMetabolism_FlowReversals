@@ -94,13 +94,18 @@ for(fil in file.names){
   gasdome<-rbind(gasdome,gas)
 }
 
+
+velocity_RC_power <- read_csv("04_Outputs/velocity_RC_power.csv")%>%
+  mutate(day=as.Date(Date))%>% 
+  group_by(ID, day) %>%
+  summarise(velocity = mean(velocity, na.rm = TRUE), .groups = "drop")
+
 k600 <- gasdome%>%
   distinct(k600_1.day,ID,day, .keep_all = T)
-
-ggplot(k600%>%filter(ID=='LF'), aes(x = depth)) +
-  geom_point(aes(y = k600_1.day))+
-  facet_wrap(~ID, scales='free')
-
-
+# ggplot(k600%>%filter(ID=='LF'), aes(x = depth)) +
+#   geom_point(aes(y = k600_1.day))+
+#   facet_wrap(~ID, scales='free')
+# 
+# 
 split<-k600 %>% split(k600$ID)
 write.xlsx(split, file = '04_Outputs/rC_k600.xlsx')
