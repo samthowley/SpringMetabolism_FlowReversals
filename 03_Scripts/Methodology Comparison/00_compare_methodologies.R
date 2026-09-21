@@ -136,7 +136,52 @@ daily_all %>%
   theme_bw(base_size = 9)+
   theme(legend.position = "bottom")
 
-## 3. what K600 each methodology actually hands the mass balance
+## ---- reach-test-passing subset -----------------------------------------------
+## The point: methodology doesn't just move GPP/ER, it also gates how many days
+## are even usable -- a day only counts here if its majority reach.test == "passes".
+reach_pass_daily <- daily_all %>% filter(reach_test_mode == "passes")
+
+n_reach_pass <- daily_all %>%
+  mutate(methodology = factor(methodology, levels = c(methods$label, "PERSITE_FINAL"))) %>%
+  group_by(ID, methodology) %>%
+  summarise(n_days            = n(),
+            n_days_reach_pass = sum(reach_test_mode == "passes", na.rm = TRUE),
+            .groups = "drop") %>%
+  arrange(ID, methodology)
+cat("\n==== DAYS SURVIVING THE REACH TEST (per site x methodology) ====\n")
+print(n_reach_pass, n = Inf)
+
+## 4. GPP, reach-test-passing days only
+reach_pass_daily %>%
+  mutate(ID = factor(ID, levels = sites)) %>%
+  ggplot(aes(x = date, y = GPP, color = methodology)) +
+  annotate("rect", xmin = -Inf, xmax = Inf,
+           ymin = GPP_RANGE[1], ymax = GPP_RANGE[2], fill = "grey50", alpha = 0.15) +
+  geom_point(size = 0.4, alpha = 0.5) +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~ID, scales = "free", ncol = 1) +
+  labs(title = "GPP under each methodology -- reach-test-passing days only",
+       subtitle = "same days as the GPP plot above, filtered to reach.test == 'passes'",
+       x = NULL, y = "GPP (g O2 m-2 d-1)") +
+  theme_bw(base_size = 9) +
+  theme(legend.position = "bottom")
+
+## 5. ER, reach-test-passing days only
+reach_pass_daily %>%
+  mutate(ID = factor(ID, levels = sites)) %>%
+  ggplot(aes(x = date, y = ER, color = methodology)) +
+  annotate("rect", xmin = -Inf, xmax = Inf,
+           ymin = ER_RANGE[1], ymax = ER_RANGE[2], fill = "grey50", alpha = 0.15) +
+  geom_point(size = 0.4, alpha = 0.5) +
+  geom_hline(yintercept = 0) +
+  facet_wrap(~ID, scales = "free", ncol = 1) +
+  labs(title = "ER under each methodology -- reach-test-passing days only",
+       subtitle = "same days as the ER plot above, filtered to reach.test == 'passes'",
+       x = NULL, y = "ER (g O2 m-2 d-1)") +
+  theme_bw(base_size = 9) +
+  theme(legend.position = "bottom")
+
+## 6. what K600 each methodology actually hands the mass balance
 daily_all %>%
   mutate(ID = factor(ID, levels = sites)) %>%
   ggplot(aes(x = methodology, y = K600, fill = methodology)) +

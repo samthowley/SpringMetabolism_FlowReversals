@@ -62,3 +62,4 @@ daily %>%
   theme_bw(base_size = 10)+
   theme(legend.position = "bottom") ,
 ncol=2)
+

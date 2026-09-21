@@ -17,6 +17,10 @@ IU<- readNWISuv(ventID, parameterCd, startDate, endDate)
 IU.edit<-IU %>% 
   rename('Date'='dateTime', 'VentDO'='X_00300_00000', 'VentTemp'='X_00010_00000')%>%
   mutate(
+    ## readNWISuv returns UTC; our loggers are fixed EST (UTC-5, no DST).
+    ## Put NWIS on the logger clock (stored with a "UTC" label like every other file).
+    ## Without this, ID's vent series ran 5 h ahead of the stream DO sensor.
+    Date = force_tz(with_tz(Date, "Etc/GMT+5"), "UTC"),
     min=minute(Date), 
     ID='ID', 
     ) %>% 

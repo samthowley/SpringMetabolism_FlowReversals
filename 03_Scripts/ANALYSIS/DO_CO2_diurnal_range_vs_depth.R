@@ -43,3 +43,6 @@ co2_diurnal_plot <- ggplot(diurnal, aes(x = depth, y = CO2.diurnal, color = ID))
   labs(x = "Depth (m)", y = expression(Diurnal~CO[2]~range~(ppm))) +
   theme_spring()
 co2_diurnal_plot
+
+
+plot_grid(do_diurnal_plot, co2_diurnal_plot, ncol = 2)

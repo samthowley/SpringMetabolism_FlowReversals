@@ -18,7 +18,8 @@ depth_range <- depth %>%
 vel_cal <- map_dfr(sites, function(s) {
   make_vel_cal(s, units = "county", excl = EXCL) %>%
     mutate(point_type = if_else(is.na(Date), "flow-reversal anchor", "hand measured"))
-})
+})%>%
+  mutate(velocity =if_else(ID=='AM' & velocity>0.15, NA, velocity))
 
 vel_fits <- map_dfr(sites, function(s) {
   cal <- vel_cal %>% filter(ID == s)
