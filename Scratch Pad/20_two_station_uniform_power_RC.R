@@ -12,7 +12,10 @@ sites <- c("AM", "GB", "ID", "LF", "OS")
 
 ## ---- CONFIG: change these two lines to switch RC forms ----------------------
 VEL_FORM  <- "power"   # "power" | "linear"        -- velocity ~ depth
-K600_FORM <- "M6"      # "M8" (plain power) | "linear" | "M6" (power+breakpoint)
+K600_FORM <- "M8"      # "M8" (plain power) | "linear" | "M6" (power+breakpoint)
+## M6 -> M8 2026-10-01: once the gasdome1.R depth bug was fixed, K600 is nearly
+## flat against depth (ID R2 .73 -> .20), so the breakpoint has nothing left to
+## model and its flat-above segment just holds K600 too high on deep days.
 K600_PRED <- "depth"   # "depth" | "velocity"       -- K600 predictor
 EXCL      <- "strict"  # "base" | "strict"          -- point-exclusion severity, both forms
 DUSK_TRIM_HR <- 4      # night hours right after dusk left out of ER (flux still decaying off the day signal)

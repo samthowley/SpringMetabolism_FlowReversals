@@ -20,8 +20,14 @@ dome_length<-0.38
 library(tools)
 
 
-(file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
-file.names<-file.names[c(1,4,10)]
+## Named, not positional. file.names[c(1,4,10)] used to resolve to
+## CO2.csv / DO.csv / raw.depth.csv, and index 10 silently moves whenever a file
+## is added to 02_Clean_data/Chem. raw.depth.csv is the PRE-offset stage, but the
+## two-station mass balance multiplies K600 back by depth.csv (the offset version,
+## 1_Calculating Stage.R L285-288: AM -0.4, LF -0.55, ID +0.7). depth has to cancel
+## in K.flux = K600 * depth * deficit, so the division below must use the same file
+## the balance multiplies by. Switched to depth.csv 2026-10-01.
+file.names <- file.path("02_Clean_data/Chem", c("CO2.csv", "DO.csv", "depth.csv"))
 
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
 
