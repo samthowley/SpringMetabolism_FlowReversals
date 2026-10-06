@@ -1,7 +1,7 @@
 #call in data########
 library(weathermetrics)
 #might be worth seeing if GB has anymore DO data
-source("03_Scripts/disturbance isolation functions.R")
+source("03_Scripts/analysis/disturbance isolation functions.R")
 
 master <- read_csv("02_Clean_data/master_chem1.csv")%>%
   mutate(
