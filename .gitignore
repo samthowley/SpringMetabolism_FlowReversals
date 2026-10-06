@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# files over GitHub 100 MB limit
+04_Outputs/Power Function RC/compiled_two_station_all_methods.csv
