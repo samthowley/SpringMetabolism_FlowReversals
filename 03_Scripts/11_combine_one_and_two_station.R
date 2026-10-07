@@ -1,51 +1,99 @@
 library(plotly)
-
-two_station <- read_csv("04_Outputs/two_station.csv")%>%
-  select(Date, ID, depth, DO, K600, discharge, GPP, ER)%>%
-  rename(GPP.2=GPP, ER.2=ER, K600.2=K600)%>%
-  mutate(Date=as.Date(Date))%>%
-  group_by(ID, Date) %>%
-  summarise(across(where(is.numeric), mean, na.rm = TRUE))
-
-one_station_metabolism <- read_csv("04_Outputs/one.station.metabolism.csv")
-
-both.methods<-left_join(two_station, one_station_metabolism, by=c("Date", "ID"))
-
-
-
-
-both.methods%>%
-  ggplot(aes(x=discharge))+
-  geom_point(aes(y=GPP.1), color='black')+
-  geom_point(aes(y=GPP.2), color='gray')+
-  scale_x_log10()+
-  facet_wrap(~ID, scales='free')
-
-#K600 with depth########
-
+library(weathermetrics)
+library(tidyverse)
+library(cowplot)
 
 SpC <- read_csv("02_Clean_data/Chem/SpC.csv")%>%
   mutate(Date=as.Date(Date))%>%
   group_by(Date, ID)%>%
-  summarise(
-    SpC=mean(SpC, na.rm=T)
+  summarise(across(where(is.numeric), mean, na.rm = TRUE))
+
+
+two_station <- read_csv("04_Outputs/two_station.csv")%>%
+  mutate(
+    Date = as.Date(Date),
+    k_O2_perd = streamMetabolizer::convert_k600_to_kGAS(
+      K600, temperature = fahrenheit.to.celsius(Temp), gas = "O2"),
+    kTau = k_O2_perd * travel.time.hr / 24     # dimensionless
+  )%>%
+  group_by(ID, Date) %>%  
+  select(Date, ID, depth, DO, K600, discharge, GPP, ER, kTau)%>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE))%>%
+    rename(GPP.2=GPP, ER.2=ER, K600.2=K600)%>%
+  left_join(SpC,by=c("Date", "ID"))
+
+
+range(two_station$SpC, na.rm=T)
+
+
+two_station.clean<-two_station%>%
+  filter(SpC>200,
+    kTau<=2.5,
+    )%>%
+  mutate(
+     GPP.2=ifelse(ID=='ID' & kTau>1, NA, GPP.2),
+    
+    GPP.2=ifelse(GPP.2<0, NA, GPP.2),
+    ER.2=ifelse(ER.2>0, NA, ER.2),
+    ER.2=ifelse(ER.2< -35, NA, ER.2)
+    
+  )
+
+# plot_grid(
+#   two_station.clean%>%
+#     ggplot(aes(x=depth, color=kTau))+
+#     geom_point(aes(y=GPP.2))+
+#     scale_color_viridis_b()+
+#     scale_x_log10()+
+#     facet_wrap(~ID, scales='free'),
+#   
+#   
+#   two_station.clean%>%
+#     ggplot(aes(x=depth, color=kTau))+
+#     geom_point(aes(y=ER.2))+
+#     scale_color_viridis_b()+
+#     scale_x_log10()+
+#     facet_wrap(~ID, scales='free')
+# )
+
+
+
+one_station_metabolism <- read_csv("04_Outputs/one.station.metabolism.csv")
+
+both.methods<-full_join(two_station.clean, one_station_metabolism, by=c("Date", "ID"))
+
+met.coalesce<-both.methods%>%
+  mutate(
+    GPP.coalesce=coalesce(GPP.2, GPP.1),
+    ER.coalesce=coalesce(ER.2, ER.1)
   )
 
 
-K600<-onestation.df%>%
-  separate(ID,into = c('ID', 'stage'),sep='_')%>%
-  select(date, ID, K600_daily_mean)%>%
-  rename(Date=date)%>%
-  left_join(depth)%>%
-  left_join(SpC)%>%
-  filter (!ID %in% c('IU'))
 
-
-K600%>%
-  ggplot(aes(x=depth, y=K600_daily_mean, color=SpC))+
-  geom_point()+
-  scale_color_viridis_b()+
+plot_grid(
+  met.coalesce%>%
+  ggplot(aes(x=Date))+
+  geom_point(aes(y=GPP.1), color='black')+
+  geom_point(aes(y=GPP.2), color='gray')+
+  geom_point(aes(y=GPP.coalesce), color='red', shape=1)+
+  #scale_x_log10()+
   facet_wrap(~ID, scales='free')+
-  ggtitle("One Station K600")
+  theme_bw(),
+
+
+  met.coalesce%>%
+  ggplot(aes(x=Date))+
+  geom_point(aes(y=ER.1), color='black')+
+  geom_point(aes(y=ER.2), color='gray')+
+  geom_point(aes(y=ER.coalesce), color='red', shape=1)+
+  #scale_x_log10()+
+  facet_wrap(~ID, scales='free')+
+  theme_bw()
+)
+
+
+write_csv(met.coalesce, "04_Outputs/combined metabolism methods.csv")
+
+
 
 
