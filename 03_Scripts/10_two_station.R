@@ -6,7 +6,6 @@ library(streamMetabolizer)       # calc_light()
 library(readxl)
 library(measurements)
 
-## ============================================================================
 
 sites <- c("AM", "GB", "ID", "LF", "OS")
 
@@ -60,8 +59,7 @@ unit_lists <- list(
   county   = c('AM', 'LF', 'OS')          # GB/ID stay raw
 )
 
-## LF flow-reversal anchors: velocity goes to 0 at high depth (backflooding).
-## Dropped automatically under a power fit (can't log velocity = 0).
+
 lf_flow_reversals <- tribble(
   ~ID,  ~depth, ~velocity,
   "LF",  1.75,   0,
@@ -77,14 +75,9 @@ VentDO <- read_csv("02_Clean_data/Chem/VentDO.csv", show_col_types = FALSE) %>%
   mutate(
     VentDO   = ifelse(ID == 'GB' & VentDO < 2,   NA, VentDO),
     VentDO   = ifelse(ID == 'AM' & VentDO < 0.9, NA, VentDO),
-    ## VentTemp is MIXED units: own gas-dome rows F (~72), county/NWIS rows C (~22).
-    ## Cs() assumes C. >40 can only be F for a FL spring vent.
     VentTemp = if_else(VentTemp > 40, fahrenheit.to.celsius(VentTemp), VentTemp)
   )
 
-## GB 2023-10-19 VentDO = 3.03 is an outlier: below the IQR fence of GB's 2021-2024
-## samples (4.09-5.06) AND of the full 1990-2026 record (3.33). fill() carried it
-## flat for months -> positive-ER stretch. Replaced with the GB 2021-2024 mean.
 gb_vent_mean <- VentDO %>%
   filter(ID == 'GB', year(Date) %in% 2021:2024, as_date(Date) != as.Date('2023-10-19')) %>%
   summarise(m = mean(VentDO, na.rm = TRUE)) %>%
@@ -437,6 +430,9 @@ daily <- gpp_er %>%
 
 results <- left_join(master, gpp_er %>% select(ID, date, GPP, ER), by = c("ID", "date"))
 
+
+write_csv(results, "04_Outputs/two_station.csv")
+
 ## ==================== 5. plots ================================================
 methodology_label <- paste0("vel ", VEL_FORM, ", K600 ", K600_PRED, "-", K600_FORM)
 
@@ -483,67 +479,3 @@ daily %>%filter(velocity>0)%>%
   theme(legend.position = "none"),
 ncol=1)
 
-#COMBINE ONE STATION AND TWO STATION###################
-
-file.names <- list.files(path="04_Outputs/one station results", pattern=".csv", full.names=TRUE)
-onestation.df <- data.frame()
-for(fil in file.names){
-  df <- read_csv(fil)
-  onestation.df <- rbind(onestation.df, df)}
-
-
-onestation<-onestation.df%>%
-  rename(GPP1=GPP_daily_mean,
-         ER1=ER_daily_mean,
-         K6001=K600_daily_mean,
-         Date=date)%>%
-  separate(ID,into = c('ID', 'stage'),sep='_')%>%
-  mutate(GPP1=if_else(GPP1<0, 0, GPP1),
-         model="1")%>%
-  select(-ER_Rhat, -K600_daily_Rhat, -stage)%>%
-  arrange(ID, Date)
-
-two<-daily%>% select(date, ID, depth, GPP, ER, K600_day)%>%
-  rename(GPP2=GPP, ER2=ER, K6002=K600_day, Date=date)%>%
-  mutate(model="2",
-         GPP2=if_else(GPP2<3, NA, GPP2),
-         ER2=if_else(ER2> -3, NA, ER2),
-         )%>%
-  arrange(ID, Date)
-
-
-two%>%
-  filter(!ID %in% c('OS', 'IU'))%>%
-  ggplot(aes(x = depth)) +
-  geom_point(aes(y = GPP2, shape='GPP'),) +
-  geom_point(aes(y = ER2, shape='ER'), shape=1) +
-  facet_wrap(~ID, scales = "free") +
-  theme_minimal()
-
-
-all.met <- onestation %>%
-  full_join(two, by = c("Date", "ID"), suffix = c("_onestation", "_two")) %>%
-  mutate(
-    # Prioritize "two" over "onestation"
-    GPP = coalesce(GPP2, GPP1),
-    ER = coalesce(ER2, ER1),
-
-    # Track which dataset was used
-    source = case_when(
-      !is.na(GPP2) ~ "two",
-      !is.na(GPP1) ~ "one",
-      TRUE ~ "neither"
-    )
-  ) %>%
-  arrange(ID, Date)
-
-all.met%>%
-  filter(!ID %in% c('OS', 'IU'))%>%
-  ggplot(aes(x = depth)) +
-  geom_point(aes(y = GPP1, color='1'),alpha=0.5) +
-  geom_point(aes(y = ER1, color='1'), alpha=0.5) +
-
-  geom_point(aes(y = ER2, color='2'), alpha=0.5) +
-  geom_point(aes(y = GPP2, color='2'),alpha=0.5) +
-  facet_wrap(~ID, scales = "free") +
-  theme_minimal()

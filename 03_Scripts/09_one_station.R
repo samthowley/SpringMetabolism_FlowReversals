@@ -19,34 +19,6 @@ master <- reduce(data, full_join, by = c("ID", 'Date'))
 master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0) %>%select(-min)
 data <- master[!duplicated(master[c('Date','ID')]),]
 
-#discharge floor (no hi/lo split -- see note)#####
-
-## 2026-10-06: the hi/lo discharge split was REMOVED. It fought the binned
-## K600 model. pool_K600="binned" learns K600 as a piecewise-linear function of
-## ln(Q), so it needs the full Q range; pre-splitting on Q throws away exactly
-## the variation the nodes are fitted to. At GB the mean-discharge threshold
-## left the "hi" half with only 23% of the site's ln(Q) range (0.29 of 1.28),
-## and GB_hi was the worst-converging model in the run (K600 Rhat < 1.05 on only
-## 40% of days, vs 100% for GB_lo). Failed and converged days had identical data
-## and near-identical posterior means, i.e. the nodes were unidentified, not the
-## data bad. Note also that velocity is a rating curve on depth here, so
-## cor(ln Q, ln depth) = +/-1 exactly -- splitting on Q WAS splitting on depth.
-## OS is EXCLUDED from this binned loop and fitted ONLY by its own section below
-## (pool_K600='normal', prior = mean of the cleaned gas-dome K600).
-##
-## Why: binned K600 learns K600 as a piecewise-linear function of ln(Q), so it
-## needs Q to vary. OS barely does -- its ln(Q) range is 0.19, i.e. discharge
-## moves only 1.2x from min to max across the whole record -- so the nodes stay
-## unidentified. OS converged on just 33% of days in the binned run, against
-## 100% at GB and LF. A single pooled K600 is the right tool for a site that
-## flat.
-##
-## This also removes a double-count: OS used to be fitted here AND below, which
-## wrote ~918 OS rows to met_results_two.csv and ~806 to OS.csv with 806
-## overlapping ID+date pairs. Script 10 rbinds every file in that folder, so OS
-## was entering the combine twice under two different K600 treatments. (Before
-## OS was added to lat.lon above, the loop produced all-NA OS rows instead, so
-## the clash was invisible rather than absent.)
 df_tail <- data %>%
   filter(ID != "OS")%>%
   group_by(ID)%>%
@@ -59,10 +31,6 @@ ggplot(df_tail, aes(discharge))+geom_histogram()+facet_wrap(~ID, scales='free')
 
 #Prepare data for two station sites#######
 
-## 2026-10-06: OS added. Without it OS got NA lat/lon from this join, so
-## calc_light() returned NA and OS_hi / OS_lo both failed with "no valid days of
-## data" while still writing all-NA rows into met_results_two.csv. OS coords are
-## from the KMZ, same values 10_two_station.R uses.
 lat.lon <- data.frame(
   ID = c('AM', 'LF', 'GB', 'ID', 'OS'),
   lat = c(30.155, 29.585, 29.83, 29.93, 29.6448),
@@ -313,25 +281,35 @@ IU.edit<-prediction2.IU%>%
 write_csv(IU.edit, "04_Outputs/one station results/IU.csv")
 
 #organize#####
-master.met<-rbind(met_results_two, OS.edit, IU.edit)%>%
+
+
+
+
+
+names(one.station)
+one.station<-rbind(
+  read_csv("04_Outputs/one station results/met_results_two.csv")%>%
+  filter(ID!='OS'),
+  read_csv("04_Outputs/one station results/IU.csv"),
+  read_csv("04_Outputs/one station results/OS.csv")
+)%>%
   filter(
     GPP_daily_mean>0, ER_daily_mean<0, ER_Rhat > 0.9 & ER_Rhat < 1.2,K600_daily_Rhat > 0.9 & K600_daily_Rhat < 1.2)%>%
-  separate(
-    ID, into = c("ID", "q_sep"), sep = "_")%>%
-  select(
-    date, GPP_daily_mean, ER_daily_mean, K600_daily_mean, ID, -q_sep)%>%
-  arrange(ID, date)%>%
-  rename(
-    GPP=GPP_daily_mean, ER=ER_daily_mean, K600=K600_daily_mean)
+  rename(Date=date, GPP.1=GPP_daily_mean, ER.1=ER_daily_mean, K600.1=K600_daily_mean)%>%
+  select(ID, Date, GPP.1, ER.1, K600.1)%>%
+  arrange(ID, Date)
 
-ggplot(master.met, aes(x = date)) +
+glimpse(one.station)
+
+
+ggplot(one.station, aes(x = Date)) +
   #geom_line(aes(y = K600))+
-  geom_line(aes(y = GPP), color='green')+
-  geom_line(aes(y = ER), color='red')+
+  geom_line(aes(y = GPP.1), color='green')+
+  geom_line(aes(y = ER.1), color='red')+
   geom_hline(yintercept = 0)+
   facet_wrap(~ID, scales='free')
 
-write_csv(master.met, "04_Outputs/one.station.metabolism.csv")
+write_csv(one.station, "04_Outputs/one.station.metabolism.csv")
 
 
 

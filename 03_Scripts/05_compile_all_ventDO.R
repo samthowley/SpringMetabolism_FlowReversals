@@ -1,29 +1,3 @@
-# =============================================================================
-# Compile ALL sites' roving VentDO field files into one master VentDO series.
-#
-# Source (already copied from the network Roving_edited share, see
-# 01_Raw_data/Hobo/Roving DO/<ID>/): AM, GB, LF, OS.
-# ID keeps its existing continuous USGS-gauge VentDO (pulled in 03_Scripts/VentDO.R,
-# already in 04_Outputs/VentDO.csv) -- no roving grab files exist for ID, it doesn't
-# need this treatment (already the best-instrumented site).
-# GB and LF additionally get county SRWMD/USGS WQ grab-sample DO merged in
-# (01_Raw_data/County Data/{GB,LF}.Vent_WQ.xlsx) -- see below.
-#
-# Data-quality rules (Samantha, established during the GB investigation):
-#   - Any reading >7 mg/L within a file = sensor out of the water. Discard those
-#     rows, keep the rest of the visit.
-#   - Visit averages, not per-timestamp matching.
-#   - Dates come from the DATA, never the filename -- confirmed necessary here:
-#     many files' embedded timestamps don't match their filenames at all
-#     (e.g. everything named "roving_OS_05182023 (1)" through "(7)" is actually
-#     7 different, unrelated visit dates).
-#   - Some excels contain BOTH sites' data as separate sheets (a joint AM+GB or
-#     LF+Otter field visit) and got copied into both site folders -- e.g.
-#     "Roving_GB_DO_01182022.xlsx" (in the GB folder) has sheets
-#     "AllenMill | GilchristBlue"; naively taking sheet 1 would silently pull
-#     AM's numbers into GB. Sheet selection below matches the sheet name to the
-#     target site instead of defaulting to sheet 1.
-# =============================================================================
 
 library(readxl)
 library(tidyverse)
@@ -170,10 +144,6 @@ extract_all <- extract_all %>%
   select(-correct_ID) %>%
   anti_join(remove_files, by = c("ID", "file"))  # remove_files' IDs are untouched by the relabel above, so this still matches correctly
 
-cat("\n=== After manual relabel/remove ===\n")
-print(extract_all %>% filter(file %in% c(relabel$file, remove_files$file)) %>%
-        select(ID, file, status, visit_date, mean_DO))
-
 # ---- outlier / mislabeling screen ------------------------------------------
 # Robust per-site baseline (median + MAD) from OK visits, then flag any visit
 # that's far from its OWN site's baseline but sits inside ANOTHER site's baseline
@@ -184,8 +154,6 @@ site_baseline <- ok %>%
   group_by(ID) %>%
   summarise(med = median(mean_DO), mad = mad(mean_DO), lo = quantile(mean_DO, 0.1), hi = quantile(mean_DO, 0.9), .groups = "drop")
 
-cat("\n=== Per-site VentDO baseline (from this extraction) ===\n")
-print(site_baseline)
 
 flag_visit <- function(id, val) {
   own <- site_baseline %>% filter(ID == id)
@@ -204,14 +172,6 @@ outlier_screen <- ok %>%
          flagged = own_z > 3 & matches_other_site != "" & !manually_verified) %>%
   arrange(desc(flagged), desc(own_z))
 
-write_csv(outlier_screen, file.path(outdir, "ventdo_all_outlier_screen.csv"))
-
-cat("\n=== FLAGGED visits (>3 MAD from own site's median AND within another site's range) ===\n")
-print(outlier_screen %>% filter(flagged) %>%
-        select(ID, file, visit_date, mean_DO, sd_DO, own_z, matches_other_site, sheet_note), n = 50)
-
-cat("\n=== sheet-selection notes (ambiguous sheet picks, worth a manual glance) ===\n")
-print(extract_all %>% filter(!is.na(sheet_note)) %>% select(ID, file, sheet_note))
 
 # ---- build master VentDO series --------------------------------------------
 new_ventdo <- outlier_screen %>%
@@ -265,13 +225,5 @@ master_ventdo <- bind_rows(new_ventdo, id_ventdo, county_ventdo) %>%
   anti_join(county_confirmed_bad, by = c("ID", "Date")) %>%
   arrange(ID, Date) %>% distinct()
 
-write_csv(master_ventdo, file.path(outdir, "VentDO_all.csv"))
-write_csv(master_ventdo, "02_Clean_data/Chem/VentDO_all.csv")
 write_csv(master_ventdo, "02_Clean_data/Chem/VentDO.csv")  # replaces the old file at Samantha's request
 
-cat("\n=== Master VentDO series written ===\n")
-cat("02_Clean_data/Chem/VentDO_all.csv and 02_Clean_data/Chem/VentDO.csv (replaced), n =", nrow(master_ventdo), "\n")
-print(master_ventdo %>% filter(ID != "ID") %>% count(ID))
-cat("(ID kept as-is from the continuous USGS series: n =", nrow(id_ventdo), ")\n")
-
-cat("\nDone. Outputs: ventdo_all_extraction_log.csv, ventdo_all_outlier_screen.csv, VentDO_all.csv\n")
