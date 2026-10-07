@@ -244,6 +244,8 @@ flood_dates <- function(df, variable, direction = c('min', 'max')) {
                       min(as.Date(Date[crit]), na.rm = TRUE)
                     else
                       max(as.Date(Date)) + 1L,
+        # FALSE = never returned to threshold, flood.end is just the end of the record
+        flood.recovered = any(crit, na.rm = TRUE),
         .groups = 'drop'
       )
 
@@ -265,6 +267,8 @@ flood_dates <- function(df, variable, direction = c('min', 'max')) {
                       min(as.Date(Date[crit]), na.rm = TRUE)
                     else
                       max(as.Date(Date)) + 1L,
+        # FALSE = never returned to threshold, flood.end is just the end of the record
+        flood.recovered = any(crit, na.rm = TRUE),
         .groups = 'drop'
       )
   }
@@ -324,6 +328,12 @@ fit_recessions <- function(trim, base, variable, base.var) {
     mutate(ID = names(rC), r2 = sapply(rC, function(m) if (!is.null(m)) summary(m)$r.squared else NA_real_)) %>%
     rename(Intercept = "(Intercept)", slope = "count") %>%
     separate(ID, into = c("ID", "flood"), sep = "_", convert = TRUE) %>%
+    left_join(
+      prep %>%
+        group_by(group_ID) %>%
+        summarise(n.recess = n_distinct(as.Date(Date)), .groups = 'drop') %>%
+        separate(group_ID, into = c("ID", "flood"), sep = "_", convert = TRUE),
+      by = c("ID", "flood")) %>%
     left_join(base, by = c("ID", "flood")) %>%
     rename(recess.intercept = Intercept, recess.slope = slope, r2.recess = r2) %>%
     select(-base)
@@ -342,6 +352,12 @@ fit_rise <- function(trim, base, variable, base.var) {
     mutate(ID = names(rC), r2 = sapply(rC, function(m) if (!is.null(m)) summary(m)$r.squared else NA_real_)) %>%
     rename(Intercept = "(Intercept)", slope = "count") %>%
     separate(ID, into = c("ID", "flood"), sep = "_", convert = TRUE) %>%
+    left_join(
+      prep %>%
+        group_by(group_ID) %>%
+        summarise(n.rise = n_distinct(as.Date(Date)), .groups = 'drop') %>%
+        separate(group_ID, into = c("ID", "flood"), sep = "_", convert = TRUE),
+      by = c("ID", "flood")) %>%
     left_join(base, by = c("ID", "flood")) %>%
     rename(rise.intercept = Intercept, rise.slope = slope, r2.rise = r2) %>%
     select(-base)
