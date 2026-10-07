@@ -19,26 +19,54 @@ master <- reduce(data, full_join, by = c("ID", 'Date'))
 master<-master %>%  mutate(min = minute(Date)) %>% filter(min==0) %>%select(-min)
 data <- master[!duplicated(master[c('Date','ID')]),]
 
-#split high and low periods#####
+#discharge floor (no hi/lo split -- see note)#####
 
+## 2026-10-06: the hi/lo discharge split was REMOVED. It fought the binned
+## K600 model. pool_K600="binned" learns K600 as a piecewise-linear function of
+## ln(Q), so it needs the full Q range; pre-splitting on Q throws away exactly
+## the variation the nodes are fitted to. At GB the mean-discharge threshold
+## left the "hi" half with only 23% of the site's ln(Q) range (0.29 of 1.28),
+## and GB_hi was the worst-converging model in the run (K600 Rhat < 1.05 on only
+## 40% of days, vs 100% for GB_lo). Failed and converged days had identical data
+## and near-identical posterior means, i.e. the nodes were unidentified, not the
+## data bad. Note also that velocity is a rating curve on depth here, so
+## cor(ln Q, ln depth) = +/-1 exactly -- splitting on Q WAS splitting on depth.
+## OS is EXCLUDED from this binned loop and fitted ONLY by its own section below
+## (pool_K600='normal', prior = mean of the cleaned gas-dome K600).
+##
+## Why: binned K600 learns K600 as a piecewise-linear function of ln(Q), so it
+## needs Q to vary. OS barely does -- its ln(Q) range is 0.19, i.e. discharge
+## moves only 1.2x from min to max across the whole record -- so the nodes stay
+## unidentified. OS converged on just 33% of days in the binned run, against
+## 100% at GB and LF. A single pooled K600 is the right tool for a site that
+## flat.
+##
+## This also removes a double-count: OS used to be fitted here AND below, which
+## wrote ~918 OS rows to met_results_two.csv and ~806 to OS.csv with 806
+## overlapping ID+date pairs. Script 10 rbinds every file in that folder, so OS
+## was entering the combine twice under two different K600 treatments. (Before
+## OS was added to lat.lon above, the loop produced all-NA OS rows instead, so
+## the clash was invisible rather than absent.)
 df_tail <- data %>%
+  filter(ID != "OS")%>%
   group_by(ID)%>%
   mutate(
-    discharge=if_else(discharge<=0, 0.01, discharge),
-    threshold= case_when(
-      discharge >= mean(discharge, na.rm=T)~'hi',
-      TRUE~'lo')
+    discharge=if_else(discharge<=0, 0.01, discharge)   # keep: log(Q) needs > 0
   )%>%
-  mutate(ID_q = paste(ID, threshold, sep = "_"))
+  ungroup()
 
-ggplot(df_tail, aes(discharge, color=threshold))+geom_histogram()+facet_wrap(~ID, scales='free')
+ggplot(df_tail, aes(discharge))+geom_histogram()+facet_wrap(~ID, scales='free')
 
 #Prepare data for two station sites#######
 
+## 2026-10-06: OS added. Without it OS got NA lat/lon from this join, so
+## calc_light() returned NA and OS_hi / OS_lo both failed with "no valid days of
+## data" while still writing all-NA rows into met_results_two.csv. OS coords are
+## from the KMZ, same values 10_two_station.R uses.
 lat.lon <- data.frame(
-  ID = c('AM', 'LF', 'GB', 'ID'),
-  lat = c(30.155, 29.585, 29.83, 29.93),
-  lon = c(-83.238, -82.93, -82.68, -82.8))
+  ID = c('AM', 'LF', 'GB', 'ID', 'OS'),
+  lat = c(30.155, 29.585, 29.83, 29.93, 29.6448),
+  lon = c(-83.238, -82.93, -82.68, -82.8, -82.9428))
 
 input <- df_tail %>%
   left_join(lat.lon, by = "ID") %>%   # join coords by ID [web:93]
@@ -51,13 +79,13 @@ input <- df_tail %>%
   )
 
 split_list <- input %>%
-  group_by(ID_q) %>%
+  group_by(ID) %>%
   group_split()
 
 names(split_list) <- input %>%
-  group_by(ID_q) %>%
+  group_by(ID) %>%
   group_keys() %>%
-  pull(ID_q)
+  pull(ID)
 
 rdy_for_sm <- lapply(split_list, function(df) {
   samplingperiod <- data.frame(solar.time = seq(from = as.POSIXct(min(df$solar.time)),
@@ -123,22 +151,19 @@ prepped.k600s<-left_join(k600s, discharge)%>%
   mutate(discharge=if_else(discharge<0, NA, discharge))%>%
   filter(!is.na(discharge))
 
-K600.hi <- prepped.k600s%>%
-  mutate(ID_q=paste(ID, 'hi', sep = "_"))
-
-K600.lo <- prepped.k600s%>%
-  mutate(ID_q=paste(ID, 'lo', sep = "_"))
-
-Ks<-rbind(K600.hi, K600.lo)
+## one K600 calibration set per site now. Previously this was duplicated into
+## ID_hi / ID_lo, which gave both halves IDENTICAL ln(Q) node centres and priors
+## -- the only thing that differed was which half of the record was fitted.
+Ks <- prepped.k600s
 
 k_list <- Ks %>%
-  group_by(ID_q) %>%
+  group_by(ID) %>%
   group_split()
 
 names(k_list) <- Ks %>%
-  group_by(ID_q) %>%          # group_keys(ID_q) was removed in dplyr 1.0 -- group first
+  group_by(ID) %>%            # group_keys(ID) was removed in dplyr 1.0 -- group first
   group_keys() %>%
-  pull(ID_q)
+  pull(ID)
 
 bayes_name <- mm_name(type='bayes', pool_K600="binned", err_obs_iid=TRUE, err_proc_iid=TRUE)
 bayes_specs <- function(site) {
@@ -166,9 +191,9 @@ bayes_specs <- function(site) {
 
 k600.specs <- lapply(k_list, function(k600_df) {
   k600 <- k600_df %>%
-    group_by(ID_q) %>%
+    group_by(ID) %>%
     bayes_specs()
-  
+
   return(k600)
 })
 
@@ -199,7 +224,10 @@ ggplot(met_results_two, aes(x = date)) +
 
 #OS########
 (file.names <- list.files(path="02_Clean_data/Chem", pattern=".csv", full.names=TRUE))
-file.names<-file.names[c(2,4,6,11)]
+## 2026-10-06: was file.names[c(2,4,6,11)], which resolved to SpC.csv, not
+## velocity.csv -- index 11 shifted when raw.depth.csv was added to the folder,
+## so the select(-velocity) below errored. Named explicitly now.
+file.names <- file.path("02_Clean_data/Chem", c("depth.csv","DO.csv","K600.csv","velocity.csv"))
 data <- lapply(file.names,function(x) {read_csv(x, col_types = cols(ID = col_character()))})
 OS <- reduce(data, full_join, by = c("ID", 'Date'))%>%filter(ID=='OS')
 
@@ -207,13 +235,19 @@ input.OS <- OS %>%
   rename(DO.obs = DO) %>%
   arrange(Date)%>%
   mutate(
-    lat=29.585,
-    lon=-82.93,
+    lat=29.6448,   # was 29.585 -- that is LF. OS coords from the KMZ.
+    lon=-82.9428,
     temp.water = fahrenheit.to.celsius(Temp),
     DO.sat     = Cs(temp.water),
     solar.time = as.POSIXct(Date, format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
     light      = calc_light(solar.time, lat, lon)
-  )%>%select(-lat, -lon, -Date, -ID, -Temp, -velocity, -K600_1.d_daily)
+  )%>%
+  ## 2026-10-06: positive select, not a negative one. Dropping named columns
+  ## let DO.csv's `source_file` and `remove` through, and metab() rejects any
+  ## column it does not expect ("data should omit these extra columns"). Listing
+  ## what the model needs is also immune to new columns appearing upstream.
+  ## pool_K600='normal' needs no discharge. Same column set as the IU block below.
+  select(solar.time, DO.obs, DO.sat, depth, temp.water, light)
 
 k600.OS <- k600s %>%
   filter(ID == "OS", !is.na(k600_1.day)) %>%
@@ -249,7 +283,7 @@ library(dataRetrieval)
 
 
 startDate <- "2021-04-03"
-endDate <- "2024-08-06"
+endDate <- "2024-02-06"
 parameterCd <- c('00010','00300','00065')
 ventID<-'02322700'
 
