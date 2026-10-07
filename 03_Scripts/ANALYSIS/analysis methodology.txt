@@ -1,0 +1,119 @@
+SPRING METABOLISM DURING BACKWATER FLOODS (FLOW REVERSALS)
+METHODS PLAN - notes from 2026-10-06
+Scripts live in 03_Scripts/ANALYSIS
+
+
+1. HYPOTHESES
+H1  The spring metabolic signal becomes less productive with increasing stage,
+    then halts during backwater floods (flow reversals).
+H2  Less-disturbed spring runs tolerate floods better (smaller metabolic impact).
+    This is a site-to-site comparison.
+H3  Backwater floods leave lasting (legacy) metabolic effects.
+
+
+2. VARIABLES
+- Metabolic regime: GPP and |ER| (ER is stored negative; absolute value is used).
+- Raw signal: DO and CO2.
+- GPP, |ER|, DO and CO2 carry equal weight.
+- H1 (breakpoints): DO and CO2 as diel range (daily max minus daily min).
+- H2 / H3 (flood metrics): DO as daily minimum, CO2 as daily maximum (kept daily).
+- Depth (stage) is the forcing variable.
+
+
+3. FLOODS, BASELINE, CLASS
+- Flood periods come from the slope of depth (isolate disturbances.R, writes
+  01_Raw_data/flood.periods.csv).
+- Start / end of each variable's response: smoothed series crosses 0.8x (declines)
+  or 1.2x (rises) of baseline for 3 days in a row.
+- Baseline is built from the non-flood days that follow each flood (averaged with
+  the low-stage days), so baseline is a post-flood state.
+- Class: FR = DO > 5 and SpC < 200; BO = DO < 3; everything else HI. pH is not
+  used (too spotty). Class is partly built from DO, so DO tests use vulnerability
+  rather than class.
+- Vulnerability score (one value per site, increasing): IU 1, ID 2, GB 3, LF 4,
+  AM 5, OS 6.
+
+
+4. H1: STAGE AND THE METABOLIC SIGNAL
+Script: breakpoints NEP.R  ->  04_Outputs/breakpoints.csv (site x variable)
+- Fit value ~ depth per site and variable: linear (0 breakpoints), 1 breakpoint,
+  2 breakpoints. Keep the simpler model unless the bigger one raises adjusted R2
+  by 0.02 or more. Each segment needs at least 10 days and 5% of the site's days.
+- Pattern label from segment slopes (flat = 95% CI includes 0), e.g. up-down-flat,
+  down-flat, or linear (no breakpoint). ER can have three stages.
+- Turn stage = stage at the first peak or trough (GPP peak = likely river water
+  contact optimum).
+- Halting (GPP): last two segments are down then flat, and the top segment mean is
+  at or below 10% of the site's 95th percentile. Halting stage = last breakpoint.
+  A site with no breakpoint = "no threshold" (a result, not a failure).
+
+
+5. H2: TOLERANCE
+Script: build flood metrics.R  ->  04_Outputs/flood impacts/flood_metrics.csv
+(one row per site x flood x variable)
+- Severity metrics: % change from baseline (abs.percent.change to compare across
+  variables), duration, duration relative to the depth flood, and
+  severity = abs % change x duration.
+- Model per variable: metric ~ vulnerable.score + stage change + (1|ID).
+  Vulnerability is one number per site, so there is no site term or site
+  interaction (collinear, and overfits). Only 6 sites, so the vulnerability
+  effect is exploratory: report estimates with CIs.
+- Sensitivity check: average floods per site, rank-correlate with vulnerability.
+- Headline comparison (regime vs raw signal):
+  abs.percent.change ~ variable + (1|ID) + (1|ID:flood)
+  Expectation: GPP / ER less impacted than DO and CO2.
+- Log-transform durations and times to recover.
+
+
+6. H3: LEGACY EFFECTS
+Part 1: is there a legacy?
+- Offset = mean of the first N days after the depth flood ends minus mean of the
+  last N days before it starts, paired by flood (N = 7, parameter window.n in
+  build flood metrics.R; check 3 and 14).
+- Windows are anchored on the depth flood so they sit at comparable stage
+  (depth.pre, depth.post, depth.diff are in the csv). A window is dropped if it
+  runs into the neighbouring flood or has fewer than 4 days of data.
+- offset.pct.impact: positive = still shifted in the direction of the flood
+  response (GPP and DO fall during floods, CO2 and ER rise).
+- Do NOT measure against the flood baseline (circular, it is built from
+  post-flood days).
+- Model: offset.pct.impact ~ class + stage change + (1|ID). Test each class mean
+  against 0, and compare FR with the others.
+- Supporting metrics: R2 of recovery (use n.recess for a minimum n), recession
+  slope, lag behind depth (end.lag, peak.lag), flood.recovered flag.
+Part 2: only if part 1 finds a legacy (prior: about 75% sure there is none)
+- offset.pct.impact ~ vulnerable.score + (1|ID): is it larger at the most
+  disturbed sites?
+
+
+7. NOTES AND CAVEATS
+- flood.recovered = FALSE means the variable never returned to threshold and
+  flood.end is just the end of the record. Flag these; no summary table for now.
+- Rise / recession slopes are per sample step (hourly DO, CO2, depth; daily GPP,
+  ER), so compare only within a variable (z-scores are in the csv). Slopes with
+  the wrong sign are set to NA together with their R2.
+- Metabolism models assume downstream flow, so GPP and ER during reversals may be
+  partly a model artifact. DO feeds GPP / ER; CO2 is the independent line.
+- DO and CO2 also respond to water source (groundwater vs river); SpC can be used
+  as a covariate.
+- Hard-coded cleaning to document: CO2 > 600 only; CO2 outliers removed (OS flood
+  1, AM flood 4); GB CO2 baseline replacement; OS DO baseline = 4.5; manual class
+  overrides (AM and LF flood 6, LF BO to HI); GB depth set to NA after 2024-07-01.
+- The old breakpoint script most likely returned NA for slope SEs (it looked for a
+  column named "St.Err", the package names it "St.Err."); fixed.
+
+
+8. PARAMETERS (top of each script)
+window.n = 7, min.window = 4 (build flood metrics.R)
+min.day.frac = 0.9, floor.frac = 0.10, adj_r2_min_gain = 0.02,
+min.seg.frac = 0.05, min.seg.n = 10 (breakpoints NEP.R)
+
+
+9. RUN ORDER
+1. Re-run isolate disturbances_GPP, ER, DO, CO2 and depth, all five together
+   (adds flood.recovered, n.rise, n.recess to the flood impact csvs).
+2. build flood metrics.R  (sources analysis prep.R)
+3. breakpoints NEP.R      (sources analysis prep.R)
+4. Round two models read flood_metrics.csv and breakpoints.csv.
+Move to an archive folder once their pieces are covered: rise.R, recovery.R,
+duration.R, peak dates.R.

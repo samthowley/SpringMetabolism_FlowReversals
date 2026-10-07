@@ -1,120 +1,145 @@
-#source('03_Scripts/ANALYSIS/analysis prep.R')
+source('03_Scripts/ANALYSIS/analysis prep.R')
 
-#library(tidyverse)
-#library(patchwork)
-#library(segmented)
+library(segmented)
 select <- dplyr::select
 
-theme_spring <- function() {
-  theme_bw(base_size = 11) +
-    theme(
-      strip.background  = element_blank(),
-      strip.text        = element_text(face = "bold"),
-      panel.grid.minor  = element_blank(),
-      legend.position   = "bottom"
-    )
-}
+# H1: how do GPP, ER, DO and CO2 change with stage?
+#   GPP, ER (|ER|) = daily value; DO, CO2 = daily diel range (max - min)
+# Each site x variable gets a linear fit (0 breakpoints), a 1 breakpoint fit and
+# a 2 breakpoint fit; the simplest model that improves the fit enough is kept.
+# Output: 04_Outputs/breakpoints.csv (one row per site x variable)
 
-df <- left_join(
-  chem_hourly %>%
-    select(ID, Date, DO, CO2, depth) %>%
-    mutate(Date = as.Date(Date)) %>%
-    group_by(ID, Date) %>%
-    summarise(DO    = mean(DO,    na.rm = TRUE),
-              CO2   = mean(CO2,   na.rm = TRUE),
-              depth = mean(depth, na.rm = TRUE),
-              .groups = "drop"),
-  metab %>% rename(Date = Date) %>% select(-depth, -K600) %>%
-    distinct(ID, Date, .keep_all = TRUE) %>%
-    mutate(NEP = GPP + ER),
-  by = c("Date", "ID"),
-  relationship = "one-to-one"
-) %>% arrange(ID, Date)
+#parameters########
+min.day.frac    <- 0.9   # a day needs this fraction of the site's usual readings to get a diel range
+floor.frac      <- 0.10  # GPP counts as halted when the top segment mean is below this fraction of the site's 95th percentile
+fit_criterion   <- "adjR2"   # "adjR2" (default) | "AIC" | "BIC"
+adj_r2_min_gain <- 0.02      # minimum adj-R2 improvement to prefer the more complex model
+aic_min_gain    <- 2         # minimum AIC reduction to prefer the more complex model
+min.seg.frac    <- 0.05      # each segment needs at least this fraction of the site's days ...
+min.seg.n       <- 10        # ... and at least this many
 
-# ── Join diagnostics (remove once IU is confirmed working) ───────────────────
-message("IDs in chem_hourly : ", paste(sort(unique(chem_hourly$ID)), collapse = ", "))
-message("IDs in metab       : ", paste(sort(unique(metab$ID)),        collapse = ", "))
-message("IDs in df          : ", paste(sort(unique(df$ID)),           collapse = ", "))
+#daily data########
+# same CO2 > 600 filter as isolate disturbances_CO2.R
+daily.chem <- chem_hourly %>%
+  mutate(
+    Date = as.Date(Date),
+    CO2  = if_else(CO2 > 600, CO2, NA_real_)
+  ) %>%
+  group_by(ID, Date) %>%
+  summarise(
+    n.DO        = sum(!is.na(DO)),
+    n.CO2       = sum(!is.na(CO2)),
+    DO.diurnal  = if (n.DO == 0)  NA_real_ else max(DO,  na.rm = TRUE) - min(DO,  na.rm = TRUE),
+    CO2.diurnal = if (n.CO2 == 0) NA_real_ else max(CO2, na.rm = TRUE) - min(CO2, na.rm = TRUE),
+    depth       = mean(depth, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  group_by(ID) %>%
+  mutate(
+    DO.diurnal  = if_else(n.DO  >= min.day.frac * median(n.DO[n.DO > 0]),   DO.diurnal,  NA_real_),
+    CO2.diurnal = if_else(n.CO2 >= min.day.frac * median(n.CO2[n.CO2 > 0]), CO2.diurnal, NA_real_)
+  ) %>%
+  ungroup() %>%
+  select(-n.DO, -n.CO2)
+
+df <- daily.chem %>%
+  left_join(
+    metab %>%
+      distinct(ID, Date, .keep_all = TRUE) %>%
+      transmute(ID, Date, GPP, ER = abs(ER)),
+    by = c("Date", "ID"),
+    relationship = "one-to-one"
+  ) %>%
+  rename(DO = DO.diurnal, CO2 = CO2.diurnal) %>%
+  arrange(ID, Date)
+
+# Join diagnostics
 df %>%
   group_by(ID) %>%
   summarise(n_rows  = n(),
             n_depth = sum(!is.na(depth)),
+            n_DO    = sum(!is.na(DO)),
             n_CO2   = sum(!is.na(CO2)),
             n_GPP   = sum(!is.na(GPP)),
             n_ER    = sum(!is.na(ER)),
             .groups = "drop") %>%
   print()
 
-
 master_long <- df %>%
-  pivot_longer(cols = c(GPP, ER, NEP, DO, CO2),
+  pivot_longer(cols = c(GPP, ER, DO, CO2),
                names_to = "variable", values_to = "value") %>%
   filter(!is.na(depth)) %>%
   left_join(peak_dates, by = join_by(ID, Date), relationship = "many-to-many") %>%
   arrange(ID, depth)%>%
   group_by(ID)%>%
-  #fill(class, .direction = 'down')%>%
   mutate(
     class=if_else(is.na(class), 'baseline', class),
-    variable = factor(variable, levels = c("depth", "DO", "CO2", "GPP", "ER", "NEP")),
+    variable = factor(variable, levels = c("DO", "CO2", "GPP", "ER")),
     ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
   )
 unique(master_long$ID)
 
-# ── Model-selection parameters ────────────────────────────────────────────────
-# fit_criterion: "adjR2" (default) | "AIC" | "BIC"
-#   adjR2 — 3 bp wins only when adj-R² improves by >= adj_r2_min_gain
-#   AIC   — 3 bp wins when ΔAIC > aic_min_gain (conventional threshold = 2)
-#   BIC   — 3 bp wins when ΔBIC > 0 (BIC penalises complexity more strongly)
-fit_criterion   <- "adjR2"
-adj_r2_min_gain <- 0.02   # minimum adj-R² improvement to prefer 3 bp over 2 bp
-aic_min_gain    <- 2      # minimum AIC *reduction* to prefer 3 bp over 2 bp
 
+#helpers########
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-# Evenly-spaced interior quantiles used as breakpoint starting positions
-bp_starts <- function(x, n) as.numeric(quantile(x, seq(1/(n+1), n/(n+1), length.out = n)))
-
-# Adjusted R² for a segmented or lm object
+# Adjusted R2 for a segmented or lm object
 get_adj_r2 <- function(fit) summary(fit)$adj.r.squared
 
-# Attempt a segmented fit with n_bp breakpoints; returns NULL on failure
+# TRUE if every segment holds enough observations (blocks tiny end segments and
+# two breakpoints sitting right next to each other)
+seg_ok <- function(fit, depth_vec) {
+  bp   <- sort(fit$psi[, "Est."])
+  n_in <- as.numeric(table(cut(depth_vec, c(-Inf, bp, Inf))))
+  all(n_in >= max(min.seg.n, min.seg.frac * length(depth_vec)))
+}
+
+# Segmented fit with n_bp breakpoints. Most days sit near baseline stage, so
+# one set of starting values can land on a poor solution: try several starting
+# sets (depth quantiles and evenly spaced depths) and keep the lowest AIC.
+# Returns NULL if nothing converges.
 try_seg <- function(lm_fit, depth_vec, n_bp) {
-  tryCatch(
-    segmented(lm_fit, seg.Z = ~depth,
-              psi     = list(depth = bp_starts(depth_vec, n_bp)),
-              control = seg.control(it.max = 50, n.boot = 0)),
-    error = function(e) NULL
-  )
+  cand <- sort(unique(c(as.numeric(quantile(depth_vec, c(0.2, 0.4, 0.6, 0.8, 0.9))),
+                        seq(min(depth_vec), max(depth_vec), length.out = 5)[2:4])))
+  starts <- if (n_bp == 1) as.list(cand) else combn(cand, n_bp, simplify = FALSE)
+  best <- NULL
+  for (st in starts) {
+    fit <- tryCatch(
+      suppressWarnings(
+        segmented(lm_fit, seg.Z = ~depth, psi = list(depth = st),
+                  control = seg.control(it.max = 50, n.boot = 0))),
+      error = function(e) NULL
+    )
+    if (is.null(fit) || !inherits(fit, "segmented")) next
+    if (any(is.na(fit$psi[, "Est."])) || !seg_ok(fit, depth_vec)) next
+    if (is.null(best) || AIC(fit) < AIC(best)) best <- fit
+  }
+  best
 }
 
-# Return whichever of fit1 (1 bp) / fit2 (2 bp) wins under the chosen criterion
-choose_model <- function(fit1, fit2) {
-  if (is.null(fit1) && is.null(fit2)) return(NULL)
-  if (is.null(fit2)) return(fit1)
-  if (is.null(fit1)) return(fit2)
-
-  switch(fit_criterion,
-    adjR2 = {
-      if ((get_adj_r2(fit2) - get_adj_r2(fit1)) >= adj_r2_min_gain) fit2 else fit1
-    },
-    AIC = {
-      if ((AIC(fit1) - AIC(fit2)) >= aic_min_gain) fit2 else fit1
-    },
-    BIC = {
-      if (BIC(fit2) < BIC(fit1)) fit2 else fit1
-    }
-  )
+# Start from the linear fit (0 bp); take the 1 bp fit only if it beats it, then
+# take the 2 bp fit only if it beats whatever is currently kept
+choose_model <- function(fit0, fit1, fit2) {
+  best <- fit0
+  for (cand in list(fit1, fit2)) {
+    if (is.null(cand)) next
+    better <- switch(fit_criterion,
+      adjR2 = (get_adj_r2(cand) - get_adj_r2(best)) >= adj_r2_min_gain,
+      AIC   = (AIC(best) - AIC(cand)) >= aic_min_gain,
+      BIC   = BIC(cand) < BIC(best)
+    )
+    if (isTRUE(better)) best <- cand
+  }
+  best
 }
 
 
-# ── Pre-compute segmented fits ────────────────────────────────────────────────
+#segmented fits########
 seg_preds <- list()
 seg_bps   <- list()
 bp_slopes <- list()
+bp_summ   <- list()
 
-for (var in c("GPP", "ER", "NEP", "DO", "CO2")) {
+for (var in c("GPP", "ER", "DO", "CO2")) {
   dat_v <- df %>%
     transmute(Date, ID, depth, value = .data[[var]]) %>%
     filter(!is.na(depth), !is.na(value))
@@ -122,53 +147,102 @@ for (var in c("GPP", "ER", "NEP", "DO", "CO2")) {
   for (site in unique(dat_v$ID)) {
     sub <- filter(dat_v, ID == site) %>% arrange(depth)
     if (nrow(sub) < 25) {
-      message(sprintf("SKIP  %s × %s — only %d observations (need ≥ 25)", var, site, nrow(sub)))
+      message(sprintf("SKIP  %s x %s: only %d observations (need >= 25)", var, site, nrow(sub)))
       next
     }
 
     lm_fit <- lm(value ~ depth, data = sub)
     seg1   <- try_seg(lm_fit, sub$depth, 1)
     seg2   <- try_seg(lm_fit, sub$depth, 2)
+    best   <- choose_model(lm_fit, seg1, seg2)
 
-    best <- choose_model(seg1, seg2)
-    if (is.null(best)) {
-      message(sprintf("SKIP  %s × %s — both segmented fits failed to converge", var, site))
-      next
+    key <- paste(var, site)
+
+    # Breakpoints (none when the linear fit wins) and segment slopes
+    if (inherits(best, "segmented")) {
+      bp_val <- sort(best$psi[, "Est."])
+      sl     <- slope(best)$depth
+      sl_est <- sl[, "Est."]
+      se_col <- grep("^St(d)?\\.? ?Err", colnames(sl), value = TRUE)[1]
+      sl_se  <- if (!is.na(se_col)) sl[, se_col] else rep(NA_real_, nrow(sl))
+    } else {
+      bp_val <- numeric(0)
+      cf     <- summary(best)$coefficients
+      sl_est <- cf["depth", "Estimate"]
+      sl_se  <- cf["depth", "Std. Error"]
     }
-
-    key   <- paste(var, site)
-    bp_val <- best$psi[, "Est."]   # length = n_bp (2 or 3)
 
     # Predictions along depth range
     px <- seq(min(sub$depth), max(sub$depth), length.out = 300)
     py <- predict(best, newdata = data.frame(depth = px))
     seg_preds[[key]] <- tibble(variable = var, ID = site, depth = px, fitted = py)
 
-    # Breakpoints (one row per breakpoint)
-    seg_bps[[key]] <- tibble(variable = var, ID = site, breakpoint = bp_val)
-
-    # Slopes — one row per segment; n_segments = n_bp + 1
-    sl     <- slope(best)$depth
-    se_col <- intersect(c("St.Err", "Std.Err"), colnames(sl))
-    se_col <- if (length(se_col) > 0) se_col[1] else NULL
-
-    if (!is.null(sl) && nrow(sl) >= 1) {
-      bp_sorted    <- sort(bp_val)
-      lower_bounds <- c(min(sub$depth), bp_sorted)
-      upper_bounds <- c(bp_sorted, max(sub$depth))
-
-      bp_slopes[[key]] <- tibble(
-        variable      = var,
-        ID            = site,
-        n_breakpoints = length(bp_val),
-        adj_r2        = get_adj_r2(best),
-        segment       = seq_len(nrow(sl)),
-        seg_lower     = lower_bounds,
-        seg_upper     = upper_bounds,
-        slope         = sl[, "Est."],
-        slope_se      = if (!is.null(se_col)) sl[, se_col] else NA_real_
-      )
+    if (length(bp_val) > 0) {
+      seg_bps[[key]] <- tibble(variable = var, ID = site, breakpoint = bp_val)
     }
+
+    lower_bounds <- c(min(sub$depth), bp_val)
+    upper_bounds <- c(bp_val, max(sub$depth))
+
+    bp_slopes[[key]] <- tibble(
+      variable      = var,
+      ID            = site,
+      n_breakpoints = length(bp_val),
+      adj_r2        = get_adj_r2(best),
+      segment       = seq_along(sl_est),
+      seg_lower     = lower_bounds,
+      seg_upper     = upper_bounds,
+      slope         = as.numeric(sl_est),
+      slope_se      = as.numeric(sl_se)
+    )
+
+    # Pattern: direction of each segment (flat = 95% CI of the slope includes 0)
+    flat <- abs(sl_est) < 1.96 * sl_se
+    flat[is.na(flat)] <- FALSE
+    dir <- if_else(flat, "flat", if_else(sl_est > 0, "up", "down"))
+    n_seg <- length(dir)
+
+    # First interior breakpoint where the slope changes sign (peak or trough)
+    turn.stage <- NA_real_
+    turn.type  <- NA_character_
+    if (n_seg > 1) {
+      for (i in seq_len(n_seg - 1)) {
+        if (dir[i] == "up" & dir[i + 1] == "down") { turn.stage <- bp_val[i]; turn.type <- "peak";   break }
+        if (dir[i] == "down" & dir[i + 1] == "up") { turn.stage <- bp_val[i]; turn.type <- "trough"; break }
+      }
+    }
+
+    # Halting (GPP only): ends down then flat, and the top segment sits near zero
+    top.level     <- mean(sub$value[sub$depth >= max(lower_bounds)])
+    top.level.rel <- top.level / as.numeric(quantile(sub$value, 0.95))
+    halted <- var == "GPP" && n_seg > 1 &&
+      dir[n_seg] == "flat" && dir[n_seg - 1] == "down" &&
+      isTRUE(top.level.rel <= floor.frac)
+
+    bp_summ[[key]] <- tibble(
+      variable        = var,
+      ID              = site,
+      metric          = if_else(var %in% c("DO", "CO2"), "diel range", "daily value"),
+      n.obs           = nrow(sub),
+      depth.min       = min(sub$depth),
+      depth.max       = max(sub$depth),
+      n.breakpoints   = length(bp_val),
+      pattern         = paste(dir, collapse = "-"),
+      bp1             = if (length(bp_val) >= 1) bp_val[1] else NA_real_,
+      bp2             = if (length(bp_val) >= 2) bp_val[2] else NA_real_,
+      slope1          = as.numeric(sl_est)[1],
+      slope1.se       = as.numeric(sl_se)[1],
+      slope2          = if (n_seg >= 2) as.numeric(sl_est)[2] else NA_real_,
+      slope2.se       = if (n_seg >= 2) as.numeric(sl_se)[2]  else NA_real_,
+      slope3          = if (n_seg >= 3) as.numeric(sl_est)[3] else NA_real_,
+      slope3.se       = if (n_seg >= 3) as.numeric(sl_se)[3]  else NA_real_,
+      adj.r2          = get_adj_r2(best),
+      turn.stage      = turn.stage,
+      turn.type       = turn.type,
+      top.level.rel   = top.level.rel,
+      halted          = if (var == "GPP") halted else NA,
+      halting.stage   = if (var == "GPP" && isTRUE(halted)) max(bp_val) else NA_real_
+    )
   }
 }
 
@@ -185,23 +259,35 @@ seg_bp_all <- bind_rows(seg_bps) %>%
 
 bp_slopes_df <- bind_rows(bp_slopes)
 
-# ── Dominant flood class per segment ─────────────────────────────────────────
+breakpoints.out <- bind_rows(bp_summ) %>%
+  mutate(
+    variable = factor(variable, levels = var_levels),
+    ID       = factor(ID,       levels = id_levels)
+  ) %>%
+  arrange(variable, ID) %>%
+  mutate(variable = as.character(variable), ID = as.character(ID))
+
+write_csv(breakpoints.out, "04_Outputs/breakpoints.csv")
+
+breakpoints.out %>% select(variable, ID, n.breakpoints, pattern, bp1, bp2, turn.type, halted, halting.stage)
+
+
+#dominant flood class per segment########
 # Ordinal encoding: baseline=1, BO=2, HI=3, FR=4
 # Weighted mean ordinal (by n distinct days per class in segment depth range),
 # then rounded back to the nearest class label.
 class_ord_map <- c(baseline = 1, BO = 2, HI = 3, FR = 4)
 ord_to_class  <- c("1" = "baseline", "2" = "BO", "3" = "HI", "4" = "FR")
 
-# One row per site × date × depth, with class already filled down
+# One row per site x date x depth, with class already filled down
 depth_class <- master_long %>%
   distinct(ID, Date, depth, class) %>%
   filter(!is.na(class)) %>%
   mutate(class_num = class_ord_map[class])
 
-# Join every segment to all site observations, filter to depth range,
-# count distinct days per class, compute weighted mean ordinal
 seg_class <- bp_slopes_df %>%
   select(variable, ID, segment, seg_lower, seg_upper) %>%
+  mutate(ID = factor(ID, levels = id_levels)) %>%
   left_join(depth_class, by = "ID", relationship = "many-to-many") %>%
   filter(depth >= seg_lower, depth <= seg_upper, !is.na(class_num)) %>%
   distinct(variable, ID, segment, Date, class, class_num) %>%
@@ -214,15 +300,14 @@ seg_class <- bp_slopes_df %>%
                             levels = names(class_ord_map)))
 
 bp_slopes_df <- bp_slopes_df %>%
+  mutate(ID = factor(ID, levels = id_levels)) %>%
   left_join(seg_class %>% select(variable, ID, segment, seg_class),
             by = c("variable", "ID", "segment"))
 
-# write_csv(bp_slopes_df, "04_Outputs/breakpoint_slopes.csv")
 
-# ── Breakpoint plot ───────────────────────────────────────────────────────────
+#breakpoint plot########
 (a <- master_long %>%
-  filter(variable %in% c("GPP", "ER", "NEP", "DO", "CO2")) %>%
-    mutate(class = factor(class, levels = c("baseline", "HI", "BO", "FR")))%>% 
+    mutate(class = factor(class, levels = c("baseline", "HI", "BO", "FR")))%>%
   ggplot(aes(x = depth, y = value)) +
   geom_point(aes(color = class), size = 0.6) +
   geom_line(data = seg_pred_all,
@@ -240,35 +325,18 @@ bp_slopes_df <- bp_slopes_df %>%
   theme(axis.text.x = element_text(size = 7),
         legend.position = 'right'))
 
-unique(master_long$class)
-# ggsave("05_Figures/H1_fig2_breakpoints.png", fig2,
-#        width = 14, height = 10, dpi = 300)
 
-
-# ── Slope scatter plot ────────────────────────────────────────────────────────
+#slope scatter plot########
 # Each point = one segment; colour = dominant flood class for that segment's
-# depth range (weighted mean ordinal, rounded); shape = segment order
-# Grey lines connect segments within the same site to show slope progression
-criterion_caption <- switch(fit_criterion,
-  adjR2 = paste0("adjR² (min gain = ", adj_r2_min_gain, ")"),
-  AIC   = paste0("AIC (min reduction = ", aic_min_gain, ")"),
-  BIC   = "BIC"
-)
-
+# depth range; label = segment number (shallow -> deep)
 b <- bp_slopes_df %>%
-    mutate(
-      variable = factor(variable, levels = c("depth", "DO", "CO2", "NEP", "GPP", "ER")),
-      ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
-    )%>%
+  mutate(variable = factor(variable, levels = var_levels)) %>%
   ggplot(aes(x = ID, y = slope, color = seg_class, group = ID)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
-  # lines connecting segments within a site
   geom_line(color = "grey75", linewidth = 0.5) +
-  # error bars drawn before text so text sits on top
   geom_errorbar(aes(ymin = slope - slope_se, ymax = slope + slope_se,
                     color = seg_class),
                 width = 0.15, linewidth = 0.4, na.rm = TRUE) +
-  # segment number as the point marker; shallow -> deep reads 1 → n
   geom_text(aes(label = segment, color = seg_class),
             fontface = "bold", size = 4, show.legend = FALSE) +
   scale_color_manual(values = class_colors, na.value = "grey70",
