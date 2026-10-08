@@ -47,13 +47,12 @@ h.percent.change<-depth%>%
 
 GPP <- read_csv("04_Outputs/flood impacts/GPP.csv")           # floods where GPP decreases
 GPPmax <- read_csv("04_Outputs/flood impacts/GPPmax.csv")     # floods where GPP increases
-ER <- read_csv("04_Outputs/flood impacts/ER.csv")             # floods where |ER| increases
-ERmin <- read_csv("04_Outputs/flood impacts/ERmin.csv")       # floods where |ER| decreases
+ER <- read_csv("04_Outputs/flood impacts/ER.csv")
 DO <- read_csv("04_Outputs/flood impacts/DO.csv")
 CO2 <- read_csv("04_Outputs/flood impacts/CO2.csv")
 
-# response.dir: direction of the variable during the flood (GPP and ER are in both groups)
-declined<-rbind(GPP, ERmin, DO)%>%rename(peak.response=minimum)%>%mutate(response.dir='decrease')
+# response.dir: direction of the variable during the flood (GPP is in both groups)
+declined<-rbind(GPP, DO)%>%rename(peak.response=minimum)%>%mutate(response.dir='decrease')
 increased<-rbind(GPPmax, ER, CO2,depth)%>%rename(peak.response=maximum)%>%mutate(response.dir='increase')
 
 flood.response<-rbind(declined, increased)%>%
@@ -65,11 +64,8 @@ flood.response<-rbind(declined, increased)%>%
          class = factor(class, levels = c("HI", "BO", "FR"))
          )%>%
   mutate(
-    recess.slope=if_else(variable =='ER' & response.dir=='increase' & recess.slope>0, NA, recess.slope),
-    r2.recess=if_else(variable =='ER'  & response.dir=='increase' & recess.slope>0, NA, r2.recess),
-
-    recess.slope=if_else(variable =='ER' & response.dir=='decrease' & recess.slope<0, NA, recess.slope),
-    r2.recess=if_else(variable =='ER'  & response.dir=='decrease' & recess.slope<0, NA, r2.recess),
+    recess.slope=if_else(variable =='ER' & recess.slope>0, NA, recess.slope),
+    r2.recess=if_else(variable =='ER'  & recess.slope>0, NA, r2.recess),
 
     recess.slope=if_else(variable =='CO2' & recess.slope>0, NA, recess.slope),
     r2.recess=if_else(variable =='CO2'  & recess.slope>0, NA, r2.recess),
@@ -108,7 +104,6 @@ flood.response<-rbind(declined, increased)%>%
 GPP_flood_df <- read_csv("04_Outputs/flood impacts/GPP.flood.df.csv")
 GPPmax_flood_df <- read_csv("04_Outputs/flood impacts/GPPmax.flood.df.csv")
 ER_flood_df  <- read_csv("04_Outputs/flood impacts/ER.flood.df.csv")
-ERmin_flood_df <- read_csv("04_Outputs/flood impacts/ERmin.flood.df.csv")
 DO_flood_df  <- read_csv("04_Outputs/flood impacts/DO.flood.df.csv")
 CO2_flood_df <- read_csv("04_Outputs/flood impacts/CO2.flood.df.csv")
 depth_flood_df <- read_csv("04_Outputs/flood impacts/depth.flood.df.csv")
@@ -117,7 +112,7 @@ h.per.change.timeseries <- depth_flood_df%>%
   mutate(h.percent.change=(conc-base)/base*100)%>%
   select(ID, flood, Date, h.percent.change)
 
-time.series <- rbind(GPP_flood_df, GPPmax_flood_df, ER_flood_df, ERmin_flood_df, DO_flood_df, CO2_flood_df,depth_flood_df)%>%
+time.series <- rbind(GPP_flood_df, GPPmax_flood_df, ER_flood_df, DO_flood_df, CO2_flood_df,depth_flood_df)%>%
   left_join(h.per.change.timeseries)%>%
   left_join(flood.class)%>%
   left_join(flood.response%>%select(ID, flood, variable, peak.Date)%>%mutate(flood=as.numeric(flood)), by=c("ID", "flood", "variable"))%>%

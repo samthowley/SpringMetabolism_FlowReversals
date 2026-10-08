@@ -96,15 +96,27 @@ depth.window <- window.means%>%
 # offset = post-flood mean minus pre-flood mean (not the flood baseline, which is
 # built from post-flood days)
 # offset.pct.impact: + = still shifted in the direction of the flood response
-# (GPP and DO fall during floods, CO2 and ER rise)
+# (DO falls during floods, CO2 rises; GPP and ER each fall in some floods and rise in
+# others, so the sign comes from response.dir per flood)
+response.dir <- flood.response%>%
+  filter(variable!='depth')%>%
+  transmute(
+    ID=as.character(ID),
+    flood=as.numeric(as.character(flood)),
+    variable=as.character(variable),
+    response.dir
+  )
+
 offset <- window.means%>%
   filter(variable!='depth')%>%
+  left_join(response.dir, by=c('ID', 'flood', 'variable'))%>%
   mutate(
+    response.dir=coalesce(response.dir, if_else(variable %in% c('GPP', 'DO'), 'decrease', 'increase')),
     pre.mean=if_else(coalesce(n.pre, 0)>=min.window, mean.pre, NA_real_),
     post.mean=if_else(coalesce(n.post, 0)>=min.window, mean.post, NA_real_),
     offset=post.mean-pre.mean,
     offset.pct=if_else(pre.mean>0, offset/pre.mean*100, NA_real_),
-    offset.pct.impact=offset.pct*if_else(variable %in% c('GPP', 'DO'), -1, 1)
+    offset.pct.impact=offset.pct*if_else(response.dir=='decrease', -1, 1)
   )%>%
   select(ID, flood, variable, n.pre, n.post, pre.mean, post.mean, offset,
          offset.pct, offset.pct.impact)%>%
@@ -131,16 +143,16 @@ for (col in c('flood.recovered', 'n.rise', 'n.recess')) {
 }
 
 #metrics########
-# expected direction of the rise to peak; the recession is the reverse
-rise.dir <- c(GPP=-1, DO=-1, CO2=1, ER=1)
-
+# expected direction of the rise to peak (-1 = the variable falls, +1 = it rises);
+# the recession is the reverse. Comes from response.dir, so GPP is -1 in most
+# floods and +1 in the five GPP-increase floods (GPPmax script)
 flood.metrics <- flood.response%>%
   filter(variable!='depth')%>%
   mutate(
     ID=as.character(ID),
     flood=as.numeric(as.character(flood)),
     variable=as.character(variable),
-    exp.dir=rise.dir[variable],
+    exp.dir=if_else(response.dir=='decrease', -1, 1),
     rise.ok=sign(rise.slope)==exp.dir,
     recess.ok=sign(recess.slope)==-exp.dir,
     rise.slope=if_else(rise.ok, rise.slope, NA_real_),
@@ -148,7 +160,7 @@ flood.metrics <- flood.response%>%
     recess.slope=if_else(recess.ok, recess.slope, NA_real_),
     r2.recess=if_else(recess.ok, r2.recess, NA_real_)
   )%>%
-  group_by(variable)%>%
+  group_by(variable, response.dir)%>%   # GPP rises in some floods and falls in others: z-score each separately
   mutate(
     rise.slope.z=as.numeric(scale(rise.slope)),
     recess.slope.z=as.numeric(scale(recess.slope))
@@ -170,7 +182,7 @@ flood.metrics <- flood.response%>%
   )%>%
   left_join(offset, by=c('ID', 'flood', 'variable'))%>%
   select(
-    ID, flood, variable, metric, class, vulnerable.score, h.percent.change,
+    ID, flood, variable, response.dir, metric, class, vulnerable.score, h.percent.change,
     flood.start, flood.end, peak.Date, base, peak.response,
     percent.change, abs.percent.change, duration, duration.depth, duration.rel,
     severity,

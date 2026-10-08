@@ -1,16 +1,9 @@
 source("03_Scripts/ANALYSIS/00-disturbance isolation functions daily.R")
 
-# |ER| increases during these floods. The floods where |ER| decreases (ID 1-4,
-# LF 3) are analysed in 04-isolate disturbances_ERmin.R, which keeps its own copy
-# of this list; they are left out of the outputs below.
-er.decrease.floods <- tibble(
-  ID    = c('ID', 'ID', 'ID', 'ID', 'LF'),
-  flood = c(1, 2, 3, 4, 3)
-)
 
 # --- Data loading -----------------------------------------------------------
 ER <- read_csv("04_Outputs/combined metabolism methods.csv") %>%
-  dplyr::select(Date, ID, ER) %>%
+  select(Date, ID, ER) %>%
   left_join(read_csv("02_Clean_data/Chem/depth.csv")) %>%
   mutate(
     Date = as.Date(Date),
@@ -25,16 +18,15 @@ ER_flagged <- ER %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
-  dplyr::select(-start, -end) %>%
+  select(-start, -end) %>%
   arrange(ID, Date) %>%
-  filter(!is.na(ER))
+  filter(!is.na(ER))%>%
+  mutate(
+         ER=if_else(ID=='ID'& flood == 2 & ER>25, NA_real_, ER)
+         )
 # --- Baseline ---------------------------------------------------------------
-# baseline uses the days between floods, so it is computed with every flood and
-# the decreasing floods are dropped afterwards
-ER.base <- baseline(ER_flagged, ER) %>%
-  anti_join(er.decrease.floods, by = c('ID', 'flood'))
-ER.max  <- maximum(ER_flagged, ER) %>%
-  anti_join(er.decrease.floods, by = c('ID', 'flood'))
+ER.base <- baseline(ER_flagged, ER)
+ER.max      <- maximum(ER_flagged, ER)
 
 # --- Smooth -----------------------------------------------------------------
 
@@ -57,48 +49,43 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
 
 
 ER.smooth <- smooth(
-  ER_flagged %>% group_by(ID) %>% fill(flood, .direction = "down") %>% ungroup() %>% filter(!is.na(ER))%>%
-    filter(!(ID=='AM' & flood==6 & ER>17))%>%
-    filter(!(ID=='OS' & flood==1 & Date<'2022-08-20'))%>%
-    filter(!(ID=='GB' & flood==1 & Date>'2022-11-01'))%>%
-    filter(!(ID=='LF' & flood==2 & Date>'2023-04-01'))
-  
-  ,
-  
+  ER_flagged %>% fill(flood, .direction = "down") %>% filter(!is.na(ER)),
   ER) %>%
-  anti_join(er.decrease.floods, by = c('ID', 'flood')) %>%
   left_join(ER.base)
 
 # --- Isolate disturbance (|ER| increases during floods) ---------------------
-ER.clean <- prep.max.both.daily(ER.smooth, ER_loess, ER)
-
-ER.cleaner<-ER.clean%>%
-  filter(!(ID=='GB' & flood==7 & count>40))
+ER.clean <- rbind(
+  
+prep.max.both.daily(
+  ER.smooth%>%filter(ID!='AM'), 
+  ER, ER, gap_days = 14)
+,
+prep.max.both.daily(
+  ER.smooth%>%filter(ID=='AM'), 
+  ER_loess, ER_loess, gap_days = 14)%>%
+  group_by(ID, flood)%>%
+  mutate(
+    ER=if_else(ID=='AM' & count>40 & flood==5, NA, ER)
+    )
+)
 
 #Check: clean fit####
-site='IU'
+# ER.clean %>%
+#   filter(ID == 'LF', !is.na(flood)) %>%
+#   ggplot(aes(x = count, y = ER_loess)) +
+#   geom_point(color = 'red') +
+#   geom_point(aes(y = ER), color = 'blue') +
+#   geom_line(aes(y = base)) +
+#   facet_wrap(~flood, scales = 'free')
+# 
+#   ER.smooth %>%
+#     filter(ID == 'AM') %>%
+#     ggplot(aes(x = Date, y = ER)) +
+#     geom_point(color = 'grey60', size = 0.3) +
+#     geom_line(aes(y = ER_loess), color = 'blue') +
+#     geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+#     facet_wrap(~flood, scales = 'free') 
 
-plot_grid(
-  ER.cleaner %>%
-  filter(ID == site, !is.na(flood)) %>%
-  ggplot(aes(x = count, y = ER_loess)) +
-  geom_point(color = 'red') +
-  geom_point(aes(y = ER), color = 'blue') +
-  geom_line(aes(y = depth*15), color = 'black') +
-  geom_line(aes(y = base)) +
-  geom_vline(xintercept=0, color='yellow')+
-  facet_wrap(~flood, scales = 'free')
-,
-  ER.smooth %>%
-    filter(ID == site) %>%
-    ggplot(aes(x = Date, y = ER)) +
-    geom_point(color = 'grey60', size = 0.3) +
-    geom_line(aes(y = ER_loess), color = 'blue') +
-    geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-    geom_line(aes(y = depth*15), color = 'black') +
-    facet_wrap(~flood, scales = 'free') ,
-ncol=1
-)
 # --- Flood bounds -----------------------------------------------------------
 
 flood.bounds<-flood_dates(ER.smooth, ER_loess, direction='max')
@@ -108,8 +95,8 @@ flood.bounds<-flood_dates(ER.smooth, ER_loess, direction='max')
 ER.duration <- duration(flood.bounds)
 
 # --- Recession & rise models ------------------------------------------------
-recession.lm <- fit_recessions(ER.cleaner, ER.base, ER, base.ER)
-rise.lm      <- fit_rise(ER.cleaner,       ER.base, ER, base.ER)
+recession.lm <- fit_recessions(ER.clean, ER.base, ER, base.ER)
+rise.lm      <- fit_rise(ER.clean,       ER.base, ER, base.ER)
 
 # Check: recession fit
 # ER.clean %>%
@@ -139,10 +126,10 @@ ER_trimmed <- ER.smooth %>%
   left_join(
     flood.bounds.join, by = join_by(ID, flood, between(Date, flood.start, flood.end)))%>%
   filter(keep=='Y') %>%
-  dplyr::select(-keep, -flood.start, -flood.end)%>%
+  select(-keep, -flood.start, -flood.end)%>%
   mutate(variable='ER')%>%
   rename(conc=ER, loess=ER_loess)%>%
-  dplyr::select(Date, ID, flood, conc, loess, base, variable)
+  select(Date, ID, flood, conc, loess, base, variable)
 
 write_csv(ER_trimmed, "04_Outputs/flood impacts/ER.flood.df.csv")
 

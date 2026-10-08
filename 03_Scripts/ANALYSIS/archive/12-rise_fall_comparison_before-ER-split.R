@@ -16,10 +16,8 @@ rise_fall <- bind_rows(
   flood.response %>%
     filter(time2peak > 0) %>%
     mutate(
-      rise.slope = if_else(variable == 'ER'  & response.dir == 'increase' & rise.slope < 0, NA_real_, rise.slope),
-      r2.rise    = if_else(variable == 'ER'  & response.dir == 'increase' & rise.slope < 0, NA_real_, r2.rise),
-      rise.slope = if_else(variable == 'ER'  & response.dir == 'decrease' & rise.slope > 0, NA_real_, rise.slope),
-      r2.rise    = if_else(variable == 'ER'  & response.dir == 'decrease' & rise.slope > 0, NA_real_, r2.rise),
+      rise.slope = if_else(variable == 'ER'  & rise.slope < 0, NA_real_, rise.slope),
+      r2.rise    = if_else(variable == 'ER'  & rise.slope < 0, NA_real_, r2.rise),
       rise.slope = if_else(variable == 'CO2' & rise.slope < 0, NA_real_, rise.slope),
       r2.rise    = if_else(variable == 'CO2' & rise.slope < 0, NA_real_, r2.rise),
       rise.slope = if_else(variable == 'GPP' & response.dir == 'decrease' & rise.slope > 0, NA_real_, rise.slope),

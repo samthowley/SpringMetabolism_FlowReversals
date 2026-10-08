@@ -5,7 +5,7 @@ source('03_Scripts/ANALYSIS/17-test helpers.R')
 #
 # Part 1  is there a legacy?
 #   1a  offset.pct.impact ~ 1 + (1|ID): is the post-flood window still shifted vs the pre-flood window?
-#       offset.pct.impact > 0 = still shifted in the flood-response direction (GPP, DO lower; CO2, ER higher)
+#       offset.pct.impact > 0 = still shifted in the flood-response direction (DO lower; CO2 higher; GPP and ER lower or higher depending on the flood, see response.dir)
 #   1b  offset.pct.impact ~ class + h.percent.change + (1|ID): each class mean vs 0, FR vs the others
 #       (class is partly built from DO, so read the DO rows with care)
 #   1c  supporting: recovery R2, lag behind the depth flood (end.lag, peak.lag), flood.recovered

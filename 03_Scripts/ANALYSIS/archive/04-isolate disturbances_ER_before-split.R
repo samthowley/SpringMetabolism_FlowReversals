@@ -1,12 +1,5 @@
 source("03_Scripts/ANALYSIS/00-disturbance isolation functions daily.R")
 
-# |ER| increases during these floods. The floods where |ER| decreases (ID 1-4,
-# LF 3) are analysed in 04-isolate disturbances_ERmin.R, which keeps its own copy
-# of this list; they are left out of the outputs below.
-er.decrease.floods <- tibble(
-  ID    = c('ID', 'ID', 'ID', 'ID', 'LF'),
-  flood = c(1, 2, 3, 4, 3)
-)
 
 # --- Data loading -----------------------------------------------------------
 ER <- read_csv("04_Outputs/combined metabolism methods.csv") %>%
@@ -29,12 +22,8 @@ ER_flagged <- ER %>%
   arrange(ID, Date) %>%
   filter(!is.na(ER))
 # --- Baseline ---------------------------------------------------------------
-# baseline uses the days between floods, so it is computed with every flood and
-# the decreasing floods are dropped afterwards
-ER.base <- baseline(ER_flagged, ER) %>%
-  anti_join(er.decrease.floods, by = c('ID', 'flood'))
-ER.max  <- maximum(ER_flagged, ER) %>%
-  anti_join(er.decrease.floods, by = c('ID', 'flood'))
+ER.base <- baseline(ER_flagged, ER)
+ER.max      <- maximum(ER_flagged, ER)
 
 # --- Smooth -----------------------------------------------------------------
 
@@ -57,7 +46,7 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
 
 
 ER.smooth <- smooth(
-  ER_flagged %>% group_by(ID) %>% fill(flood, .direction = "down") %>% ungroup() %>% filter(!is.na(ER))%>%
+  ER_flagged %>% fill(flood, .direction = "down") %>% filter(!is.na(ER))%>%
     filter(!(ID=='AM' & flood==6 & ER>17))%>%
     filter(!(ID=='OS' & flood==1 & Date<'2022-08-20'))%>%
     filter(!(ID=='GB' & flood==1 & Date>'2022-11-01'))%>%
@@ -66,14 +55,16 @@ ER.smooth <- smooth(
   ,
   
   ER) %>%
-  anti_join(er.decrease.floods, by = c('ID', 'flood')) %>%
   left_join(ER.base)
 
 # --- Isolate disturbance (|ER| increases during floods) ---------------------
 ER.clean <- prep.max.both.daily(ER.smooth, ER_loess, ER)
 
-ER.cleaner<-ER.clean%>%
-  filter(!(ID=='GB' & flood==7 & count>40))
+ER.cleaner<-ER.clean%>% 
+  filter(!(ID=='GB' & flood==7 & count>40))%>%
+  filter(!(ID=='ID' %in% c(1,2,3,4)))%>%
+  filter(!(ID=='LF' & flood==3))%>%
+  filter(!(ID=='ID'& flood==4))
 
 #Check: clean fit####
 site='IU'
@@ -108,8 +99,8 @@ flood.bounds<-flood_dates(ER.smooth, ER_loess, direction='max')
 ER.duration <- duration(flood.bounds)
 
 # --- Recession & rise models ------------------------------------------------
-recession.lm <- fit_recessions(ER.cleaner, ER.base, ER, base.ER)
-rise.lm      <- fit_rise(ER.cleaner,       ER.base, ER, base.ER)
+recession.lm <- fit_recessions(ER.clean, ER.base, ER, base.ER)
+rise.lm      <- fit_rise(ER.clean,       ER.base, ER, base.ER)
 
 # Check: recession fit
 # ER.clean %>%

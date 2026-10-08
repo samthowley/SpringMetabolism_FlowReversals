@@ -1,12 +1,14 @@
 source("03_Scripts/ANALYSIS/00-disturbance isolation functions.R")
 
 # --- Daily prep functions ----------------------------------------------------
-# Gap detection runs on the FULL data (before baseline filter). No second-pass
-# trim_gaps: for daily variables (ER, GPP) the recession/rise naturally
-# terminates at baseline, so the baseline filter itself acts as the endpoint.
-# gap_days controls the minimum missing-data gap that triggers trimming.
+# No trimming: every row in a flood group is kept. These only add
+#   within_baseline, threshold, recovered  (recovery bookkeeping)
+#   count                                  (0 = peak, <0 pre, >0 post)
+#   stage.flood                            ('pre' / 'post')
+# Baseline, gap and depth-date trims were removed; the previous versions are in
+# archive/00-disturbance isolation functions daily_with-trims.R
 
-prep.min.both.daily <- function(df.smooth, variable, variable_loess, gap_days) {
+prep.min.both.daily <- function(df.smooth, variable, variable_loess) {
 
   df.recover <- df.smooth %>%
     group_by(ID, flood) %>%
@@ -17,28 +19,14 @@ prep.min.both.daily <- function(df.smooth, variable, variable_loess, gap_days) {
       recovered       = if_else(within_baseline >= threshold, "recovered", NA_character_)
     )
 
-  clean<-count.min(df.recover, {{variable_loess}}) %>%
+  count.min(df.recover, {{variable_loess}}) %>%
     arrange(ID, flood, Date) %>%
     group_by(ID, flood) %>%
-    filter(
-      {{variable}} < base)%>%
-    mutate(
-      stage.flood     = if_else(count >= 0, 'post', 'pre'),
-      days_since_last = as.numeric(difftime(as.Date(Date), lag(as.Date(Date)), units = "days")),
-      gap_in_post     = stage.flood == 'post' & !is.na(days_since_last) & days_since_last > gap_days,
-      after_first_gap = cumsum(coalesce(gap_in_post, FALSE)) > 0,
-      gap_in_pre      = stage.flood == 'pre'  & !is.na(days_since_last) & days_since_last > gap_days,
-      before_last_gap = rev(cumsum(rev(coalesce(gap_in_pre, FALSE)))) > 0
-    ) %>%
-    filter(
-      #{{variable}} < base,
-      !(after_first_gap & stage.flood == 'post'),
-      !(before_last_gap & stage.flood == 'pre')
-    ) %>%
+    mutate(stage.flood = if_else(count >= 0, 'post', 'pre')) %>%
     ungroup()
 }
 
-prep.max.both.daily <- function(df.smooth, variable, variable_loess, gap_days = 14) {
+prep.max.both.daily <- function(df.smooth, variable, variable_loess) {
 
   df.recover <- df.smooth %>%
     group_by(ID, flood) %>%
@@ -49,23 +37,9 @@ prep.max.both.daily <- function(df.smooth, variable, variable_loess, gap_days = 
       recovered       = if_else(within_baseline <= threshold, "recovered", NA_character_)
     )
 
-  clean<-count.max(df.recover, {{variable_loess}}) %>%
-    
+  count.max(df.recover, {{variable_loess}}) %>%
     arrange(ID, flood, Date) %>%
     group_by(ID, flood) %>%
-    filter(
-      {{variable}} > base)%>%
-    mutate(
-      stage.flood     = if_else(count >= 0, 'post', 'pre'),
-      days_since_last = as.numeric(difftime(as.Date(Date), lag(as.Date(Date)), units = "days")),
-      gap_in_post     = stage.flood == 'post' & !is.na(days_since_last) & days_since_last > gap_days,
-      after_first_gap = cumsum(coalesce(gap_in_post, FALSE)) > 0,
-      gap_in_pre      = stage.flood == 'pre'  & !is.na(days_since_last) & days_since_last > gap_days,
-      before_last_gap = rev(cumsum(rev(coalesce(gap_in_pre, FALSE)))) > 0
-    ) %>%
-    filter(
-      !(after_first_gap & stage.flood == 'post'),
-      !(before_last_gap & stage.flood == 'pre')
-    ) %>%
+    mutate(stage.flood = if_else(count >= 0, 'post', 'pre')) %>%
     ungroup()
 }

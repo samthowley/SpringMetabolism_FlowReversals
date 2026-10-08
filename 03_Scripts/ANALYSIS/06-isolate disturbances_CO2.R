@@ -2,7 +2,7 @@ source("03_Scripts/ANALYSIS/00-disturbance isolation functions hourly.R")
 
 # --- Data loading -----------------------------------------------------------
 
-CO2<-master%>%select(Date, ID, CO2, depth)%>%
+CO2<-master%>%dplyr::select(Date, ID, CO2, depth)%>%
   filter(CO2>600)
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
@@ -13,7 +13,7 @@ CO2_flagged <- CO2 %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
-  select(-start, -end) %>%
+  dplyr::select(-start, -end) %>%
   arrange(ID, Date) %>%
   mutate(
      date = as.Date(Date),
@@ -52,7 +52,18 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
   }) %>% compact() %>% bind_rows()
 }
 
-CO2_flagged<-CO2_flagged %>% fill(flood, .direction = "down")%>% filter(!is.na(CO2), !is.na(Date))
+CO2_flagged<-CO2_flagged %>% fill(flood, .direction = "down")%>% 
+  filter(!is.na(CO2), !is.na(Date))%>%
+  filter(!(ID=='AM' & flood==4 & Date>'2023-10-01'))%>%
+  filter(!(ID=='ID' & flood==2 & Date>'2023-05-01'))%>%
+  filter(!(ID=='OS' & flood==1 & Date>'2022-10-17'))%>%
+  filter(!(ID=='OS' & flood==2 & Date>'2023-05-01'))%>%
+  filter(!(ID=='OS' & flood==3 & Date>'2023-10-01'))
+
+
+
+CO2_flagged%>%filter(ID=='OS' & flood=='3')
+
 CO2.smooth <- smooth(
   CO2_flagged,
   CO2) %>%
@@ -61,24 +72,35 @@ CO2.smooth <- smooth(
 
 CO2.clean <- prep.max.both(CO2.smooth, CO2, CO2_loess)
 
+CO2.cleaner<-CO2.clean%>%
+  filter(!(ID=='GB' & flood=='5'))%>%
+  filter(!(ID=='ID' & flood=='3'))
+
+site='OS'
+
+plot_grid(
 CO2.clean %>%
-  filter(ID =='AM', !is.na(flood)) %>%
+  filter(ID ==site, !is.na(flood)) %>%
   ggplot(aes(x = count, y = CO2_loess)) +
   geom_point(color = 'red') +
   geom_point(aes(y = CO2), color = 'grey60') +
   geom_line(aes(y = base)) +
   #geom_smooth(aes(x = count, y = CO2.daily.max, group = stage.flood), method = 'lm', se = FALSE) +
   facet_wrap(~flood, scales = 'free') +
+  geom_vline(aes(xintercept = 0), color = 'black', linetype = 'dashed') +
   theme_minimal()
-# 
-# # Check: clean fit
-#   CO2.smooth %>%
-#     filter(ID =='OS', flood==1) %>%
-#     ggplot(aes(x = Date, y = CO2)) +
-#     geom_point(color = 'grey60', size = 0.3) +
-#     geom_point(aes(y = CO2_loess), color = 'blue') +
-#     geom_point(aes(y = base), color = 'red', linetype = 'dashed') +
-#     facet_wrap(~flood, scales = 'free') 
+,
+# Check: clean fit
+  CO2.smooth %>%
+    filter(ID ==site) %>%
+    ggplot(aes(x = Date, y = CO2)) +
+    geom_point(color = 'grey60', size = 0.3) +
+    geom_point(aes(y = CO2_loess), color = 'blue') +
+    geom_point(aes(y = depth*1000), color = 'black') +
+    geom_point(aes(y = base), color = 'red', linetype = 'dashed') +
+    facet_wrap(~flood, scales = 'free'),
+ncol=2
+)
 
 # --- Flood bounds -----------------------------------------------------------
 flood.bounds <- flood_dates(CO2.smooth, CO2_loess, direction = 'max')
@@ -119,10 +141,10 @@ CO2_trimmed <- CO2.smooth %>%
   left_join(
     flood.bounds.join, by = join_by(ID, flood, between(Date, flood.start, flood.end)))%>%
   filter(keep=='Y') %>%
-  select(-keep, -flood.start, -flood.end)%>%
+  dplyr::select(-keep, -flood.start, -flood.end)%>%
   mutate(variable='CO2')%>%
   rename(conc=CO2, loess=CO2_loess)%>%
-  select(Date, ID, flood, conc, loess, base, variable)
+  dplyr::select(Date, ID, flood, conc, loess, base, variable)
 
 write_csv(CO2_trimmed, "04_Outputs/flood impacts/CO2.flood.df.csv")
 

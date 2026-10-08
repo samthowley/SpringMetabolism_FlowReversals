@@ -1,15 +1,19 @@
 source("03_Scripts/ANALYSIS/00-disturbance isolation functions daily.R")
 
+gpp.increase.floods <- tibble(
+  ID    = c('ID', 'ID', 'ID', 'IU', 'IU'),
+  flood = c(2, 3, 4, 2, 3)
+)
+
 # --- Data loading -----------------------------------------------------------
 GPP <- read_csv("04_Outputs/combined metabolism methods.csv") %>%
-  select(Date, ID, GPP) %>%
+  dplyr::select(Date, ID, GPP) %>%
   left_join(
     read_csv("02_Clean_data/Chem/depth.csv") %>%
       mutate(Date = as.Date(Date)) %>%
       group_by(ID, Date) %>%
       summarise(depth = mean(depth, na.rm = TRUE), .groups = 'drop')
   )
-
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
@@ -19,17 +23,18 @@ GPP_flagged <- GPP %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
-  select(-start, -end) %>%
+  dplyr::select(-start, -end) %>%
   arrange(ID, Date) %>%
   filter(!is.na(GPP)) %>%
-  mutate(date = as.Date(Date),
-         GPP=if_else(ID=='LF' & flood==2 & GPP<1.2, NA_real_, GPP)
-         )
+  mutate(date = as.Date(Date))
 
 # --- Baseline ---------------------------------------------------------------
-GPP.base <- baseline(GPP_flagged, GPP)
-
-GPP.min <- minimum(GPP_flagged, GPP)
+# computed with every flood (the baseline uses the days between floods), then
+# kept for the increasing floods only
+GPP.base <- baseline(GPP_flagged, GPP) %>%
+  semi_join(gpp.increase.floods, by = c('ID', 'flood'))
+GPP.max  <- maximum(GPP_flagged, GPP) %>%
+  semi_join(gpp.increase.floods, by = c('ID', 'flood'))
 
 # --- Smooth -----------------------------------------------------------------
 fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, min_rows = 5) {
@@ -51,84 +56,68 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
 
 
 GPP.smooth <- smooth(
-  GPP_flagged %>% fill(flood, .direction = "down"),
+  GPP_flagged %>% group_by(ID) %>% fill(flood, .direction = "down") %>% ungroup(),
   GPP) %>%
+  semi_join(gpp.increase.floods, by = c('ID', 'flood')) %>%
   left_join(GPP.base)
 
-# --- Isolate disturbance ----------------------------------------------------
-GPP.clean <- prep.min.both.daily(GPP.smooth, GPP_loess, GPP, 14)%>%
-  mutate(
-    GPP=if_else(ID=='IU' & flood==2 & count>100, NA, GPP),
-    GPP=if_else(ID=='IU' & flood==4 & count>20, NA, GPP)
-  )
+# --- Isolate disturbance (GPP increases during floods) ----------------------
+GPP.clean <- prep.max.both.daily(GPP.smooth, GPP_loess, GPP_loess)
 
+site = 'ID'
 
+plot_grid(
 GPP.smooth %>%
-  filter(ID == 'AM') %>%
+  filter(ID == site, !is.na(flood)) %>%
   ggplot(aes(x = Date, y = GPP)) +
   geom_point(color = 'grey60', size = 0.3) +
   geom_line(aes(y = GPP_loess), color = 'blue') +
   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-  facet_wrap(~flood, scales = 'free')
+  facet_wrap(~flood, scales = 'free'),
 
 GPP.clean %>%
-  filter(ID == 'AM', !is.na(flood)) %>%
+  filter(ID == site, !is.na(flood)) %>%
   ggplot(aes(x = count, y = GPP_loess)) +
   geom_point(color = 'red') +
   geom_point(aes(y = GPP), color = 'blue') +
+  geom_line(aes(y = depth*2), color = 'black') +
   geom_line(aes(y = base)) +
   geom_smooth(aes(x = count, y = GPP, group = stage.flood), method = 'lm', se = FALSE) +
-  facet_wrap(~flood, scales = 'free')
-
-
-
+  facet_wrap(~flood, scales = 'free'),
+ncol = 1
+)
 
 # --- Flood bounds -----------------------------------------------------------
-
-#flood_dates <- function(df, variable)
-GPP.dates<-flood_dates(GPP.smooth, GPP_loess, direction="min")
+GPP.dates <- flood_dates(GPP.smooth, GPP_loess, direction = 'max')
 #plot_flood_dates(GPP.smooth, GPP_loess, GPP.dates)
 
-# --- Minimum, duration ------------------------------------------------------
+# --- Maximum, duration ------------------------------------------------------
 GPP.duration <- duration(GPP.dates)
 
 # --- Recession & rise models ------------------------------------------------
 recession.lm <- fit_recessions(GPP.clean, GPP.base, GPP, base.GPP)
 rise.lm      <- fit_rise(GPP.clean,       GPP.base, GPP, base.GPP)
 
-# Check: recession fit
-GPP.clean %>%
-  filter(ID == 'IU', count>0) %>%
-  ggplot(aes(x = count, y = GPP, color = stage.flood)) +
-  geom_point(size = 0.5) +
-  geom_point(aes(y = GPP_loess), color = 'blue', alpha = 0.4) +
-  geom_line(aes(y = base, color = NULL), color = 'red', linetype = 'dashed') +
-  geom_smooth(aes(x = count, y = GPP, group = stage.flood),
-              method = 'lm', se = FALSE, color = 'darkgreen') +
-  facet_wrap(~flood, scales = 'free') +
-  labs(title = "GPP: recession check (OS)")
-
 # --- Compile outputs --------------------------------------------------------
 flood.impacts.GPP <-
   full_join(recession.lm, GPP.duration) %>%
   full_join(rise.lm,  by = c('ID', 'flood')) %>%
-  full_join(GPP.min,  by = c('ID', 'flood')) %>%
+  full_join(GPP.max,  by = c('ID', 'flood')) %>%
   full_join(GPP.base, by = c('ID', 'flood')) %>%
   mutate(variable = 'GPP')
 
-write_csv(flood.impacts.GPP, "04_Outputs/flood impacts/GPP.csv")
+write_csv(flood.impacts.GPP, "04_Outputs/flood impacts/GPPmax.csv")
 
 
-
-flood.bounds.join<-GPP.dates%>%mutate(keep='Y')
+flood.bounds.join <- GPP.dates %>% mutate(keep = 'Y')
 
 GPP_trimmed <- GPP.smooth %>%
   left_join(
-    flood.bounds.join, by = join_by(ID, flood, between(Date, flood.start, flood.end)))%>%
-  filter(keep=='Y') %>%
-  select(-keep, -flood.start, -flood.end)%>%
-  mutate(variable='GPP')%>%
-  rename(conc=GPP, loess=GPP_loess)%>%
-  select(Date, ID, flood, conc, loess, base, variable)
+    flood.bounds.join, by = join_by(ID, flood, between(Date, flood.start, flood.end))) %>%
+  filter(keep == 'Y') %>%
+  dplyr::select(-keep, -flood.start, -flood.end) %>%
+  mutate(variable = 'GPP') %>%
+  rename(conc = GPP, loess = GPP_loess) %>%
+  dplyr::select(Date, ID, flood, conc, loess, base, variable)
 
-write_csv(GPP_trimmed, "04_Outputs/flood impacts/GPP.flood.df.csv")
+write_csv(GPP_trimmed, "04_Outputs/flood impacts/GPPmax.flood.df.csv")
