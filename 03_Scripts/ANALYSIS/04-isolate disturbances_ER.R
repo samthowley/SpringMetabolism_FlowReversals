@@ -1,11 +1,11 @@
 source("03_Scripts/ANALYSIS/00-disturbance isolation functions daily.R")
 
-# |ER| increases during these floods. The floods where |ER| decreases (ID 1-4,
-# LF 3) are analysed in 04-isolate disturbances_ERmin.R, which keeps its own copy
-# of this list; they are left out of the outputs below.
+# |ER| increases during these floods. The floods where |ER| decreases (AM 1-4,
+# LF 3, ID 4) are analysed in 04-isolate disturbances_ERmin.R, which keeps its own
+# copy of this list; they are left out of the outputs below.
 er.decrease.floods <- tibble(
-  ID    = c('ID', 'ID', 'ID', 'ID', 'LF'),
-  flood = c(1, 2, 3, 4, 3)
+  ID    = c('AM', 'AM', 'AM', 'AM', 'LF', 'ID'),
+  flood = c(1, 2, 3, 4, 3, 4)
 )
 
 # --- Data loading -----------------------------------------------------------

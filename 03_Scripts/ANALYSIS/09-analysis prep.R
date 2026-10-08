@@ -4,7 +4,6 @@ library(tidyverse)
 library(cowplot)
 library(lme4)
 
-
 site_colors <- c(AM = "#E41A1C", GB = "#377EB8", ID = "#4DAF4A",
                  LF = "#984EA3", OS = "#FF7F00", IU = "#A65628")
 
@@ -24,10 +23,10 @@ theme_spring <- function() {
 
 #extract average response##########
 SpC<-read_csv("04_Outputs/flood impacts/SpC.csv")%>%
-  select(ID, flood, minimum)%>%
+  dplyr::select(ID, flood, minimum)%>%
   rename(SpC=minimum)
 pH<-read_csv("04_Outputs/flood impacts/pH.csv")%>%
-  select(ID, flood, minimum)%>%
+  dplyr::select(ID, flood, minimum)%>%
   rename(pH=minimum)
 
 flood.class<-full_join(SpC, pH)%>%
@@ -41,7 +40,7 @@ vulnerability <- data.frame(
 depth <- read_csv("04_Outputs/flood impacts/depth.csv")
 h.percent.change<-depth%>%
   mutate(h.percent.change=(maximum-base)/base*100)%>%
-  select(ID, flood, h.percent.change)%>%
+  dplyr::select(ID, flood, h.percent.change)%>%
   left_join(flood.class)%>%left_join(vulnerability)
 
 
@@ -102,7 +101,7 @@ flood.response<-rbind(declined, increased)%>%
   )%>%
   ungroup()
 
-#write_csv(flood.response, "04_Outputs/flood impacts/flood.response.avg.csv")
+write_csv(flood.response, "04_Outputs/flood impacts/flood.response.avg.csv")
 
 #flood time series###########
 GPP_flood_df <- read_csv("04_Outputs/flood impacts/GPP.flood.df.csv")
@@ -115,12 +114,12 @@ depth_flood_df <- read_csv("04_Outputs/flood impacts/depth.flood.df.csv")
 
 h.per.change.timeseries <- depth_flood_df%>%
   mutate(h.percent.change=(conc-base)/base*100)%>%
-  select(ID, flood, Date, h.percent.change)
+  dplyr::select(ID, flood, Date, h.percent.change)
 
 time.series <- rbind(GPP_flood_df, GPPmax_flood_df, ER_flood_df, ERmin_flood_df, DO_flood_df, CO2_flood_df,depth_flood_df)%>%
   left_join(h.per.change.timeseries)%>%
   left_join(flood.class)%>%
-  left_join(flood.response%>%select(ID, flood, variable, peak.Date)%>%mutate(flood=as.numeric(flood)), by=c("ID", "flood", "variable"))%>%
+  left_join(flood.response%>%dplyr::select(ID, flood, variable, peak.Date)%>%mutate(flood=as.numeric(flood)), by=c("ID", "flood", "variable"))%>%
   mutate(
     Date = as.Date(Date), 
     peak.Date = as.Date(peak.Date),
@@ -139,7 +138,7 @@ time.series <- rbind(GPP_flood_df, GPPmax_flood_df, ER_flood_df, ERmin_flood_df,
 
 
 peak_dates <- read_csv("04_Outputs/flood impacts/peak dates.csv")
-#write_csv(time.series, "04_Outputs/flood impacts/flood.time.series.csv")
+write_csv(time.series, "04_Outputs/flood impacts/flood.time.series.csv")
 
 #needed df##########
 
@@ -202,14 +201,14 @@ floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
 
 analysis <- left_join(
   chem_hourly %>%
-    select(ID, Date, DO, CO2, depth) %>%
+    dplyr::select(ID, Date, DO, CO2, depth) %>%
     mutate(Date = as.Date(Date)) %>%
     group_by(ID, Date) %>%
     summarise(DO    = mean(DO,    na.rm = TRUE),
               CO2   = mean(CO2,   na.rm = TRUE),
               depth = mean(depth, na.rm = TRUE),
               .groups = "drop"),
-  metab %>% rename(Date = Date) %>% select(-depth, -DO, -K600) %>%
+  metab %>% rename(Date = Date) %>% dplyr::select(-depth, -DO, -K600) %>%
     distinct(ID, Date, .keep_all = TRUE) %>%
     mutate(NEP = GPP + ER),
   by = c("Date", "ID"),
@@ -232,7 +231,7 @@ analysis.long<-analysis%>%
     ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS')),
     #class = factor(class, levels = c("HI", "BO", "FR"))
   )%>%
-  left_join(  flood.response%>%select(ID, flood, variable, peak.Date, flood.end, flood.start)
+  left_join(  flood.response%>%dplyr::select(ID, flood, variable, peak.Date, flood.end, flood.start)
   )
 
 

@@ -373,6 +373,10 @@ b <- bp_slopes_df %>%
             fontface = "bold", size = 4, show.legend = FALSE) +
   scale_color_manual(values = class_colors, na.value = "grey70",
                      name = "Dominant flood\nclass (shallow -> deep)") +
+  # inverse hyperbolic sine: linear near 0, log-like for large slopes, keeps the sign
+  scale_y_continuous(transform = scales::transform_asinh(),
+                     breaks = c(-1e5, -1e4, -1e3, -100, -10, -1, 0, 1, 10, 100, 1e3, 1e4, 1e5),
+                     labels = scales::label_comma(drop0trailing = TRUE)) +
   facet_wrap(~variable, scales = "free_y", nrow=1)  +
   theme_spring() +
   theme(legend.position = "right")

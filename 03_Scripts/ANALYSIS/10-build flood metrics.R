@@ -206,3 +206,126 @@ flood.metrics%>%
     n.offset=sum(!is.na(offset)),
     median.depth.diff=median(depth.diff, na.rm=T),
     median.gap.next=median(gap.next, na.rm=T))
+
+
+#rise vs fall comparison########
+# (was script 12) Rise = flood start to peak, fall = peak to recovery.
+# Built from flood.metrics above, so slopes with the wrong sign are already
+# masked together with their R2, and the z-scores are within variable and response.dir.
+phase_colors <- c(Rise = "#d6604d", Fall = "#4393c3")
+
+metric_labels <- c(
+  slope.z = "Slope (z-scored)",
+  r2      = "R²"
+)
+
+rise_fall <- bind_rows(
+
+  flood.metrics %>%
+    filter(time2peak > 0) %>%
+    transmute(ID, flood, variable, class, vulnerable.score,
+              slope.z = rise.slope.z, r2 = r2.rise, phase = "Rise"),
+
+  flood.metrics %>%
+    filter(time.to.recover > 0) %>%
+    transmute(ID, flood, variable, class, vulnerable.score,
+              slope.z = recess.slope.z, r2 = r2.recess, phase = "Fall")
+
+) %>%
+  mutate(
+    phase    = factor(phase,    levels = c("Rise", "Fall")),
+    variable = factor(variable, levels = c("DO", "CO2", "GPP", "ER")),
+    ID       = factor(ID,       levels = c("IU", "ID", "GB", "LF", "AM", "OS")),
+    class    = factor(class,    levels = c("HI", "BO", "FR"))
+  )
+
+rise_fall_long <- rise_fall %>%
+  pivot_longer(
+    cols      = c(slope.z, r2),
+    names_to  = "metric",
+    values_to = "value"
+  ) %>%
+  mutate(metric = factor(metric, levels = c("slope.z", "r2")))
+
+# Table 1: mean slope.z and mean R2 by site and phase
+rise_fall_slope_by_site <- rise_fall %>%
+  filter(!is.na(class)) %>%
+  group_by(ID, variable, phase) %>%
+  summarise(mean_slope_z = mean(slope.z, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = c("variable", "phase"), values_from = "mean_slope_z")
+
+print(rise_fall_slope_by_site)
+
+rise_fall_r2_by_site <- rise_fall %>%
+  filter(!is.na(class)) %>%
+  group_by(ID, variable, phase) %>%
+  summarise(mean_r2 = mean(r2, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = c("variable", "phase"), values_from = "mean_r2")
+
+print(rise_fall_r2_by_site)
+
+# Table 2: mean slope.z and R2 by flood class and phase
+rise_fall_by_class <- rise_fall %>%
+  filter(!is.na(class)) %>%
+  group_by(class, variable, phase) %>%
+  summarise(
+    mean_slope_z = mean(slope.z, na.rm = TRUE),
+    mean_r2      = mean(r2,      na.rm = TRUE),
+    .groups = "drop"
+  )
+
+print(rise_fall_by_class)
+
+# Figure 1: rise vs fall by flood class
+rise_fall_long %>%
+  filter(!is.na(class)) %>%
+  ggplot(aes(x = class, y = value, color = phase)) +
+  geom_boxplot(position = position_dodge(0.8), outlier.shape = NA) +
+  geom_point(
+    aes(shape = ID),
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+    size = 1.5, alpha = 0.7
+  ) +
+  scale_color_manual(name = "Phase", values = phase_colors) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  theme_spring() +
+  facet_grid(metric ~ variable, scales = "free",
+             labeller = labeller(metric = metric_labels)) +
+  theme(axis.title = element_blank())
+
+# Figure 2: rise vs fall by site
+rise_fall_long %>%
+  filter(!is.na(class)) %>%
+  ggplot(aes(x = ID, y = value, color = phase)) +
+  geom_boxplot(position = position_dodge(0.8), outlier.shape = NA) +
+  geom_point(
+    aes(shape = ID),
+    position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8),
+    size = 1.5, alpha = 0.7
+  ) +
+  scale_color_manual(name = "Phase", values = phase_colors) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  theme_spring() +
+  facet_grid(metric ~ variable, scales = "free",
+             labeller = labeller(metric = metric_labels)) +
+  labs(x = "Increasing Flood Vulnerability") +
+  theme(axis.title.y = element_blank())
+
+# Figure 3: slope vs R2, rise vs fall, colored by class
+rise_fall %>%
+  filter(!is.na(class)) %>%
+  ggplot(aes(x = slope.z, y = r2, color = class, shape = phase)) +
+  geom_point(size = 3, alpha = 0.8) +
+  scale_color_manual(name = "Class", values = class_colors) +
+  scale_shape_manual(name = "Phase", values = c(Rise = 16, Fall = 1)) +
+  geom_hline(yintercept = 0.4, linetype = "dashed", color = "gray", linewidth = 1) +
+  annotate(
+    "text", x = -Inf, y = 0.37, label = "Displays Hysteresis",
+    hjust = -0.02, color = "gray40", size = 3, fontface = "italic"
+  ) +
+  facet_wrap(~ variable, scales = "free") +
+  theme_spring() +
+  labs(
+    x = "Slope (z-scored)",
+    y = "R²"
+  )

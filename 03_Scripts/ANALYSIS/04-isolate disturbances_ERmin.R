@@ -5,8 +5,8 @@ source("03_Scripts/ANALYSIS/00-disturbance isolation functions daily.R")
 # fall to the trough, recovery back). The floods where |ER| increases are in
 # 04-isolate disturbances_ER.R, which keeps its own copy of this list.
 er.decrease.floods <- tibble(
-  ID    = c('ID', 'ID', 'ID', 'ID', 'LF'),
-  flood = c(1, 2, 3, 4, 3)
+  ID    = c('AM', 'AM', 'AM', 'AM', 'LF', 'ID'),
+  flood = c(1, 2, 3, 4, 3, 4)
 )
 
 # --- Data loading -----------------------------------------------------------
@@ -59,11 +59,14 @@ fit_loess_by_group <- function(df, y_var, x_var = "t", group_var, span = 0.3, mi
 
 ER.smooth <- smooth(
   ER_flagged %>% group_by(ID) %>% fill(flood, .direction = "down") %>% ungroup() %>%
-    filter(!is.na(ER)),
+    filter(!is.na(ER))%>%
+    filter(!(ID=='AM' & flood==2 & Date>'2023-05-01'))
+  ,
   ER) %>%
   semi_join(er.decrease.floods, by = c('ID', 'flood')) %>%
   left_join(ER.base)
 
+#ER.smooth%>%filter(ID=='AM' & flood=='2')
 # --- Isolate disturbance (|ER| decreases during floods) ---------------------
 ER.clean <- prep.min.both.daily(ER.smooth, ER_loess, ER)
 
