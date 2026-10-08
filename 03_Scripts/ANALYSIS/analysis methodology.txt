@@ -16,7 +16,8 @@ H3  Backwater floods leave lasting (legacy) metabolic effects.
 - Metabolic regime: GPP and |ER| (ER is stored negative; absolute value is used).
 - Raw signal: DO and CO2.
 - GPP, |ER|, DO and CO2 carry equal weight.
-- H1 (breakpoints): DO and CO2 as diel range (daily max minus daily min).
+- H1 (breakpoints): GPP, |ER|, DO and CO2 as daily values vs daily mean depth; DO and CO2
+  are daily means (CO2 readings <= 600 dropped; a day needs 90% of the usual readings).
 - H2 / H3 (flood metrics): DO as daily minimum, CO2 as daily maximum (kept daily).
 - Depth (stage) is the forcing variable.
 
@@ -39,7 +40,8 @@ H3  Backwater floods leave lasting (legacy) metabolic effects.
 Script: 11-breakpoints NEP.R  ->  04_Outputs/breakpoints.csv (site x variable)
 - Fit value ~ depth per site and variable: linear (0 breakpoints), 1 breakpoint,
   2 breakpoints. Keep the simpler model unless the bigger one raises adjusted R2
-  by 0.02 or more. Each segment needs at least 10 days and 5% of the site's days.
+  by 0.05 or more. Each segment needs at least 10 observations and 5% of the site's
+  observations.
 - Pattern label from segment slopes (flat = 95% CI includes 0), e.g. up-down-flat,
   down-flat, or linear (no breakpoint). ER can have three stages.
 - Turn stage = stage at the first peak or trough (GPP peak = likely river water
@@ -67,24 +69,26 @@ Script: 10-build flood metrics.R  ->  04_Outputs/flood impacts/flood_metrics.csv
 
 
 6. H3: LEGACY EFFECTS
-Part 1: is there a legacy?
-- Offset = mean of the first N days after the depth flood ends minus mean of the
-  last N days before it starts, paired by flood (N = 7, parameter window.n in
-  10-build flood metrics.R; check 3 and 14).
+Part 1: do post-flood means differ from pre-flood means?
+- pre = mean of the 7 days before the depth flood starts; post = mean of the first
+  7 days after it ends, paired by flood (N = 7, parameter window.n in
+  10-build flood metrics.R).
+- Difference between means (mean.diff) = post - pre.
+- Percent change (prepost.pct.change) = (post - pre) / pre * 100, i.e. change relative
+  to the pre-flood mean.
+  Positive = higher after the flood than before, negative = lower, 0 = no change.
 - Windows are anchored on the depth flood so they sit at comparable stage
   (depth.pre, depth.post, depth.diff are in the csv). A window is dropped if it
   runs into the neighbouring flood or has fewer than 4 days of data.
-- offset.pct.impact: positive = still shifted in the direction of the flood
-  response (GPP and DO fall during floods, CO2 and ER rise).
 - Do NOT measure against the flood baseline (circular, it is built from
   post-flood days).
-- Model: offset.pct.impact ~ class + stage change + (1|ID). Test each class mean
-  against 0, and compare FR with the others.
+- 1a: prepost.pct.change ~ 1 + (1|ID) per variable: is the average different from 0?
+- 1b: prepost.pct.change ~ class + vulnerable.score + h.percent.change + (1|ID).
+  Each class mean is tested against 0, FR is compared with the others, and the
+  vulnerable.score term says whether the change is bigger at the more disturbed sites.
 - Supporting metrics: R2 of recovery (use n.recess for a minimum n), recession
-  slope, lag behind depth (end.lag, peak.lag), flood.recovered flag.
-Part 2: only if part 1 finds a legacy (prior: about 75% sure there is none)
-- offset.pct.impact ~ vulnerable.score + (1|ID): is it larger at the most
-  disturbed sites?
+  slope, lag behind depth (end.lag, peak.lag), flood.recovered flag. A lag of a
+  few days can be missed by a 7-day mean, so check end.lag as well.
 
 
 7. NOTES AND CAVEATS
@@ -106,7 +110,7 @@ Part 2: only if part 1 finds a legacy (prior: about 75% sure there is none)
 
 8. PARAMETERS (top of each script)
 window.n = 7, min.window = 4 (10-build flood metrics.R)
-min.day.frac = 0.9, floor.frac = 0.10, adj_r2_min_gain = 0.02,
+min.day.frac = 0.9, floor.frac = 0.10, adj_r2_min_gain = 0.05,
 min.seg.frac = 0.05, min.seg.n = 10 (11-breakpoints NEP.R)
 
 
@@ -145,11 +149,12 @@ H2  19: per variable and metric, metric ~ vulnerable.score + h.percent.change + 
     site-mean Spearman check; headline abs.percent.change ~ variable + (1|ID) + (1|flood.id)
     with contrast regime (GPP, ER) minus raw signal (DO, CO2); < 0 = regime less impacted.
     Duration-type metrics drop floods that never recovered (drop.unrecovered).
-H3  20: 1a offset.pct.impact ~ 1 + (1|ID) per variable (Holm across variables);
-    1b offset.pct.impact ~ class + h.percent.change + (1|ID), each class mean vs 0 and FR vs others;
-    1c recovery R2 by class, lags behind depth (end.lag, peak.lag), unrecovered counts;
-    verdict written to H3_verdict.txt. Part 2 (vulnerability) runs only if a legacy is
-    found, or set force.part2 <- TRUE.
+H3  20: 1a prepost.pct.change ~ 1 + (1|ID) per variable (Holm across variables);
+    1b prepost.pct.change ~ class + vulnerable.score + h.percent.change + (1|ID), each class
+    mean vs 0, FR vs others, and the vulnerability term;
+    1c recovery R2 by class, lags behind depth (end.lag, peak.lag), unrecovered counts.
+    Also plots: pre vs post means (ggscatter), percent change by class and by site,
+    and the pre / post window time series. Nothing is written to disk.
 Notes: lmer fits with a random site intercept are often singular with 6 sites (the
 singular column flags it); the vulnerable.score effect rests on 6 sites, so read the CI.
 Class is partly built from DO: treat DO rows in the class models with care.

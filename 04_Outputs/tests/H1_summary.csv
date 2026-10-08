@@ -1,0 +1,5 @@
+variable,n.sites,n.linear,n.one.bp,n.two.bp,n.decline.at.top,n.flat.at.top,n.rise.at.top,n.rise.first,n.with.turn,median.turn.rel,n.halted,median.halt.stage,median.adj.r2,gpp.sign.test.p
+GPP,6,1,2,3,4,2,0,2,3,0.09732488420813584,0,NA,0.1858714452689546,0.34374999999999994
+ER,6,0,2,4,0,0,6,4,5,0.3591018497478514,0,NA,0.44612569968724597,NA
+DO,6,0,2,4,5,1,0,3,5,0.14560733330190517,0,NA,0.42005442753081057,NA
+CO2,5,0,2,3,5,0,0,2,4,0.051040563665874644,0,NA,0.19212031821545184,NA

@@ -34,45 +34,48 @@ if (file.exists(peak_dates.file)) {
 }
 
 # H1: how do GPP, ER, DO and CO2 change with stage?
-#   GPP, ER (|ER|) = daily value; DO, CO2 = daily diel range (max - min)
+#   GPP, ER (|ER|), DO, CO2 = daily value vs daily mean depth
+#   DO and CO2 are daily means (CO2 readings <= 600 are dropped first)
 # Each site x variable gets a linear fit (0 breakpoints), a 1 breakpoint fit and
 # a 2 breakpoint fit; the simplest model that improves the fit enough is kept.
 # Output: 04_Outputs/breakpoints.csv (one row per site x variable)
 
 #parameters########
-min.day.frac    <- 0.9   # a day needs this fraction of the site's usual readings to get a diel range
+min.day.frac    <- 0.9   # a day needs this fraction of the site's usual readings to get a daily mean DO or CO2
 floor.frac      <- 0.10  # GPP counts as halted when the top segment mean is below this fraction of the site's 95th percentile
 fit_criterion   <- "adjR2"   # "adjR2" (default) | "AIC" | "BIC"
-adj_r2_min_gain <- 0.02      # minimum adj-R2 improvement to prefer the more complex model
+adj_r2_min_gain <- 0.05      # minimum adj-R2 improvement to prefer the more complex model
 aic_min_gain    <- 2         # minimum AIC reduction to prefer the more complex model
 min.seg.frac    <- 0.05      # each segment needs at least this fraction of the site's days ...
 min.seg.n       <- 10        # ... and at least this many
 
 #daily data########
-# same CO2 > 600 filter as isolate disturbances_CO2.R
+# daily means of the hourly DO and CO2 (CO2 > 600 filter, same as isolate disturbances_CO2.R),
+# paired with the daily mean depth; GPP and ER are already daily
 daily.chem <- chem_hourly %>%
   mutate(
     Date = as.Date(Date),
     CO2  = if_else(CO2 > 600, CO2, NA_real_)
   ) %>%
+  filter(DO<7)%>%
   group_by(ID, Date) %>%
   summarise(
-    n.DO        = sum(!is.na(DO)),
-    n.CO2       = sum(!is.na(CO2)),
-    DO.diurnal  = if (n.DO == 0)  NA_real_ else max(DO,  na.rm = TRUE) - min(DO,  na.rm = TRUE),
-    CO2.diurnal = if (n.CO2 == 0) NA_real_ else max(CO2, na.rm = TRUE) - min(CO2, na.rm = TRUE),
-    depth       = mean(depth, na.rm = TRUE),
+    n.DO  = sum(!is.na(DO)),
+    n.CO2 = sum(!is.na(CO2)),
+    DO    = mean(DO,  na.rm = TRUE),
+    CO2   = mean(CO2, na.rm = TRUE),
+    depth = mean(depth, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   group_by(ID) %>%
   mutate(
-    DO.diurnal  = if_else(n.DO  >= min.day.frac * median(n.DO[n.DO > 0]),   DO.diurnal,  NA_real_),
-    CO2.diurnal = if_else(n.CO2 >= min.day.frac * median(n.CO2[n.CO2 > 0]), CO2.diurnal, NA_real_)
+    DO  = if_else(n.DO  >= min.day.frac * median(n.DO[n.DO > 0]),   DO,  NA_real_),
+    CO2 = if_else(n.CO2 >= min.day.frac * median(n.CO2[n.CO2 > 0]), CO2, NA_real_)
   ) %>%
   ungroup() %>%
   select(-n.DO, -n.CO2)
 
-df <- daily.chem %>%
+vars.long <- daily.chem %>%
   left_join(
     metab %>%
       distinct(ID, Date, .keep_all = TRUE) %>%
@@ -80,25 +83,17 @@ df <- daily.chem %>%
     by = c("Date", "ID"),
     relationship = "one-to-one"
   ) %>%
-  rename(DO = DO.diurnal, CO2 = CO2.diurnal) %>%
+  pivot_longer(cols = c(GPP, ER, DO, CO2), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(depth), !is.na(value)) %>%
   arrange(ID, Date)
 
 # Join diagnostics
-df %>%
-  group_by(ID) %>%
-  summarise(n_rows  = n(),
-            n_depth = sum(!is.na(depth)),
-            n_DO    = sum(!is.na(DO)),
-            n_CO2   = sum(!is.na(CO2)),
-            n_GPP   = sum(!is.na(GPP)),
-            n_ER    = sum(!is.na(ER)),
-            .groups = "drop") %>%
+vars.long %>%
+  count(ID, variable) %>%
+  pivot_wider(names_from = variable, values_from = n) %>%
   print()
 
-master_long <- df %>%
-  pivot_longer(cols = c(GPP, ER, DO, CO2),
-               names_to = "variable", values_to = "value") %>%
-  filter(!is.na(depth)) %>%
+master_long <- vars.long %>%
   left_join(peak_dates, by = join_by(ID, Date), relationship = "many-to-many") %>%
   arrange(ID, depth)%>%
   group_by(ID)%>%
@@ -170,9 +165,9 @@ bp_slopes <- list()
 bp_summ   <- list()
 
 for (var in c("GPP", "ER", "DO", "CO2")) {
-  dat_v <- df %>%
-    transmute(Date, ID, depth, value = .data[[var]]) %>%
-    filter(!is.na(depth), !is.na(value))
+  dat_v <- vars.long %>%
+    filter(variable == var) %>%
+    select(Date, ID, depth, value)
 
   for (site in unique(dat_v$ID)) {
     sub <- filter(dat_v, ID == site) %>% arrange(depth)
@@ -252,7 +247,7 @@ for (var in c("GPP", "ER", "DO", "CO2")) {
     bp_summ[[key]] <- tibble(
       variable        = var,
       ID              = site,
-      metric          = if_else(var %in% c("DO", "CO2"), "diel range", "daily value"),
+      metric          = if_else(var %in% c("DO", "CO2"), "daily mean", "daily value"),
       n.obs           = nrow(sub),
       depth.min       = min(sub$depth),
       depth.max       = max(sub$depth),

@@ -9,9 +9,6 @@ library(emmeans)
 library(cowplot)
 select <- dplyr::select
 
-#paths########
-dir.create("04_Outputs/tests", showWarnings = FALSE, recursive = TRUE)
-out.dir <- "04_Outputs/tests/"
 
 #site info########
 # vulnerability score, one value per site (increasing = more disturbed)

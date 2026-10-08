@@ -17,7 +17,7 @@ two_station <- read_csv("04_Outputs/two_station.csv")%>%
     kTau = k_O2_perd * travel.time.hr / 24     # dimensionless
   )%>%
   group_by(ID, Date) %>%  
-  select(Date, ID, depth, DO, K600, discharge, GPP, ER, kTau)%>%
+  dplyr::select(Date, ID, depth, DO, K600, discharge, GPP, ER, kTau)%>%
   summarise(across(where(is.numeric), mean, na.rm = TRUE))%>%
     rename(GPP.2=GPP, ER.2=ER, K600.2=K600)%>%
   left_join(SpC,by=c("Date", "ID"))
@@ -32,29 +32,38 @@ two_station.clean<-two_station%>%
     )%>%
   mutate(
      GPP.2=ifelse(ID=='ID' & kTau>1, NA, GPP.2),
-    
-    GPP.2=ifelse(GPP.2<0, NA, GPP.2),
-    ER.2=ifelse(ER.2>0, NA, ER.2),
     ER.2=ifelse(ER.2< -35, NA, ER.2)
-    
   )
 
-# plot_grid(
-#   two_station.clean%>%
-#     ggplot(aes(x=depth, color=kTau))+
-#     geom_point(aes(y=GPP.2))+
-#     scale_color_viridis_b()+
-#     scale_x_log10()+
-#     facet_wrap(~ID, scales='free'),
-#   
-#   
-#   two_station.clean%>%
-#     ggplot(aes(x=depth, color=kTau))+
-#     geom_point(aes(y=ER.2))+
-#     scale_color_viridis_b()+
-#     scale_x_log10()+
-#     facet_wrap(~ID, scales='free')
-# )
+
+two_station.clean%>%
+  mutate(
+    GPP.2=ifelse(GPP.2<0, NA, GPP.2),
+    ER.2=ifelse(ER.2>0, NA, ER.2),
+  )%>%
+  ggplot(aes(x=Date, color=kTau))+
+  geom_point(aes(y=GPP.2))+
+  geom_point(aes(y=ER.2))+
+  scale_color_viridis_b()+
+  #scale_x_log10()+
+  facet_wrap(~ID, scales='free')
+
+plot_grid(
+  two_station.clean%>%
+    ggplot(aes(x=depth, color=kTau))+
+    geom_point(aes(y=GPP.2))+
+    scale_color_viridis_b()+
+    scale_x_log10()+
+    facet_wrap(~ID, scales='free'),
+
+
+  two_station.clean%>%
+    ggplot(aes(x=depth, color=kTau))+
+    geom_point(aes(y=ER.2))+
+    scale_color_viridis_b()+
+    scale_x_log10()+
+    facet_wrap(~ID, scales='free')
+)
 
 
 
@@ -69,13 +78,17 @@ met.coalesce<-both.methods%>%
     ER.coalesce=coalesce(ER.2, ER.1),,
     K600.coalesce=coalesce(K600.2, K600.1),
     
-    
     GPP.coalesce=ifelse(ID=='IU', GPP.1, GPP.coalesce),
     ER.coalesce=ifelse(ID=='IU', ER.1, ER.coalesce),
     K600.coalesce=ifelse(ID=='IU', K600.1, K600.coalesce),
+    
+    
+    GPP.coalesce=ifelse(GPP.2<0, NA, GPP.coalesce),
+    ER.coalesce=ifelse(ER.2>0, NA, ER.coalesce),
+    
   )%>%
   rename(K600=K600.coalesce, GPP=GPP.coalesce, ER=ER.coalesce)%>%
-  select(Date, ID, depth, DO, K600, discharge, GPP, ER)
+  dplyr::select(Date, ID, depth, DO, K600, discharge, GPP, ER)
 
 
 

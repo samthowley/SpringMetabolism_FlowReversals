@@ -5,10 +5,7 @@ source('03_Scripts/ANALYSIS/00-test helpers.R')
 # The breakpoint fits are the test: this script summarises them across sites.
 # With 6 sites, results are counts and a site table, not p-values you can lean on.
 #
-# Outputs (04_Outputs/tests/):
-#   H1_by_site.csv       one row per site x variable, ordered by vulnerability
-#   H1_summary.csv       one row per variable: how many sites show each pattern
-#   H1_stage_thresholds.png
+# Nothing is written to disk: results print in the console, plots in the Plots pane, tables in the Viewer.
 
 #end behaviour at the top of the stage range########
 # the last segment is the one at the highest stage: slope3 if it exists, else slope2, else slope1
@@ -37,12 +34,6 @@ h1.sites <- breakpoints %>%
   ) %>%
   arrange(variable, vulnerable.score)
 
-write_csv(h1.sites %>%
-            select(variable, ID, vulnerable.score, n.obs, depth.min, depth.max,
-                   n.breakpoints, pattern, first.dir, final.dir, bp1, bp2, bp1.rel, bp2.rel,
-                   turn.stage, turn.type, turn.rel, top.level.rel, halted, halting.stage, halt.rel,
-                   adj.r2),
-          paste0(out.dir, "H1_by_site.csv"))
 
 #summary by variable########
 h1.summary <- h1.sites %>%
@@ -74,7 +65,6 @@ if (nrow(gpp) > 0) {
     mutate(gpp.sign.test.p = if_else(variable == "GPP", sign.p, NA_real_))
 }
 
-write_csv(h1.summary, paste0(out.dir, "H1_summary.csv"))
 
 #what H1 says for GPP########
 message("\nH1, GPP by site (ordered by vulnerability):")
@@ -102,5 +92,4 @@ p.thresh <- ggplot(thresh, aes(x = ID, y = stage.rel)) +
   labs(x = "Site (low to high vulnerability)", y = "Breakpoint stage (fraction of site range)") +
   theme_spring()
 
-ggsave(paste0(out.dir, "H1_stage_thresholds.png"), p.thresh, width = 10, height = 3.5, dpi = 200)
-p.thresh
+print(p.thresh)
