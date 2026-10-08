@@ -1,95 +1,81 @@
-source('03_Scripts/ANALYSIS/00-test helpers.R')
+source('03_Scripts/ANALYSIS/09-analysis prep.R')
+library(flextable)
 
-# H1: the metabolic signal becomes less productive with increasing stage, then halts
-# Reads 04_Outputs/breakpoints.csv (one row per site x variable, from script 11).
-# The breakpoint fits are the test: this script summarises them across sites.
-# With 6 sites, results are counts and a site table, not p-values you can lean on.
+# H1: backwater floods decrease spring productivity
 #
-# Nothing is written to disk: results print in the console, plots in the Plots pane, tables in the Viewer.
+# Test: paired t-test, one pair per flood
+#   baseline   = the flood's baseline value (base, from the isolate disturbances scripts)
+#   flood.mean = mean daily value across the flood period (flood.start to flood.end for that variable)
+# Run for each flood class (FR, HI, BO) and for all floods together.
+# The flood is the unit (not the day), so n = number of floods.
+# One-sided: tests whether the flood mean is LOWER than baseline.
 
-#end behaviour at the top of the stage range########
-# the last segment is the one at the highest stage: slope3 if it exists, else slope2, else slope1
-h1.sites <- breakpoints %>%
+#parameters########
+h1.vars     <- 'GPP'     # add 'ER' (|ER|), 'DO' or 'CO2' to run the same test on them
+alternative <- 'less'    # 'less' = flood < baseline; 'two.sided' to test any change
+min.floods  <- 3         # minimum floods in a group to run the test
+
+#one row per flood########
+h1.pairs <- time.series%>%
+  filter(variable %in% h1.vars, !is.na(conc), !is.na(base), !is.na(class))%>%
+  group_by(ID, flood, variable, class)%>%
+  summarise(baseline=first(base), flood.mean=mean(conc), n.days=n(), .groups='drop')%>%
+  mutate(class=as.character(class))
+
+# add an 'All floods' group
+h1.pairs <- bind_rows(h1.pairs, h1.pairs%>%mutate(class='All floods'))%>%
+  mutate(class=factor(class, levels=c('All floods', 'FR', 'HI', 'BO')))
+
+#paired t-test########
+h1.test <- h1.pairs%>%
+  group_by(variable, class)%>%
+  group_modify(~{
+    if (nrow(.x) < min.floods) return(tibble(n.floods=nrow(.x)))
+    tt <- t.test(.x$flood.mean, .x$baseline, paired=TRUE, alternative=alternative)
+    tibble(
+      n.floods=nrow(.x),
+      baseline.mean=mean(.x$baseline),
+      flood.mean=mean(.x$flood.mean),
+      mean.diff=unname(tt$estimate),            # flood - baseline
+      pct.change=mean.diff/baseline.mean*100,
+      t=unname(tt$statistic),
+      df=unname(tt$parameter),
+      p=tt$p.value
+    )
+  })%>%
+  ungroup()
+
+h1.test
+
+#table########
+h1.table <- h1.test%>%
+  mutate(across(c(variable, class), as.character))%>%
+  flextable()%>%
+  set_header_labels(variable='Variable', class='Flood class', n.floods='Floods (n)',
+                    baseline.mean='Baseline mean', flood.mean='Flood mean',
+                    mean.diff='Difference (flood - baseline)', pct.change='% change',
+                    t='t', df='df', p='p')%>%
+  colformat_double(j=c('baseline.mean', 'flood.mean', 'mean.diff', 'pct.change', 't', 'df'), digits=2)%>%
+  colformat_double(j='p', digits=3)%>%
+  set_caption('Table H1: paired t-test, flood mean vs baseline')%>%
+  autofit()
+
+htmltools::html_print(htmltools::tagList(flextable::htmltools_value(h1.table)))
+
+#boxplot########
+h1.plot <- h1.pairs%>%
+  pivot_longer(c(baseline, flood.mean), names_to='period', values_to='value')%>%
   mutate(
-    final.slope = coalesce(slope3, slope2, slope1),
-    final.se    = coalesce(slope3.se, slope2.se, slope1.se),
-    first.slope = slope1,
-    first.se    = slope1.se,
-    # flat = 95% CI includes 0 (same rule as script 11)
-    final.dir = case_when(
-      is.na(final.slope) ~ NA_character_,
-      final.slope < -1.96 * final.se ~ "down",
-      final.slope >  1.96 * final.se ~ "up",
-      TRUE ~ "flat"),
-    first.dir = case_when(
-      is.na(first.slope) ~ NA_character_,
-      first.slope < -1.96 * first.se ~ "down",
-      first.slope >  1.96 * first.se ~ "up",
-      TRUE ~ "flat"),
-    # stage as a fraction of the site's observed range, so sites are comparable
-    bp1.rel  = (bp1 - depth.min) / (depth.max - depth.min),
-    bp2.rel  = (bp2 - depth.min) / (depth.max - depth.min),
-    turn.rel = (turn.stage - depth.min) / (depth.max - depth.min),
-    halt.rel = (halting.stage - depth.min) / (depth.max - depth.min)
-  ) %>%
-  arrange(variable, vulnerable.score)
-
-
-#summary by variable########
-h1.summary <- h1.sites %>%
-  group_by(variable) %>%
-  summarise(
-    n.sites           = n(),
-    n.linear          = sum(n.breakpoints == 0),
-    n.one.bp          = sum(n.breakpoints == 1),
-    n.two.bp          = sum(n.breakpoints == 2),
-    n.decline.at.top  = sum(final.dir == "down", na.rm = TRUE),   # still falling at the highest stage
-    n.flat.at.top     = sum(final.dir == "flat", na.rm = TRUE),
-    n.rise.at.top     = sum(final.dir == "up", na.rm = TRUE),
-    n.rise.first      = sum(first.dir == "up", na.rm = TRUE),      # initial increase (river-water contact?)
-    n.with.turn       = sum(!is.na(turn.stage)),
-    median.turn.rel   = median(turn.rel, na.rm = TRUE),
-    n.halted          = sum(halted %in% TRUE),
-    median.halt.stage = median(halting.stage, na.rm = TRUE),
-    median.adj.r2     = median(adj.r2, na.rm = TRUE),
-    .groups = "drop"
+    period=factor(recode(period, flood.mean='flood'), levels=c('baseline', 'flood')),
+    fill.key=if_else(period=='baseline', 'baseline', as.character(class))
   )
 
-# GPP: do sites decline with stage? exact sign test on the number of sites falling at the top
-# (6 sites at most, so the smallest possible p is 0.03: treat as a count, not strong evidence)
-gpp <- h1.sites %>% filter(variable == "GPP", !is.na(final.dir))
-if (nrow(gpp) > 0) {
-  n.dec <- sum(gpp$final.dir == "down")
-  sign.p <- binom.test(n.dec, nrow(gpp), p = 0.5, alternative = "greater")$p.value
-  h1.summary <- h1.summary %>%
-    mutate(gpp.sign.test.p = if_else(variable == "GPP", sign.p, NA_real_))
-}
-
-
-#what H1 says for GPP########
-message("\nH1, GPP by site (ordered by vulnerability):")
-print(h1.sites %>% filter(variable == "GPP") %>%
-        select(ID, pattern, n.breakpoints, turn.stage, turn.type, halted, halting.stage), n = Inf)
-message("\nH1 summary by variable:")
-print(h1.summary, width = Inf)
-
-#figure: where are the thresholds?########
-# stage of each breakpoint by site, as a fraction of that site's stage range
-thresh <- h1.sites %>%
-  select(variable, ID, bp1.rel, bp2.rel, halted, halt.rel) %>%
-  pivot_longer(c(bp1.rel, bp2.rel), names_to = "bp", values_to = "stage.rel") %>%
-  filter(!is.na(stage.rel)) %>%
-  mutate(bp = recode(bp, bp1.rel = "breakpoint 1", bp2.rel = "breakpoint 2"),
-         halting = (halted %in% TRUE) & coalesce(abs(stage.rel - halt.rel) < 1e-9, FALSE))
-
-p.thresh <- ggplot(thresh, aes(x = ID, y = stage.rel)) +
-  geom_point(aes(shape = bp, fill = halting), size = 3.2, color = "black", stroke = 0.7) +
-  scale_shape_manual(values = c("breakpoint 1" = 21, "breakpoint 2" = 24), name = NULL) +
-  scale_fill_manual(values = c(`FALSE` = "white", `TRUE` = "black"),
-                    name = "GPP halting\nstage", labels = c("no", "yes")) +
-  scale_x_discrete(limits = site.order, drop = FALSE) +
-  facet_wrap(~variable, nrow = 1) +
-  labs(x = "Site (low to high vulnerability)", y = "Breakpoint stage (fraction of site range)") +
+ggplot(h1.plot, aes(x=period, y=value))+
+  geom_line(aes(group=interaction(ID, flood)), color='grey60', alpha=0.6)+   # one line per flood
+  geom_boxplot(aes(fill=fill.key), outlier.shape=NA, alpha=0.6, width=0.55)+
+  geom_point(aes(color=ID), size=1.8)+
+  scale_fill_manual(values=c(class_colors, 'All floods'='grey50'), guide='none')+
+  scale_color_manual(values=site_colors)+
+  facet_grid(variable~class, scales='free_y')+
+  labs(x=NULL, y='Mean daily value', color='Site')+
   theme_spring()
-
-print(p.thresh)
