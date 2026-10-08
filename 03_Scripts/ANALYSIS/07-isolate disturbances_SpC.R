@@ -1,28 +1,28 @@
-source("03_Scripts/ANALYSIS/disturbance isolation functions.R")
+source("03_Scripts/ANALYSIS/00-disturbance isolation functions.R")
 
 # --- Data loading -----------------------------------------------------------
-pH<-master%>%select(Date, ID, depth, pH)
+SpC<-master%>%select(Date, ID, depth, SpC)
 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
 
 # --- Flag flood periods -----------------------------------------------------
-pH_flagged <- pH %>%
+SpC_flagged <- SpC %>%
   left_join(
     floods, by = join_by(ID, between(Date, start, end))
   ) %>%
   select(-start, -end) %>%
   arrange(ID, Date) %>%
-  filter(!is.na(pH))
+  filter(!is.na(SpC))
 
 # --- Baseline and minimum ---------------------------------------------------
-pH.base <- baseline(pH_flagged, pH)
+SpC.base <- baseline(SpC_flagged, SpC)
 
-pH.min <- minimum(pH_flagged, pH)
+SpC.min <- minimum(SpC_flagged, SpC)
 
 # --- Compile outputs --------------------------------------------------------
-flood.impacts.pH <-
-  full_join(pH.min, pH.base, by = c("ID", "flood")) %>%
-  mutate(variable = "pH")
+flood.impacts.SpC <-
+  full_join(SpC.min, SpC.base, by = c("ID", "flood")) %>%
+  mutate(variable = "SpC")
 
-write_csv(flood.impacts.pH, "04_Outputs/flood impacts/pH.csv")
+write_csv(flood.impacts.SpC, "04_Outputs/flood impacts/SpC.csv")

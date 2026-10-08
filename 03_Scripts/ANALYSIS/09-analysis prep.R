@@ -2,7 +2,6 @@ library(ggnewscale)
 library(ggpmisc)
 library(tidyverse)
 library(cowplot)
-library(ggh4x)
 library(lme4)
 
 
@@ -133,7 +132,7 @@ peak_dates <- read_csv("04_Outputs/flood impacts/peak dates.csv")
 
 #needed df##########
 
-metab <- read_csv("04_Outputs/master.metabolism.csv", show_col_types = FALSE) %>%
+metab <- read_csv("04_Outputs/combined metabolism methods.csv", show_col_types = FALSE) %>%
   mutate(Date = as.Date(Date))
 
 chem_hourly <- read_csv("02_Clean_data/master_chem1.csv", show_col_types = FALSE) %>%
@@ -199,7 +198,7 @@ analysis <- left_join(
               CO2   = mean(CO2,   na.rm = TRUE),
               depth = mean(depth, na.rm = TRUE),
               .groups = "drop"),
-  metab %>% rename(Date = Date) %>% select(-depth, -K600) %>%
+  metab %>% rename(Date = Date) %>% select(-depth, -DO, -K600) %>%
     distinct(ID, Date, .keep_all = TRUE) %>%
     mutate(NEP = GPP + ER),
   by = c("Date", "ID"),

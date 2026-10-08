@@ -3,7 +3,6 @@ library(tidyverse)
 library(readxl)
 library(measurements)
 library(dataRetrieval)
-source("03_Scripts/analysis/disturbance isolation functions.R")
 
 ###function####
 PT_formatted <- function(fil) {

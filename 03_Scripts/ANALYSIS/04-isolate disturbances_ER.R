@@ -1,8 +1,8 @@
-source("03_Scripts/ANALYSIS/disturbance isolation functions daily.R")
+source("03_Scripts/ANALYSIS/00-disturbance isolation functions daily.R")
 
 
 # --- Data loading -----------------------------------------------------------
-ER <- read_csv("04_Outputs/master.metabolism.csv") %>%
+ER <- read_csv("04_Outputs/combined metabolism methods.csv") %>%
   select(Date, ID, ER) %>%
   left_join(read_csv("02_Clean_data/Chem/depth.csv")) %>%
   mutate(

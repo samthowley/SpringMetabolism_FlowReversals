@@ -1,4 +1,5 @@
 library(tidyverse)
+library(cowplot)
 
 site_colors <- c(AM = "#E41A1C", GB = "#377EB8", ID = "#4DAF4A",
                  LF = "#984EA3", OS = "#FF7F00", IU = "#A65628")

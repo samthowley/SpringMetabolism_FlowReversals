@@ -1,7 +1,7 @@
 #call in data########
 library(weathermetrics)
 #might be worth seeing if GB has anymore DO data
-source("03_Scripts/analysis/disturbance isolation functions.R")
+source("03_Scripts/ANALYSIS/00-disturbance isolation functions.R")
 
 master <- read_csv("02_Clean_data/master_chem1.csv")%>%
   mutate(
@@ -54,7 +54,7 @@ isolate <- chem %>%
   mutate(
     abs.slope=abs(slope),
     )%>%
-  select(-start_date, -end_date, -day)%>%
+  dplyr::select(-start_date, -end_date, -day)%>%
   arrange(ID, Date)%>%filter(abs.slope>0.01)#%>%filter(abs.slope>0.01)
 
 
@@ -109,7 +109,7 @@ depth_flagged <- master %>%
 depth_flagged%>%
   ggplot(aes(x=Date, y=depth, color=as.factor(flood)))+
   geom_line()+
-  facet_wrap(~ID)
+  facet_wrap(~ID, scale='free')
   
 
 write_csv(flood.periods, "01_Raw_data/flood.periods.csv")

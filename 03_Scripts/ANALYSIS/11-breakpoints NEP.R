@@ -1,7 +1,37 @@
-source('03_Scripts/ANALYSIS/analysis prep.R')
-
+library(tidyverse)
 library(segmented)
+library(cowplot)
 select <- dplyr::select
+
+#plot settings########
+class_colors <- c(BO = "#A65628", FR = "black", HI = "#2171B5", baseline='lightblue')
+
+theme_spring <- function() {
+  theme_bw(base_size = 11) +
+    theme(
+      strip.background  = element_blank(),
+      strip.text        = element_text(face = "bold"),
+      panel.grid.minor  = element_blank(),
+      legend.position   = "bottom"
+    )
+}
+
+#call in data########
+chem_hourly <- read_csv("02_Clean_data/master_chem1.csv", show_col_types = FALSE) %>%
+  mutate(Date = as.POSIXct(Date, tz = "UTC"))
+
+metab <- read_csv("04_Outputs/combined metabolism methods.csv", show_col_types = FALSE) %>%
+  mutate(Date = as.Date(Date))
+
+peak_dates.file <- "04_Outputs/flood impacts/peak dates.csv"
+if (file.exists(peak_dates.file)) {
+  peak_dates <- read_csv(peak_dates.file, show_col_types = FALSE)
+} else {
+  message("peak dates.csv not found: plots will not be coloured by flood class")
+  peak_dates <- tibble(ID = character(),
+                       Date = as.POSIXct(character(), tz = "UTC"),
+                       class = character())
+}
 
 # H1: how do GPP, ER, DO and CO2 change with stage?
 #   GPP, ER (|ER|) = daily value; DO, CO2 = daily diel range (max - min)
@@ -306,7 +336,9 @@ bp_slopes_df <- bp_slopes_df %>%
 
 
 #breakpoint plot########
-(a <- master_long %>%
+
+
+a <- master_long %>%
     mutate(class = factor(class, levels = c("baseline", "HI", "BO", "FR")))%>%
   ggplot(aes(x = depth, y = value)) +
   geom_point(aes(color = class), size = 0.6) +
@@ -323,10 +355,10 @@ bp_slopes_df <- bp_slopes_df %>%
   labs(x = "Depth (m)", y = NULL, color = "Class") +
   theme_spring() +
   theme(axis.text.x = element_text(size = 7),
-        legend.position = 'right'))
+        legend.position = 'right')
 
 
-#slope scatter plot########
+#slope scatter plot#
 # Each point = one segment; colour = dominant flood class for that segment's
 # depth range; label = segment number (shallow -> deep)
 b <- bp_slopes_df %>%

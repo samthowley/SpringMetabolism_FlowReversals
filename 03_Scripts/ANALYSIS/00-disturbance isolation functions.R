@@ -1,4 +1,5 @@
 
+
 library(plotly)
 library(tidyverse)
 library(readxl)
@@ -63,7 +64,7 @@ baseline <- function(flagged, variable) {
 
   full_join(base_tbl, depth_i, by = c("ID", "flood")) %>%
     mutate(base = (base_1 + base_i) / 2) %>%
-    select(flood, ID, base) %>%
+    dplyr::select(flood, ID, base) %>%
     fill(base, .direction = "downup") %>%
     group_by(flood, ID) %>%
     mutate(base = if_else(is.na(base), mean(base, na.rm = TRUE), base))
@@ -75,7 +76,8 @@ baseline <- function(flagged, variable) {
 # is auto-detected: k=72 for hourly data, k=3 for daily data.
 
 .roll_k <- function(dates) {
-  dt_h <- as.numeric(median(diff(as.POSIXct(dates)), na.rm = TRUE)) / 3600
+  dt_h <- as.numeric(median(diff(as.numeric(as.POSIXct(dates))), na.rm = TRUE)) / 3600
+  if (is.na(dt_h) || dt_h <= 0) return(1L)  # single-row group: no step to detect
   as.integer(max(1L, round(72 / dt_h)))
 }
 
@@ -85,13 +87,13 @@ count.min <- function(trim, variable) {
     arrange(Date) %>%
     mutate(
       .k       = .roll_k(Date),
-      roll_avg = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+      roll_avg = zoo::rollapply({{variable}}, width = min(.k[1], n()), FUN = mean,
                                 fill = NA, align = 'center', na.rm = TRUE),
       roll_avg = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
       peak_row = which.min(replace(roll_avg, is.na(roll_avg), Inf)),
       count    = row_number() - peak_row
     ) %>%
-    select(-.k, -roll_avg, -peak_row) %>%
+    dplyr::select(-.k, -roll_avg, -peak_row) %>%
     ungroup()
 }
 
@@ -101,13 +103,13 @@ count.max <- function(trim, variable) {
     arrange(Date) %>%
     mutate(
       .k       = .roll_k(Date),
-      roll_avg = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+      roll_avg = zoo::rollapply({{variable}}, width = min(.k[1], n()), FUN = mean,
                                 fill = NA, align = 'center', na.rm = TRUE),
       roll_avg = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
       peak_row = which.max(replace(roll_avg, is.na(roll_avg), -Inf)),
       count    = row_number() - peak_row
     ) %>%
-    select(-.k, -roll_avg, -peak_row) %>%
+    dplyr::select(-.k, -roll_avg, -peak_row) %>%
     ungroup()
 }
 
@@ -119,7 +121,7 @@ count.min.double <- function(trim, variable) {
     arrange(Date) %>%
     mutate(
       .k        = .roll_k(Date),
-      roll_avg  = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+      roll_avg  = zoo::rollapply({{variable}}, width = min(.k[1], n()), FUN = mean,
                                  fill = NA, align = 'center', na.rm = TRUE),
       roll_avg  = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
       d         = c(NA_real_, diff(roll_avg)),
@@ -130,7 +132,7 @@ count.min.double <- function(trim, variable) {
                           which.min(replace(roll_avg, is.na(roll_avg), Inf))),
       count     = row_number() - peak_row
     ) %>%
-    select(-.k, -roll_avg, -d, -d_next, -local_min, -peak_row) %>%
+    dplyr::select(-.k, -roll_avg, -d, -d_next, -local_min, -peak_row) %>%
     ungroup()
 }
 
@@ -140,7 +142,7 @@ count.max.double <- function(trim, variable) {
     arrange(Date) %>%
     mutate(
       .k        = .roll_k(Date),
-      roll_avg  = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+      roll_avg  = zoo::rollapply({{variable}}, width = min(.k[1], n()), FUN = mean,
                                  fill = NA, align = 'center', na.rm = TRUE),
       roll_avg  = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
       d         = c(NA_real_, diff(roll_avg)),
@@ -151,7 +153,7 @@ count.max.double <- function(trim, variable) {
                           which.max(replace(roll_avg, is.na(roll_avg), -Inf))),
       count     = row_number() - peak_row
     ) %>%
-    select(-.k, -roll_avg, -d, -d_next, -local_max, -peak_row) %>%
+    dplyr::select(-.k, -roll_avg, -d, -d_next, -local_max, -peak_row) %>%
     ungroup()
 }
 
@@ -163,13 +165,13 @@ minimum <- function(df, variable) {
     group_by(ID, flood) %>%
     mutate(
       .k       = .roll_k(Date),
-      roll_avg = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+      roll_avg = zoo::rollapply({{variable}}, width = min(.k[1], n()), FUN = mean,
                                 fill = NA, align = 'center', na.rm = TRUE),
       roll_avg = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
       peak_row = which.min(replace(roll_avg, is.na(roll_avg), Inf))
     ) %>%
     filter(row_number() == peak_row) %>%
-    select(Date, ID, flood, roll_avg) %>%
+    dplyr::select(Date, ID, flood, roll_avg) %>%
     rename(minimum = roll_avg, peak.Date = Date) %>%
     ungroup()
 }
@@ -180,13 +182,13 @@ maximum <- function(df, variable) {
     group_by(ID, flood) %>%
     mutate(
       .k       = .roll_k(Date),
-      roll_avg = zoo::rollapply({{variable}}, width = .k[1], FUN = mean,
+      roll_avg = zoo::rollapply({{variable}}, width = min(.k[1], n()), FUN = mean,
                                 fill = NA, align = 'center', na.rm = TRUE),
       roll_avg = if (all(is.na(roll_avg))) {{variable}} else roll_avg,
       peak_row = which.max(replace(roll_avg, is.na(roll_avg), -Inf))
     ) %>%
     filter(row_number() == peak_row) %>%
-    select(Date, ID, flood, roll_avg) %>%
+    dplyr::select(Date, ID, flood, roll_avg) %>%
     rename(maximum = roll_avg, peak.Date = Date) %>%
     ungroup()
 }
@@ -280,12 +282,12 @@ flood_dates <- function(df, variable, direction = c('min', 'max')) {
 
 trim_to_flood_dates <- function(df, dates) {
   df %>%
-    left_join(select(dates, ID, flood, flood.start, flood.end),
+    left_join(dplyr::select(dates, ID, flood, flood.start, flood.end),
               by = c('ID', 'flood')) %>%
     filter(!is.na(flood.start), !is.na(flood.end),
            as.Date(Date) > flood.start,
            as.Date(Date) < flood.end) %>%
-    select(-flood.start, -flood.end)
+    dplyr::select(-flood.start, -flood.end)
 }
 
 
@@ -321,7 +323,7 @@ fit_recessions <- function(trim, base, variable, base.var) {
     mutate(group_ID = paste0(ID, "_", flood))
 
   formula_str <- paste(as_label(enquo(variable)), "~ count | group_ID")
-  rC <- lmList(as.formula(formula_str), data = prep)
+  rC <- lme4::lmList(as.formula(formula_str), data = prep)
 
   coef(rC) %>%
     as_tibble() %>%
@@ -336,7 +338,7 @@ fit_recessions <- function(trim, base, variable, base.var) {
       by = c("ID", "flood")) %>%
     left_join(base, by = c("ID", "flood")) %>%
     rename(recess.intercept = Intercept, recess.slope = slope, r2.recess = r2) %>%
-    select(-base)
+    dplyr::select(-base)
 }
 
 fit_rise <- function(trim, base, variable, base.var) {
@@ -345,7 +347,7 @@ fit_rise <- function(trim, base, variable, base.var) {
     mutate(group_ID = paste0(ID, "_", flood))
 
   formula_str <- paste(as_label(enquo(variable)), "~ count | group_ID")
-  rC <- lmList(as.formula(formula_str), data = prep)
+  rC <- lme4::lmList(as.formula(formula_str), data = prep)
 
   coef(rC) %>%
     as_tibble() %>%
@@ -360,5 +362,5 @@ fit_rise <- function(trim, base, variable, base.var) {
       by = c("ID", "flood")) %>%
     left_join(base, by = c("ID", "flood")) %>%
     rename(rise.intercept = Intercept, rise.slope = slope, r2.rise = r2) %>%
-    select(-base)
+    dplyr::select(-base)
 }

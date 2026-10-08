@@ -1,7 +1,7 @@
-source("03_Scripts/ANALYSIS/disturbance isolation functions daily.R")
+source("03_Scripts/ANALYSIS/00-disturbance isolation functions daily.R")
 
 # --- Data loading -----------------------------------------------------------
-GPP <- read_csv("04_Outputs/master.metabolism.csv") %>%
+GPP <- read_csv("04_Outputs/combined metabolism methods.csv") %>%
   select(Date, ID, GPP) %>%
   left_join(
     read_csv("02_Clean_data/Chem/depth.csv") %>%
@@ -61,24 +61,26 @@ GPP.clean <- prep.min.both.daily(GPP.smooth, GPP_loess, GPP, 14)%>%
     GPP=if_else(ID=='IU' & flood==2 & count>100, NA, GPP),
     GPP=if_else(ID=='IU' & flood==4 & count>20, NA, GPP)
   )
-# 
-# GPP.clean %>%
-#   filter(ID == 'IU', !is.na(flood)) %>%
-#   ggplot(aes(x = count, y = GPP_loess)) +
-#   geom_point(color = 'red') +
-#   geom_point(aes(y = GPP), color = 'blue') +
-#   geom_line(aes(y = base)) +
-#   geom_smooth(aes(x = count, y = GPP, group = stage.flood), method = 'lm', se = FALSE) +
-#   facet_wrap(~flood, scales = 'free')
-# 
-# 
-# GPP.smooth %>%
-#   filter(ID == 'IU') %>%
-#   ggplot(aes(x = Date, y = GPP)) +
-#   geom_point(color = 'grey60', size = 0.3) +
-#   geom_line(aes(y = GPP_loess), color = 'blue') +
-#   geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
-#   facet_wrap(~flood, scales = 'free')
+
+
+GPP.smooth %>%
+  filter(ID == 'AM') %>%
+  ggplot(aes(x = Date, y = GPP)) +
+  geom_point(color = 'grey60', size = 0.3) +
+  geom_line(aes(y = GPP_loess), color = 'blue') +
+  geom_line(aes(y = base), color = 'red', linetype = 'dashed') +
+  facet_wrap(~flood, scales = 'free')
+
+GPP.clean %>%
+  filter(ID == 'AM', !is.na(flood)) %>%
+  ggplot(aes(x = count, y = GPP_loess)) +
+  geom_point(color = 'red') +
+  geom_point(aes(y = GPP), color = 'blue') +
+  geom_line(aes(y = base)) +
+  geom_smooth(aes(x = count, y = GPP, group = stage.flood), method = 'lm', se = FALSE) +
+  facet_wrap(~flood, scales = 'free')
+
+
 
 
 # --- Flood bounds -----------------------------------------------------------

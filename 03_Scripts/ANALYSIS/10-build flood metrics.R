@@ -1,4 +1,4 @@
-source('03_Scripts/ANALYSIS/analysis prep.R')
+source('03_Scripts/ANALYSIS/09-analysis prep.R')
 
 # One tidy table of flood metrics: one row per site x flood x variable
 # (GPP, ER, DO, CO2). Feeds the H2 and H3 models in the second round.

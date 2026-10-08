@@ -62,11 +62,20 @@ one_station_metabolism <- read_csv("04_Outputs/one.station.metabolism.csv")
 
 both.methods<-full_join(two_station.clean, one_station_metabolism, by=c("Date", "ID"))
 
+
 met.coalesce<-both.methods%>%
   mutate(
     GPP.coalesce=coalesce(GPP.2, GPP.1),
-    ER.coalesce=coalesce(ER.2, ER.1)
-  )
+    ER.coalesce=coalesce(ER.2, ER.1),,
+    K600.coalesce=coalesce(K600.2, K600.1),
+    
+    
+    GPP.coalesce=ifelse(ID=='IU', GPP.1, GPP.coalesce),
+    ER.coalesce=ifelse(ID=='IU', ER.1, ER.coalesce),
+    K600.coalesce=ifelse(ID=='IU', K600.1, K600.coalesce),
+  )%>%
+  rename(K600=K600.coalesce, GPP=GPP.coalesce, ER=ER.coalesce)%>%
+  select(Date, ID, depth, DO, K600, discharge, GPP, ER)
 
 
 
@@ -89,6 +98,25 @@ plot_grid(
   #scale_x_log10()+
   facet_wrap(~ID, scales='free')+
   theme_bw()
+)
+
+
+
+plot_grid(
+  met.coalesce%>%
+    ggplot(aes(x=Date))+
+    geom_point(aes(y=GPP), color='red', shape=1)+
+    #scale_x_log10()+
+    facet_wrap(~ID, scales='free')+
+    theme_bw(),
+  
+  
+  met.coalesce%>%
+    ggplot(aes(x=Date))+
+    geom_point(aes(y=ER), color='red', shape=1)+
+    #scale_x_log10()+
+    facet_wrap(~ID, scales='free')+
+    theme_bw()
 )
 
 

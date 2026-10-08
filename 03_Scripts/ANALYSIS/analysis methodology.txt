@@ -1,6 +1,7 @@
 SPRING METABOLISM DURING BACKWATER FLOODS (FLOW REVERSALS)
 METHODS PLAN - notes from 2026-10-06
-Scripts live in 03_Scripts/ANALYSIS
+Scripts live in 03_Scripts/ANALYSIS and are numbered in run order
+(00- files are helper functions that other scripts source; they are not run on their own).
 
 
 1. HYPOTHESES
@@ -21,7 +22,7 @@ H3  Backwater floods leave lasting (legacy) metabolic effects.
 
 
 3. FLOODS, BASELINE, CLASS
-- Flood periods come from the slope of depth (isolate disturbances.R, writes
+- Flood periods come from the slope of depth (01-isolate disturbances.R, writes
   01_Raw_data/flood.periods.csv).
 - Start / end of each variable's response: smoothed series crosses 0.8x (declines)
   or 1.2x (rises) of baseline for 3 days in a row.
@@ -35,7 +36,7 @@ H3  Backwater floods leave lasting (legacy) metabolic effects.
 
 
 4. H1: STAGE AND THE METABOLIC SIGNAL
-Script: breakpoints NEP.R  ->  04_Outputs/breakpoints.csv (site x variable)
+Script: 11-breakpoints NEP.R  ->  04_Outputs/breakpoints.csv (site x variable)
 - Fit value ~ depth per site and variable: linear (0 breakpoints), 1 breakpoint,
   2 breakpoints. Keep the simpler model unless the bigger one raises adjusted R2
   by 0.02 or more. Each segment needs at least 10 days and 5% of the site's days.
@@ -49,7 +50,7 @@ Script: breakpoints NEP.R  ->  04_Outputs/breakpoints.csv (site x variable)
 
 
 5. H2: TOLERANCE
-Script: build flood metrics.R  ->  04_Outputs/flood impacts/flood_metrics.csv
+Script: 10-build flood metrics.R  ->  04_Outputs/flood impacts/flood_metrics.csv
 (one row per site x flood x variable)
 - Severity metrics: % change from baseline (abs.percent.change to compare across
   variables), duration, duration relative to the depth flood, and
@@ -69,7 +70,7 @@ Script: build flood metrics.R  ->  04_Outputs/flood impacts/flood_metrics.csv
 Part 1: is there a legacy?
 - Offset = mean of the first N days after the depth flood ends minus mean of the
   last N days before it starts, paired by flood (N = 7, parameter window.n in
-  build flood metrics.R; check 3 and 14).
+  10-build flood metrics.R; check 3 and 14).
 - Windows are anchored on the depth flood so they sit at comparable stage
   (depth.pre, depth.post, depth.diff are in the csv). A window is dropped if it
   runs into the neighbouring flood or has fewer than 4 days of data.
@@ -104,16 +105,51 @@ Part 2: only if part 1 finds a legacy (prior: about 75% sure there is none)
 
 
 8. PARAMETERS (top of each script)
-window.n = 7, min.window = 4 (build flood metrics.R)
+window.n = 7, min.window = 4 (10-build flood metrics.R)
 min.day.frac = 0.9, floor.frac = 0.10, adj_r2_min_gain = 0.02,
-min.seg.frac = 0.05, min.seg.n = 10 (breakpoints NEP.R)
+min.seg.frac = 0.05, min.seg.n = 10 (11-breakpoints NEP.R)
 
 
 9. RUN ORDER
-1. Re-run isolate disturbances_GPP, ER, DO, CO2 and depth, all five together
-   (adds flood.recovered, n.rise, n.recess to the flood impact csvs).
-2. build flood metrics.R  (sources analysis prep.R)
-3. breakpoints NEP.R      (sources analysis prep.R)
-4. Round two models read flood_metrics.csv and breakpoints.csv.
-Move to an archive folder once their pieces are covered: rise.R, recovery.R,
-duration.R, peak dates.R.
+01  isolate disturbances.R         flood periods (run first)
+02  isolate disturbances_depth.R   )
+03  isolate disturbances_GPP.R     )  run 02-08 together after 01; they add
+04  isolate disturbances_ER.R      )  flood.recovered, n.rise and n.recess to the
+05  isolate disturbances_DO.R      )  flood impact csvs, and 05 also writes the
+06  isolate disturbances_CO2.R     )  flood class files
+07  isolate disturbances_SpC.R     )
+08  isolate disturbances_pH.R      )
+09  analysis prep.R                sourced by 10, 12 and 13; builds flood.response etc.
+10  build flood metrics.R          -> flood_metrics.csv
+11  breakpoints NEP.R              -> breakpoints.csv (standalone: loads its own data,
+                                   needs only master_chem1.csv and combined metabolism methods.csv)
+17  test helpers.R                shared setup for 18-20 (loads packages and both csvs)
+18  H1 stage and metabolic signal.R   -> tests/H1_by_site.csv, H1_summary.csv, figure
+19  H2 tolerance models.R         -> tests/H2_*.csv, figures
+20  H3 legacy models.R            -> tests/H3_*.csv, H3_verdict.txt, figure
+    18-20 are standalone: they only need flood_metrics.csv and breakpoints.csv
+    (10 and 11 must have been run). Results go to 04_Outputs/tests/.
+12  rise_fall_comparison.R         figures and tables (optional)
+13  perc change.R                  figures and tables (optional)
+14  tables.R                       placeholder
+15  DO_CO2_diurnal_range_vs_depth.R, 16 DO_CO2_vs_depth_scatterplots.R  exploratory
+Round two models read flood_metrics.csv and breakpoints.csv.
+Retired scripts (rise, recovery, duration, peak dates) are in the archive folder.
+
+10. HYPOTHESIS TESTS (scripts 18-20, results in 04_Outputs/tests/)
+H1  18: counts of sites by breakpoint pattern, how many still decline at the top of
+    the stage range, GPP halting sites and halting stage; sign test on GPP decline.
+    With 6 sites this is a count, not a strong test.
+H2  19: per variable and metric, metric ~ vulnerable.score + h.percent.change + (1|ID)
+    (abs % change, log duration, log duration.rel, log severity, log time to recover);
+    site-mean Spearman check; headline abs.percent.change ~ variable + (1|ID) + (1|flood.id)
+    with contrast regime (GPP, ER) minus raw signal (DO, CO2); < 0 = regime less impacted.
+    Duration-type metrics drop floods that never recovered (drop.unrecovered).
+H3  20: 1a offset.pct.impact ~ 1 + (1|ID) per variable (Holm across variables);
+    1b offset.pct.impact ~ class + h.percent.change + (1|ID), each class mean vs 0 and FR vs others;
+    1c recovery R2 by class, lags behind depth (end.lag, peak.lag), unrecovered counts;
+    verdict written to H3_verdict.txt. Part 2 (vulnerability) runs only if a legacy is
+    found, or set force.part2 <- TRUE.
+Notes: lmer fits with a random site intercept are often singular with 6 sites (the
+singular column flags it); the vulnerable.score effect rests on 6 sites, so read the CI.
+Class is partly built from DO: treat DO rows in the class models with care.
