@@ -1,4 +1,4 @@
-source('03_Scripts/ANALYSIS/09-analysis prep.R')
+source('03_Scripts/ANALYSIS/analysis prep/09-analysis prep.R')
 
 # One tidy table of flood metrics: one row per site x flood x variable
 # (GPP, ER, DO, CO2). Feeds the H2 models (script 19).
@@ -70,21 +70,20 @@ flood.metrics <- flood.response%>%
     end.lag=as.numeric(as.Date(flood.end)-flood.end.depth)
   )%>%
   select(
-    ID, flood, variable, response.dir, metric, class, vulnerable.score, h.percent.change,
-    flood.start, flood.end, peak.Date, base, peak.response,
-    percent.change, abs.percent.change, duration, duration.depth, duration.rel,
-    severity,
-    time2peak, time.to.recover, peak.lag, end.lag, flood.recovered,
-    rise.slope, rise.slope.z, r2.rise, n.rise,
-    recess.slope, recess.slope.z, r2.recess, n.recess
+    ID, flood, variable, response.dir, metric, class, vulnerable.score, 
+    
+    h.percent.change,
+    
+    flood.start, flood.end, peak.Date, 
+    
+    base, peak.response,
+    
+    percent.change, abs.percent.change, duration, duration.depth,
+    
+    time2peak, time.to.recover, flood.recovered,
+    recess.slope , r2.recess, 
   )%>%
   arrange(variable, ID, flood)
 
 write_csv(flood.metrics, "04_Outputs/flood impacts/flood_metrics.csv")
 
-#checks########
-flood.metrics%>%count(variable, ID)%>%pivot_wider(names_from = ID, values_from = n)
-flood.metrics%>%count(variable, flood.recovered)
-flood.metrics%>%group_by(variable)%>%summarise(n.floods=n())
-
-names(flood.metrics)

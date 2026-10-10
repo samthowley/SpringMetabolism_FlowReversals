@@ -84,7 +84,6 @@ slopes <- stage.long %>%
   }) %>%
   ungroup()
 
-print(slopes %>% mutate(across(where(is.numeric), ~signif(.x, 3))), n = Inf, width = Inf)
 
 # quick read: direction of the slope by site and class (n floods in brackets)
 slopes %>%

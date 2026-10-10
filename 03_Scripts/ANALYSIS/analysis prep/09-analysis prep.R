@@ -63,28 +63,6 @@ flood.response<-rbind(declined, increased)%>%
          variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
          class = factor(class, levels = c("HI", "BO", "FR"))
          )%>%
-  mutate(
-    recess.slope=if_else(variable =='ER' & response.dir=='increase' & recess.slope>0, NA, recess.slope),
-    r2.recess=if_else(variable =='ER'  & response.dir=='increase' & recess.slope>0, NA, r2.recess),
-
-    recess.slope=if_else(variable =='ER' & response.dir=='decrease' & recess.slope<0, NA, recess.slope),
-    r2.recess=if_else(variable =='ER'  & response.dir=='decrease' & recess.slope<0, NA, r2.recess),
-
-    recess.slope=if_else(variable =='CO2' & recess.slope>0, NA, recess.slope),
-    r2.recess=if_else(variable =='CO2'  & recess.slope>0, NA, r2.recess),
-
-    recess.slope=if_else(variable =='GPP' & response.dir=='decrease' & recess.slope<0, NA, recess.slope),
-    r2.recess=if_else(variable =='GPP' & response.dir=='decrease' & recess.slope<0, NA, r2.recess),
-
-    recess.slope=if_else(variable =='GPP' & response.dir=='increase' & recess.slope>0, NA, recess.slope),
-    r2.recess=if_else(variable =='GPP' & response.dir=='increase' & recess.slope>0, NA, r2.recess),
-
-    recess.slope=if_else(variable=='DO' & recess.slope<0, NA, recess.slope),
-    r2.recess=if_else(variable=='DO' & recess.slope<0, NA, r2.recess),
-
-    time.to.recover = as.numeric(flood.end - peak.Date),
-    time2peak       = as.numeric(difftime(peak.Date, flood.start, units = "days"))
-  )%>%
   group_by(ID, variable)%>%
   arrange(ID, variable, flood.start)%>%
   mutate(
@@ -93,13 +71,8 @@ flood.response<-rbind(declined, increased)%>%
     variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
     ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS'))
   )%>%
-  ungroup()%>%
-  group_by(variable)%>%
-  mutate(
-    recess.slope.z = as.numeric(scale(recess.slope)),
-    rise.slope.z   = as.numeric(scale(rise.slope))
-  )%>%
   ungroup()
+
 
 write_csv(flood.response, "04_Outputs/flood impacts/flood.response.avg.csv")
 
@@ -176,62 +149,62 @@ chem_daily <- chem_hourly %>%
             .groups = "drop") %>%
   rename(Date = day)
 
-vel_daily <- velocity_hourly %>%
-  mutate(day = as.Date(Date)) %>%
-  group_by(ID, day) %>%
-  summarise(velocity = mean(velocity, na.rm = TRUE), .groups = "drop") %>%
-  rename(Date = day)
-
-dis_daily <- discharge_hourly %>%
-  mutate(day = as.Date(Date)) %>%
-  group_by(ID, day) %>%
-  summarise(discharge = mean(discharge, na.rm = TRUE), .groups = "drop") %>%
-  rename(Date = day)
+# vel_daily <- velocity_hourly %>%
+#   mutate(day = as.Date(Date)) %>%
+#   group_by(ID, day) %>%
+#   summarise(velocity = mean(velocity, na.rm = TRUE), .groups = "drop") %>%
+#   rename(Date = day)
+# 
+# dis_daily <- discharge_hourly %>%
+#   mutate(day = as.Date(Date)) %>%
+#   group_by(ID, day) %>%
+#   summarise(discharge = mean(discharge, na.rm = TRUE), .groups = "drop") %>%
+#   rename(Date = day)
 
 # Master daily dataset
-master <- metab %>%
-  left_join(chem_daily,  by = c("Date", "ID")) %>%
-  left_join(vel_daily,   by = c("Date", "ID")) %>%
-  left_join(dis_daily,   by = c("Date", "ID"))
-unique(master$ID)
-
-
+# master <- metab %>%
+#   left_join(chem_daily,  by = c("Date", "ID")) %>%
+#   left_join(vel_daily,   by = c("Date", "ID")) %>%
+#   left_join(dis_daily,   by = c("Date", "ID"))
+# unique(master$ID)
+# 
+# 
 floods <- read_csv("01_Raw_data/flood.periods.csv") %>%
   mutate(start = as.Date(start), end = as.Date(end))
+# 
+# analysis <- left_join(
+#   chem_hourly %>%
+#     dplyr::select(ID, Date, DO, CO2, depth) %>%
+#     mutate(Date = as.Date(Date)) %>%
+#     group_by(ID, Date) %>%
+#     summarise(DO    = mean(DO,    na.rm = TRUE),
+#               CO2   = mean(CO2,   na.rm = TRUE),
+#               depth = mean(depth, na.rm = TRUE),
+#               .groups = "drop"),
+#   metab %>% rename(Date = Date) %>% dplyr::select(-depth, -DO, -K600) %>%
+#     distinct(ID, Date, .keep_all = TRUE) %>%
+#     mutate(NEP = GPP + ER),
+#   by = c("Date", "ID"),
+#   relationship = "one-to-one"
+# ) %>% arrange(ID, Date)%>%
+#   left_join(
+#     floods, by = join_by(ID, between(Date, start, end))
+#   )
 
-analysis <- left_join(
-  chem_hourly %>%
-    dplyr::select(ID, Date, DO, CO2, depth) %>%
-    mutate(Date = as.Date(Date)) %>%
-    group_by(ID, Date) %>%
-    summarise(DO    = mean(DO,    na.rm = TRUE),
-              CO2   = mean(CO2,   na.rm = TRUE),
-              depth = mean(depth, na.rm = TRUE),
-              .groups = "drop"),
-  metab %>% rename(Date = Date) %>% dplyr::select(-depth, -DO, -K600) %>%
-    distinct(ID, Date, .keep_all = TRUE) %>%
-    mutate(NEP = GPP + ER),
-  by = c("Date", "ID"),
-  relationship = "one-to-one"
-) %>% arrange(ID, Date)%>%
-  left_join(
-    floods, by = join_by(ID, between(Date, start, end))
-  )
 
-
-analysis.long<-analysis%>%
-  pivot_longer(
-    cols = c('DO', 'CO2', 'depth', 'GPP', 'ER'),
-    names_to = "variable",
-    values_to='conc'
-  )%>%
-  mutate(
-    flood=as.factor(flood),
-    variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
-    ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS')),
-    #class = factor(class, levels = c("HI", "BO", "FR"))
-  )%>%
-  left_join(  flood.response%>%dplyr::select(ID, flood, variable, peak.Date, flood.end, flood.start)
-  )
-
+# analysis.long<-analysis%>%
+#   pivot_longer(
+#     cols = c('DO', 'CO2', 'depth', 'GPP', 'ER'),
+#     names_to = "variable",
+#     values_to='conc'
+#   )%>%
+#   mutate(
+#     flood=as.factor(flood),
+#     variable = factor(variable, levels = c("depth", "DO", "CO2", 'GPP', 'ER')),
+#     ID = factor(ID, levels = c("IU", "ID", "GB", 'LF', 'AM', 'OS')),
+#     #class = factor(class, levels = c("HI", "BO", "FR"))
+#   )%>%
+#   left_join(  flood.response%>%dplyr::select(ID, flood, variable, peak.Date, flood.end, flood.start)
+#   )
+# 
 

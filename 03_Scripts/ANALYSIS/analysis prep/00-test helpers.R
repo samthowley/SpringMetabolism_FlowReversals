@@ -17,7 +17,7 @@ site.order    <- names(vulnerability)
 
 site_colors <- c(AM = "#E41A1C", GB = "#377EB8", ID = "#4DAF4A",
                  LF = "#984EA3", OS = "#FF7F00", IU = "#A65628")
-class_colors <- c(FR = "#1B9E77", HI = "#7570B3", BO = "#D95F02")
+class_colors <- c(BO = "#A65628", FR = "black", HI = "#2171B5", baseline='lightblue')
 var.order <- c("GPP", "ER", "DO", "CO2")   # regime first, then raw signal
 
 theme_spring <- function() {
